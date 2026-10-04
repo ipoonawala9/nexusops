@@ -10,7 +10,7 @@ services:
       NEXUSOPS_OWNER_PASSWORD: ${DB_OWNER_PASSWORD:-nexusops_owner_local}
       NEXUSOPS_APP_PASSWORD: ${DB_APP_PASSWORD:-nexusops_app_local}
     ports:
-      - "${POSTGRES_PORT:-5433}:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./postgres/init:/docker-entrypoint-initdb.d:ro
@@ -23,7 +23,7 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "${REDIS_PORT:-6380}:6379"
+      - "127.0.0.1:${REDIS_PORT:-6380}:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -33,8 +33,8 @@ services:
   mailpit:
     image: axllent/mailpit:latest
     ports:
-      - "${MAILPIT_SMTP_PORT:-1025}:1025"
-      - "${MAILPIT_UI_PORT:-8025}:8025"
+      - "127.0.0.1:${MAILPIT_SMTP_PORT:-1025}:1025"
+      - "127.0.0.1:${MAILPIT_UI_PORT:-8025}:8025"
 
   backend:
     profiles: [app]
@@ -50,7 +50,7 @@ services:
       MAIL_HOST: mailpit
       MAIL_PORT: "1025"
     ports:
-      - "${BACKEND_PORT:-8081}:8080"
+      - "127.0.0.1:${BACKEND_PORT:-8081}:8080"
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
@@ -59,14 +59,14 @@ services:
     profiles: [app]
     build: ../../frontend
     ports:
-      - "3000:8080"
+      - "127.0.0.1:3000:8080"
     depends_on: [backend]
 
   ai-service:
     profiles: [app]
     build: ../../ai-service
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
 
 volumes:
   pgdata:

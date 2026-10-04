@@ -63,6 +63,12 @@ jobs:
           ignore-unfixed: true
           exit-code: "1"
 
+  infra-config:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: infra/docker/tests/check-loopback-ports.sh
+
   dependency-review:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
