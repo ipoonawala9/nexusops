@@ -6,3 +6,17 @@
 .env
 .env.*
 !.env.example
+.superpowers/
+
+# build outputs
+backend/build/
+backend/.gradle/
+frontend/node_modules/
+frontend/dist/
+frontend/test-results/
+frontend/playwright-report/
+ai-service/.venv/
+ai-service/**/__pycache__/
+ai-service/.pytest_cache/
+ai-service/.ruff_cache/
+*.egg-info/
