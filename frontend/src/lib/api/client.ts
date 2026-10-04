@@ -33,13 +33,18 @@ export interface ApiClientOptions {
   fetchImpl?: typeof fetch
 }
 
+export interface RequestOptions {
+  /** Never try a token refresh for this request (auth endpoints, including refresh itself). */
+  skipAuthRefresh?: boolean
+}
+
 export interface ApiClient {
-  request<T>(path: string, init?: RequestInit): Promise<T>
-  get<T>(path: string): Promise<T>
-  post<T>(path: string, body?: unknown): Promise<T>
-  put<T>(path: string, body?: unknown): Promise<T>
-  patch<T>(path: string, body?: unknown): Promise<T>
-  del<T>(path: string): Promise<T>
+  request<T>(path: string, init?: RequestInit, options?: RequestOptions): Promise<T>
+  get<T>(path: string, options?: RequestOptions): Promise<T>
+  post<T>(path: string, body?: unknown, options?: RequestOptions): Promise<T>
+  put<T>(path: string, body?: unknown, options?: RequestOptions): Promise<T>
+  patch<T>(path: string, body?: unknown, options?: RequestOptions): Promise<T>
+  del<T>(path: string, options?: RequestOptions): Promise<T>
 }
 
 export function createApiClient(options: ApiClientOptions): ApiClient {
@@ -68,10 +73,18 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
     return doFetch(`${options.baseUrl}${path}`, { ...init, headers, credentials: 'include' })
   }
 
-  async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
-    let response = await send(path, init, options.tokens.get())
-    if (response.status === 401) {
-      const newToken = await refreshOnce()
+  async function request<T>(
+    path: string,
+    init: RequestInit = {},
+    requestOptions: RequestOptions = {},
+  ): Promise<T> {
+    const sentToken = options.tokens.get()
+    let response = await send(path, init, sentToken)
+    // Only an expired/invalid *sent* token is worth refreshing; anonymous 401s (bad login) are final.
+    if (response.status === 401 && sentToken && !requestOptions.skipAuthRefresh) {
+      const current = options.tokens.get()
+      // Another request may already have refreshed while this one was in flight.
+      const newToken = current && current !== sentToken ? current : await refreshOnce()
       if (newToken) {
         options.tokens.set(newToken)
         response = await send(path, init, newToken)
@@ -87,16 +100,21 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
 
   const withBody =
     (method: string) =>
-    <T>(path: string, body?: unknown) =>
-      request<T>(path, { method, body: body === undefined ? undefined : JSON.stringify(body) })
+    <T>(path: string, body?: unknown, requestOptions?: RequestOptions) =>
+      request<T>(
+        path,
+        { method, body: body === undefined ? undefined : JSON.stringify(body) },
+        requestOptions,
+      )
 
   return {
     request,
-    get: <T>(path: string) => request<T>(path),
+    get: <T>(path: string, requestOptions?: RequestOptions) => request<T>(path, {}, requestOptions),
     post: withBody('POST'),
     put: withBody('PUT'),
     patch: withBody('PATCH'),
-    del: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
+    del: <T>(path: string, requestOptions?: RequestOptions) =>
+      request<T>(path, { method: 'DELETE' }, requestOptions),
   }
 }
 
