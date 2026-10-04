@@ -1,0 +1,4 @@
+# Connection properties are supplied by IntegrationTestSupport (Testcontainers).
+logging:
+  level:
+    org.testcontainers: WARN

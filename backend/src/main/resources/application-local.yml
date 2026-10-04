@@ -1,0 +1,5 @@
+spring:
+  datasource:
+    password: ${DB_APP_PASSWORD:nexusops_app_local}
+  flyway:
+    password: ${DB_OWNER_PASSWORD:nexusops_owner_local}
