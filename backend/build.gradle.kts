@@ -60,3 +60,7 @@ tasks.withType<Test> {
 tasks.named<BootRun>("bootRun") {
     systemProperty("spring.profiles.active", System.getenv("SPRING_PROFILES_ACTIVE") ?: "local")
 }
+
+tasks.named<Jar>("jar") {
+    enabled = false
+}

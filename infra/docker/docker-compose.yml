@@ -36,5 +36,37 @@ services:
       - "${MAILPIT_SMTP_PORT:-1025}:1025"
       - "${MAILPIT_UI_PORT:-8025}:8025"
 
+  backend:
+    profiles: [app]
+    build: ../../backend
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      SERVER_PORT: "8080"
+      DB_URL: jdbc:postgresql://postgres:5432/nexusops
+      DB_APP_PASSWORD: ${DB_APP_PASSWORD:-nexusops_app_local}
+      DB_OWNER_PASSWORD: ${DB_OWNER_PASSWORD:-nexusops_owner_local}
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      MAIL_HOST: mailpit
+      MAIL_PORT: "1025"
+    ports:
+      - "${BACKEND_PORT:-8081}:8080"
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  frontend:
+    profiles: [app]
+    build: ../../frontend
+    ports:
+      - "3000:8080"
+    depends_on: [backend]
+
+  ai-service:
+    profiles: [app]
+    build: ../../ai-service
+    ports:
+      - "8000:8000"
+
 volumes:
   pgdata:

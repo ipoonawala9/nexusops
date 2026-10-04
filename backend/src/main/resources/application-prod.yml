@@ -2,3 +2,10 @@ logging:
   structured:
     format:
       console: ecs
+
+# API docs are served in local/staging only; production does not advertise its API surface.
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
