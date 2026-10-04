@@ -21,6 +21,12 @@ repositories {
 
 extra["springModulithVersion"] = "2.1.1"
 
+// Security overrides of Spring Boot 4.1.1-managed versions (Trivy, 2026-10-04).
+// Remove each once the Boot BOM ships the same or newer version.
+extra["tomcat.version"] = "11.0.25" // CVE-2026-65182 (critical)
+extra["jackson-bom.version"] = "3.1.7" // CVE-2026-89407, CVE-2026-68497
+extra["jackson-2-bom.version"] = "2.21.7" // CVE-2026-89407, CVE-2026-68497
+
 dependencies {
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
