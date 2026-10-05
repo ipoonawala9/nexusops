@@ -127,6 +127,8 @@ public class UserAdminService {
         if (!added.isEmpty()) {
             authorization.checkGrantable(added);
         }
+        // User's @Version is part of the last-owner invariant: the decision below uses a snapshot read before the
+        // owner lock, and a concurrent change to this user fails the version check at flush.
         UUID ownerRole = authorization.ownerRoleId();
         if (removed.contains(ownerRole)) {
             authorization.requireOwnerActor();
@@ -149,6 +151,8 @@ public class UserAdminService {
         if (user.getId().equals(actor.userId())) {
             throw ApiProblem.conflict("You can't disable your own account.");
         }
+        // User's @Version is part of the last-owner invariant: the decision below uses a snapshot read before the
+        // owner lock, and a concurrent change to this user fails the version check at flush.
         UUID ownerRole = authorization.ownerRoleId();
         if (user.getRoleIds().contains(ownerRole)) {
             authorization.requireOwnerActor();
@@ -164,6 +168,9 @@ public class UserAdminService {
     }
 
     private void enable(User user) {
+        if (user.getRoleIds().contains(authorization.ownerRoleId())) {
+            authorization.requireOwnerActor();
+        }
         locks.lock("seats");
         Integer maxUsers = tenants.currentLimits().maxUsers();
         if (maxUsers != null

@@ -184,6 +184,17 @@ class UserAdminIT extends IntegrationTestSupport {
     }
 
     @Test
+    void onlyOwnersCanReEnableAnOwner() throws Exception {
+        UUID coOwner = userId(members.create(ws.tenantId(), Set.of(ownerRole)).email());
+        setStatus(owner, coOwner, "DISABLED").andExpect(status().isOk());
+        UUID disabler = TestRoles.create(mvc, owner, "Disabler", "identity.user.disable", "identity.user.read");
+        Session member = TestTenants.login(mvc, members.create(ws.tenantId(), Set.of(disabler)));
+        setStatus(member, coOwner, "ACTIVE").andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.detail").value(OWNER_ONLY));
+        setStatus(owner, coOwner, "ACTIVE").andExpect(status().isOk());
+    }
+
+    @Test
     void enablingRespectsTheSeatLimit() throws Exception {
         OwnerJdbc.jdbc().update("update tenants set plan_code = 'FREE' where id = ?", ws.tenantId());
         members.create(ws.tenantId(), Set.of(support));
