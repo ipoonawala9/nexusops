@@ -1,55 +1,58 @@
-package com.nexusops.identity.security;
+package com.nexusops.platform.security;
 
+import com.nexusops.platform.PlatformProperties;
 import com.nexusops.shared.security.ProblemDetailSecurityHandlers;
 import com.nexusops.shared.web.PublicEndpoints;
+import com.nimbusds.jose.jwk.RSAKey;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+import org.springframework.core.annotation.Order;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
 
-/** Stateless, deny-by-default; JWT bearer auth; principal state checked on every request. */
+/**
+ * The platform security chain (ADR-0007): ordered before the tenant chain and matching only /api/v1/platform/**.
+ * Its JWT decoder accepts only platform-audience tokens; the tenant chain's decoder accepts only tenant tokens.
+ */
 @Configuration(proxyBeanMethods = false)
-@org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication(type = org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication.Type.SERVLET)
-@EnableMethodSecurity
-public class SecurityConfig {
+@ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
+class PlatformSecurityConfig {
 
-    public static final String[] INFRA_PUBLIC_PATHS = {
-        "/actuator/health", "/actuator/health/**", "/actuator/info",
-        "/v3/api-docs", "/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**",
-        "/error"
-    };
+    static final String PLATFORM_PATHS = "/api/v1/platform/**";
 
     @Bean
-    @org.springframework.core.annotation.Order(2)
-    SecurityFilterChain apiSecurity(HttpSecurity http, ProblemDetailSecurityHandlers handlers,
-            PrincipalFilter principalFilter) throws Exception {
-        http.csrf(AbstractHttpConfigurer::disable)
+    @Order(1)
+    SecurityFilterChain platformSecurity(HttpSecurity http, ProblemDetailSecurityHandlers handlers,
+            PlatformPrincipalFilter principalFilter, RSAKey jwtRsaKey, PlatformProperties properties,
+            @Value("${nexusops.security.jwt.issuer}") String issuer) throws Exception {
+        http.securityMatcher(PLATFORM_PATHS)
+                .csrf(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)
                 .logout(AbstractHttpConfigurer::disable)
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(INFRA_PUBLIC_PATHS).permitAll()
                         .requestMatchers(PublicEndpoints.matchers()).permitAll()
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth -> oauth
-                        .bearerTokenResolver(new PublicRouteAwareBearerTokenResolver())
+                        .bearerTokenResolver(new PlatformBearerTokenResolver())
                         .authenticationEntryPoint(handlers)
                         .accessDeniedHandler(handlers)
-                        .jwt(jwt -> {}))
+                        .jwt(jwt -> jwt.decoder(PlatformJwt.decoder(jwtRsaKey, issuer, properties.audience()))))
                 .exceptionHandling(e -> e.authenticationEntryPoint(handlers).accessDeniedHandler(handlers))
                 .addFilterAfter(principalFilter, BearerTokenAuthenticationFilter.class);
         return http.build();
     }
 
-    /** PrincipalFilter belongs to the security chain only — not also to the servlet filter chain. */
+    /** PlatformPrincipalFilter belongs to the platform security chain only, not the servlet filter chain. */
     @Bean
-    FilterRegistrationBean<PrincipalFilter> principalFilterServletRegistration(PrincipalFilter filter) {
+    FilterRegistrationBean<PlatformPrincipalFilter> platformPrincipalFilterServletRegistration(PlatformPrincipalFilter filter) {
         var registration = new FilterRegistrationBean<>(filter);
         registration.setEnabled(false);
         return registration;
