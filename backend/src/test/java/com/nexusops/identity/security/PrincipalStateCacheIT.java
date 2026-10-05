@@ -25,7 +25,8 @@ class PrincipalStateCacheIT extends IntegrationTestSupport {
     @Test
     void writeWithTheCurrentGenerationLands() {
         String key = PrincipalStateCache.key(tenant, user);
-        assertThat(cache.storeIfGeneration(key, PrincipalStateCache.generationKey(tenant, user), "0", "{}")).isTrue();
+        assertThat(cache.storeIfGeneration(key, PrincipalStateCache.generationKey(tenant, user), "0",
+                PrincipalStateCache.tenantGenerationKey(tenant), "0", "{}")).isTrue();
         assertThat(redis.opsForValue().get(key)).isEqualTo("{}");
     }
 
@@ -34,9 +35,20 @@ class PrincipalStateCacheIT extends IntegrationTestSupport {
         String key = PrincipalStateCache.key(tenant, user);
         String seen = "0"; // generation read by a request before it loaded state from the DB
         cache.evict(tenant, user); // a concurrent logout-all / disable / role change
-        assertThat(cache.storeIfGeneration(key, PrincipalStateCache.generationKey(tenant, user), seen, "{\"stale\":true}"))
+        assertThat(cache.storeIfGeneration(key, PrincipalStateCache.generationKey(tenant, user), seen,
+                PrincipalStateCache.tenantGenerationKey(tenant), "0", "{\"stale\":true}"))
                 .isFalse();
         assertThat(redis.opsForValue().get(key)).isNull();
+    }
+
+    @Test
+    void inFlightMissIsDiscardedAfterTenantEvictionEvenWithNoEntryToScan() {
+        String key = PrincipalStateCache.key(tenant, user);
+        // request missed the cache: no entry existed, so SCAN will find nothing to bump
+        cache.evictTenant(tenant);
+        assertThat(cache.storeIfGeneration(key, PrincipalStateCache.generationKey(tenant, user), "0",
+                PrincipalStateCache.tenantGenerationKey(tenant), "0", "{\"stale\":true}")).isFalse();
+        assertThat(redis.hasKey(key)).isFalse();
     }
 
     @Test
