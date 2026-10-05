@@ -37,6 +37,11 @@ class GlobalExceptionHandlerTest {
             throw new AccessDeniedException("nope");
         }
 
+        @GetMapping("/conflict")
+        String conflict() {
+            throw com.nexusops.shared.web.ApiProblem.conflictField("slug", "Workspace URL is already taken.");
+        }
+
         @PostMapping("/validate")
         String validate(@Valid @RequestBody Payload payload) {
             return payload.name();
@@ -88,6 +93,17 @@ class GlobalExceptionHandlerTest {
     void malformedJsonIs400() throws Exception {
         mvc.perform(post("/validate").contentType(MediaType.APPLICATION_JSON).content("{not json"))
                 .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.requestId").exists());
+    }
+
+    @Test
+    void apiProblemMapsToItsStatusWithFieldErrors() throws Exception {
+        mvc.perform(get("/conflict"))
+                .andExpect(status().isConflict())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.title").value("Conflict"))
+                .andExpect(jsonPath("$.errors[0].field").value("slug"))
+                .andExpect(jsonPath("$.errors[0].message").value("Workspace URL is already taken."))
                 .andExpect(jsonPath("$.requestId").exists());
     }
 }

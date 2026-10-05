@@ -36,6 +36,17 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return problem(HttpStatus.UNAUTHORIZED, "Unauthorized", "Authentication is required.");
     }
 
+    @ExceptionHandler(ApiProblem.class)
+    ResponseEntity<ProblemDetail> handleApiProblem(ApiProblem ex) {
+        ProblemDetail problem = ProblemDetails.of(ex.status(), ex.status().getReasonPhrase(), ex.getMessage());
+        if (!ex.errors().isEmpty()) {
+            problem.setProperty("errors", ex.errors().stream()
+                    .map(e -> Map.of("field", e.field(), "message", e.message()))
+                    .toList());
+        }
+        return ResponseEntity.status(ex.status()).body(problem);
+    }
+
     @ExceptionHandler(Exception.class)
     ResponseEntity<ProblemDetail> handleUnexpected(Exception ex) {
         log.error("Unhandled exception", ex);
