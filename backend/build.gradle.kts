@@ -64,6 +64,7 @@ dependencyManagement {
 
 tasks.withType<Test> {
     useJUnitPlatform()
+    systemProperty("openapi.export", System.getProperty("openapi.export") ?: "false")
 }
 
 tasks.named<BootRun>("bootRun") {

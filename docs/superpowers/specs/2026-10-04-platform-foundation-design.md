@@ -251,3 +251,13 @@ Exceeding a limit returns 429 ProblemDetail + `Retry-After`. Limits are configur
 - every success criterion in §1 is demonstrated by a passing command or test;
 - the OpenAPI spec has been exported to `docs/api/openapi.json`;
 - the README quick start works from a clean clone.
+
+## 15. Deltas adopted in Plan 2
+
+1. **RLS is created in the same migration as each table**, instead of in a separate `V5__rls.sql`. That way no table ever exists without RLS.
+2. **Join tables use policies instead of composite foreign keys.** `role_permissions` and `user_roles` carry no `tenant_id`. Their RLS policies require the referenced role and user to be visible under the current tenant. This gives the same guarantee as composite FKs, because a cross-tenant row is invisible and can't be inserted.
+3. **`app.tenant_id` is set at the session level on connection checkout**, not with `SET LOCAL` per transaction. Every checkout overwrites it, so it can't carry over between users of the pool. `TenantContext` refuses to switch tenant while a transaction is active. ADR-0002 is updated in Task 11.
+4. **`audit_events` rows may have a NULL `tenant_id`.** This covers pre-tenant events such as a login to an unknown workspace. Insert is allowed when the row is NULL or matches the current tenant; select only returns current-tenant rows.
+5. **Added `POST /auth/resend-verification`.** It always returns 202, so it can't be used to discover accounts. Without it, a lost email leaves the workspace stuck.
+6. **Principal cache TTL is 60 s instead of 5 min.** It is explicitly evicted on every user, role or tenant change. The short TTL bounds how stale it can get if an eviction is missed.
+7. **Refresh-reuse grace window of 10 s.** Re-presenting a token that was rotated less than 10 s ago returns 401 *without* revoking the family. Two browser tabs share one cookie jar, so the losing tab's next attempt carries the new cookie. Any reuse after the grace window revokes the whole family and is audited.
