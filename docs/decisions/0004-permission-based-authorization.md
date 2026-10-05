@@ -17,6 +17,9 @@
     `PUT /roles/{id}/permissions` and `DELETE /roles/{id}`, the target role's *current* permissions must be a subset
     of the actor's grantable permissions, otherwise 403 "You can't change a role with permissions you don't have."
     (PUT also still requires the *new* set to be grantable);
+  - a user can't disable, re-enable or change the roles of a user stronger than themselves: for `PATCH /users/{id}`
+    with a status change and `PUT /users/{id}/roles`, the target user's current permissions must be a subset of the
+    actor's grantable permissions, otherwise 403 "You can't manage a user with permissions you don't have.";
   - only owners can manage the owner role;
   - the last owner can't be removed.
 
@@ -36,5 +39,8 @@
   the order 404 (not in this tenant) → 409 (system role) → 403 (target not within the actor's grantable set), and
   before the assignment count on delete, so a lower actor learns nothing about roles it can't manage. It checks the
   managed entity's permissions inside the transaction; `Role @Version` turns a concurrent change into a 409. Owners
-  hold the whole catalog, so they are never blocked. Not yet covered by the same rule: removing a stronger role from a
-  user, disabling or renaming a more-privileged non-owner, and revoking a more-privileged pending invitation.
+  hold the whole catalog, so they are never blocked. The user-level rule (product decision, 2026-10-06) is
+  `AuthorizationService.requireOutranks(targetRoleIds)`, called by `UserAdminService` for disable, re-enable and role
+  assignment, after the owners-only check (so owner targets still get the owner-only 403) and before the owner and
+  seat locks. Peers with the same permissions can manage each other. Not covered: renaming a more-privileged user
+  (`identity.user.update`) and revoking a more-privileged pending invitation.

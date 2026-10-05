@@ -306,5 +306,9 @@ The built system deviates from the decisions above as follows:
   actor's grantable permissions, else 403 "You can't change a role with permissions you don't have." Order: 404
   cross-tenant → 409 system role → 403 hierarchy (before the assignment count on delete). PUT still also requires the
   new set to be grantable. See ADR-0004.
+- **A user can't disable, re-enable or change the roles of a more-privileged user** (your decision, 2026-10-06). For
+  status changes via `PATCH /users/{id}` and for `PUT /users/{id}/roles`, the target user's current permissions must be
+  within the actor's grantable permissions, else 403 "You can't manage a user with permissions you don't have." Owner
+  targets keep the owners-only 403 first. Peers with identical permissions may manage each other. See ADR-0004.
 - **Mistyped parameters:** a malformed path id (e.g. not a UUID) is 404; any other mistyped parameter
   (`?page=abc`, `?actorId=not-a-uuid`) is 400 with a field error.

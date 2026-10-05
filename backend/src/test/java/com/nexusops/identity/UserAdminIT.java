@@ -39,6 +39,7 @@ class UserAdminIT extends IntegrationTestSupport {
 
     static final String LAST_OWNER = "A workspace needs at least one active owner.";
     static final String OWNER_ONLY = "Only workspace owners can manage the owner role.";
+    static final String HIERARCHY = "You can't manage a user with permissions you don't have.";
 
     @Autowired MockMvc mvc;
     @Autowired RecordingMailSender mail;
@@ -181,6 +182,36 @@ class UserAdminIT extends IntegrationTestSupport {
         setStatus(member, ownerId, "DISABLED").andExpect(status().isForbidden()).andExpect(jsonPath("$.detail").value(OWNER_ONLY));
         as(member, patch("/api/v1/users/" + target).contentType(MediaType.APPLICATION_JSON).content("{\"firstName\":\"X\"}"))
                 .andExpect(status().isForbidden()); // lacks identity.user.update
+    }
+
+    @Test
+    void cannotDisableEnableOrReassignAMorePrivilegedUser() throws Exception {
+        UUID disabler = TestRoles.create(mvc, owner, "Disabler", "identity.user.disable", "identity.user.read",
+                "authorization.role.assign");
+        UUID manager = TestRoles.create(mvc, owner, "Manager", "identity.user.disable", "identity.user.read",
+                "authorization.role.assign", "authorization.role.manage");
+        UUID reader = TestRoles.create(mvc, owner, "Reader", "identity.user.read");
+        Session member = TestTenants.login(mvc, members.create(ws.tenantId(), Set.of(disabler)));
+        UUID stronger = userId(members.create(ws.tenantId(), Set.of(manager)).email());
+
+        setStatus(member, stronger, "DISABLED").andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.detail").value(HIERARCHY));
+        setRoles(member, stronger).andExpect(status().isForbidden()).andExpect(jsonPath("$.detail").value(HIERARCHY));
+        setStatus(owner, stronger, "DISABLED").andExpect(status().isOk());
+        setStatus(member, stronger, "ACTIVE").andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.detail").value(HIERARCHY));
+        assertThat(OwnerJdbc.ownerAs(ws.tenantId()).queryForObject(
+                "select status from users where id = ?", String.class, stronger)).isEqualTo("DISABLED");
+        assertThat(OwnerJdbc.ownerAs(ws.tenantId()).queryForObject(
+                "select count(*) from user_roles where user_id = ?", Long.class, stronger)).isOne();
+
+        // Positive controls: a weaker user and a peer with the same permissions are manageable.
+        UUID weaker = userId(members.create(ws.tenantId(), Set.of(reader)).email());
+        setStatus(member, weaker, "DISABLED").andExpect(status().isOk());
+        setStatus(member, weaker, "ACTIVE").andExpect(status().isOk());
+        setRoles(member, weaker).andExpect(status().isOk());
+        UUID peer = userId(members.create(ws.tenantId(), Set.of(disabler)).email());
+        setStatus(member, peer, "DISABLED").andExpect(status().isOk());
     }
 
     @Test

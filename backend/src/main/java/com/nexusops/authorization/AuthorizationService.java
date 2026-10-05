@@ -81,6 +81,7 @@ public class AuthorizationService {
     static final String OWNER_ONLY = "Only workspace owners can manage the owner role.";
     static final String SYSTEM_IMMUTABLE = "System roles can't be changed.";
     static final String HIERARCHY = "You can't change a role with permissions you don't have.";
+    static final String USER_HIERARCHY = "You can't manage a user with permissions you don't have.";
 
     /** Union of the roles' permissions WITHOUT module gating: what this actor may grant to others. */
     @Transactional(readOnly = true)
@@ -212,6 +213,14 @@ public class AuthorizationService {
             requested.addAll(role.getPermissions());
         }
         requireGrantable(requested);
+    }
+
+    /** 403 unless every permission the target user's roles carry is within the actor's grantable set. */
+    @Transactional(readOnly = true)
+    public void requireOutranks(Collection<UUID> targetRoleIds) {
+        if (!CurrentActor.require().grantablePermissions().containsAll(grantablePermissions(targetRoleIds))) {
+            throw ApiProblem.forbidden(USER_HIERARCHY);
+        }
     }
 
     @Transactional(readOnly = true)

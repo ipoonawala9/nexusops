@@ -31,7 +31,10 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Tenant user administration. Owner-set changes are serialized per tenant (TenantLocks "owners"). */
+/**
+ * Tenant user administration. Owner-set changes are serialized per tenant (TenantLocks "owners"). Disabling,
+ * re-enabling or changing the roles of a user requires the actor to hold every permission the target holds.
+ */
 @Service
 public class UserAdminService {
 
@@ -130,8 +133,12 @@ public class UserAdminService {
         // User's @Version is part of the last-owner invariant: the decision below uses a snapshot read before the
         // owner lock, and a concurrent change to this user fails the version check at flush.
         UUID ownerRole = authorization.ownerRoleId();
-        if (removed.contains(ownerRole)) {
+        boolean removingOwner = removed.contains(ownerRole);
+        if (removingOwner) {
             authorization.requireOwnerActor();
+        }
+        authorization.requireOutranks(current);
+        if (removingOwner) {
             locks.lock("owners");
             if (user.getStatus() == UserStatus.ACTIVE && users.countByRoleAndStatus(ownerRole, UserStatus.ACTIVE) <= 1) {
                 throw ApiProblem.conflict(LAST_OWNER);
@@ -154,8 +161,12 @@ public class UserAdminService {
         // User's @Version is part of the last-owner invariant: the decision below uses a snapshot read before the
         // owner lock, and a concurrent change to this user fails the version check at flush.
         UUID ownerRole = authorization.ownerRoleId();
-        if (user.getRoleIds().contains(ownerRole)) {
+        boolean ownerTarget = user.getRoleIds().contains(ownerRole);
+        if (ownerTarget) {
             authorization.requireOwnerActor();
+        }
+        authorization.requireOutranks(user.getRoleIds());
+        if (ownerTarget) {
             locks.lock("owners");
             if (users.countByRoleAndStatus(ownerRole, UserStatus.ACTIVE) <= 1) {
                 throw ApiProblem.conflict(LAST_OWNER);
@@ -171,6 +182,7 @@ public class UserAdminService {
         if (user.getRoleIds().contains(authorization.ownerRoleId())) {
             authorization.requireOwnerActor();
         }
+        authorization.requireOutranks(user.getRoleIds());
         locks.lock("seats");
         Integer maxUsers = tenants.currentLimits().maxUsers();
         if (maxUsers != null
