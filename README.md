@@ -32,6 +32,18 @@ One-time ai-service setup: `cd ai-service && python3 -m venv .venv && .venv/bin/
 
 Host ports can be overridden through `infra/docker/.env` (see `.env.example`).
 
+## Try the API (local)
+```bash
+curl -s -X POST localhost:8081/api/v1/auth/signup -H 'Content-Type: application/json' \
+  -d '{"workspaceName":"Acme","slug":"acme","firstName":"Ada","lastName":"Owner","email":"ada@acme.test","password":"correct horse battery staple"}'
+# open Mailpit (http://localhost:8025), click the verification link's token into:
+curl -s -X POST localhost:8081/api/v1/auth/verify-email -H 'Content-Type: application/json' -d '{"token":"<token>"}'
+curl -s -c /tmp/nx.cookies -X POST localhost:8081/api/v1/auth/login -H 'Content-Type: application/json' \
+  -d '{"workspace":"acme","email":"ada@acme.test","password":"correct horse battery staple"}'
+curl -s localhost:8081/api/v1/me -H "Authorization: Bearer <accessToken>"
+```
+The API contract is in `docs/api/openapi.json`; Swagger UI at http://localhost:8081/swagger-ui.html.
+
 ## Tests
 - `make test` runs the backend (including Testcontainers integration tests, so Docker must be running), the frontend and the ai-service.
 - `make e2e` runs Playwright.

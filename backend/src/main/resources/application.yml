@@ -28,6 +28,22 @@ spring:
     problemdetails:
       enabled: true
 
+nexusops:
+  app:
+    base-url: ${APP_BASE_URL:http://localhost:5173}
+  mail:
+    from: "NexusOps <no-reply@nexusops.local>"
+  security:
+    jwt:
+      issuer: nexusops
+      audience: nexusops-tenant
+      access-token-ttl: 15m
+      refresh-token-ttl: 14d
+      private-key: ${JWT_PRIVATE_KEY:}
+      public-key: ${JWT_PUBLIC_KEY:}
+      ephemeral-keys: false
+    allowed-origins: ${ALLOWED_ORIGINS:http://localhost:5173,http://localhost:3000}
+
 server:
   shutdown: graceful
   error:
@@ -43,6 +59,11 @@ management:
     health:
       probes:
         enabled: true
+  health:
+    # Mail is non-critical (sent after commit, failures only logged); an SMTP
+    # outage must not make the service report DOWN / 503 and get pulled by the LB.
+    mail:
+      enabled: false
 
 springdoc:
   api-docs:

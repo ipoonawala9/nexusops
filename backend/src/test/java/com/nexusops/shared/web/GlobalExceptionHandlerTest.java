@@ -19,13 +19,14 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RestController;
 
 class GlobalExceptionHandlerTest {
 
     record Payload(@NotBlank String name) {}
 
-    @RestController
+    /** Profile keeps component scanning in @SpringBootTest contexts from registering these test routes. */
+    @org.springframework.context.annotation.Profile("standalone-mockmvc-only")
+    @org.springframework.web.bind.annotation.RestController
     static class ThrowingController {
         @GetMapping("/boom")
         String boom() {
@@ -35,6 +36,16 @@ class GlobalExceptionHandlerTest {
         @GetMapping("/denied")
         String denied() {
             throw new AccessDeniedException("nope");
+        }
+
+        @GetMapping("/conflict")
+        String conflict() {
+            throw com.nexusops.shared.web.ApiProblem.conflictField("slug", "Workspace URL is already taken.");
+        }
+
+        @GetMapping("/stale")
+        String stale() {
+            throw new org.springframework.orm.ObjectOptimisticLockingFailureException("Tenant", "id");
         }
 
         @PostMapping("/validate")
@@ -89,5 +100,23 @@ class GlobalExceptionHandlerTest {
         mvc.perform(post("/validate").contentType(MediaType.APPLICATION_JSON).content("{not json"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.requestId").exists());
+    }
+
+    @Test
+    void apiProblemMapsToItsStatusWithFieldErrors() throws Exception {
+        mvc.perform(get("/conflict"))
+                .andExpect(status().isConflict())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.title").value("Conflict"))
+                .andExpect(jsonPath("$.errors[0].field").value("slug"))
+                .andExpect(jsonPath("$.errors[0].message").value("Workspace URL is already taken."))
+                .andExpect(jsonPath("$.requestId").exists());
+    }
+
+    @Test
+    void optimisticLockConflictIs409() throws Exception {
+        mvc.perform(get("/stale"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail").value("This record was changed by someone else. Reload and try again."));
     }
 }
