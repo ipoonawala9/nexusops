@@ -131,6 +131,65 @@ class RoleManagementIT extends IntegrationTestSupport {
                 .andExpect(status().isForbidden());
     }
 
+    static final String HIERARCHY = "You can't change a role with permissions you don't have.";
+
+    @Test
+    void roleManagersCannotWeakenOrDeleteAMorePowerfulRole() throws Exception {
+        UUID managerRole = createdId(createRole(owner, "RoleManager",
+                "authorization.role.read", "authorization.role.manage", "identity.user.read"));
+        Session manager = TestTenants.login(mvc, members.create(ws.tenantId(), Set.of(managerRole)));
+        UUID powerful = createdId(createRole(owner, "Powerful", "identity.user.read", "tenant.settings.update"));
+
+        as(manager, patch("/api/v1/roles/" + powerful).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"Renamed\",\"description\":\"x\"}"))
+                .andExpect(status().isForbidden()).andExpect(jsonPath("$.detail").value(HIERARCHY));
+        // a strict subset of the target that the manager could otherwise grant: still a weakening of a stronger role
+        as(manager, put("/api/v1/roles/" + powerful + "/permissions").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"permissions\":[\"identity.user.read\"]}"))
+                .andExpect(status().isForbidden()).andExpect(jsonPath("$.detail").value(HIERARCHY));
+        as(manager, put("/api/v1/roles/" + powerful + "/permissions").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"permissions\":[]}"))
+                .andExpect(status().isForbidden()).andExpect(jsonPath("$.detail").value(HIERARCHY));
+        as(manager, delete("/api/v1/roles/" + powerful))
+                .andExpect(status().isForbidden()).andExpect(jsonPath("$.detail").value(HIERARCHY));
+
+        as(owner, get("/api/v1/roles/" + powerful)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("Powerful"))
+                .andExpect(jsonPath("$.description").value("d"))
+                .andExpect(jsonPath("$.permissions", Matchers.contains("identity.user.read", "tenant.settings.update")));
+        assertThat(OwnerJdbc.ownerAs(ws.tenantId()).queryForList(
+                "select action from audit_events where entity_id = ? and action <> 'RoleCreated'", String.class,
+                powerful.toString()))
+                .isEmpty();
+
+        // owners hold everything, so the rule never blocks them
+        as(owner, patch("/api/v1/roles/" + powerful).contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"Mighty\"}"))
+                .andExpect(status().isOk());
+        as(owner, put("/api/v1/roles/" + powerful + "/permissions").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"permissions\":[\"identity.user.read\"]}")).andExpect(status().isOk());
+    }
+
+    @Test
+    void roleManagersCanChangeRolesWithinTheirGrantableSet() throws Exception {
+        UUID managerRole = createdId(createRole(owner, "RoleManager",
+                "authorization.role.read", "authorization.role.manage", "identity.user.read"));
+        Session manager = TestTenants.login(mvc, members.create(ws.tenantId(), Set.of(managerRole)));
+        UUID within = createdId(createRole(owner, "Within", "identity.user.read"));
+
+        as(manager, patch("/api/v1/roles/" + within).contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"Readers\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.name").value("Readers"));
+        as(manager, put("/api/v1/roles/" + within + "/permissions").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"permissions\":[\"authorization.role.read\",\"identity.user.read\"]}"))
+                .andExpect(status().isOk());
+        as(manager, delete("/api/v1/roles/" + within)).andExpect(status().isNoContent());
+    }
+
+    @Test
+    void ownersCanDeleteAnyCustomRole() throws Exception {
+        UUID powerful = createdId(createRole(owner, "Powerful", "identity.user.read", "tenant.settings.update"));
+        as(owner, delete("/api/v1/roles/" + powerful)).andExpect(status().isNoContent());
+    }
+
     @Test
     void permissionRemovalTakesEffectImmediately() throws Exception {
         UUID viewer = createdId(createRole(owner, "Viewer", "tenant.settings.read"));

@@ -27,6 +27,13 @@ class OpenApiContractIT extends IntegrationTestSupport {
                 "\"/api/v1/users\"", "\"/api/v1/users/{id}/roles\"", "\"/api/v1/roles/{id}/permissions\"",
                 "\"/api/v1/permissions\"", "\"/api/v1/invitations\"", "\"/api/v1/invitations/accept\"",
                 "\"/api/v1/invitations/preview\"", "\"/api/v1/tenant/modules/{code}\"", "\"/api/v1/audit-events\"");
+        // role hierarchy rule (ADR-0004): a role manager can't change or delete a role stronger than their grantable set
+        for (String op : new String[] {"$.paths['/api/v1/roles/{id}'].patch", "$.paths['/api/v1/roles/{id}'].delete",
+                "$.paths['/api/v1/roles/{id}/permissions'].put"}) {
+            java.util.Map<String, Object> responses = com.jayway.jsonpath.JsonPath.read(doc, op + ".responses");
+            assertThat(responses).as(op).containsKey("403");
+            assertThat(responses.keySet()).as(op).containsAnyOf("200", "204");
+        }
         if (Boolean.getBoolean("openapi.export")) {
             Files.writeString(Path.of("../docs/api/openapi.json"), doc);
         }

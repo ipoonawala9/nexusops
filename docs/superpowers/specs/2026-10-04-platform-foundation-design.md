@@ -301,3 +301,10 @@ The built system deviates from the decisions above as follows:
   (decision 7).
 - **Owners-only also covers re-enabling a disabled owner:** it requires an owner, like assigning or removing the
   owner role.
+- **A role manager can't weaken or delete a more-powerful role** (your decision, 2026-10-05). For `PATCH /roles/{id}`,
+  `PUT /roles/{id}/permissions` and `DELETE /roles/{id}`, the target role's current permissions must be within the
+  actor's grantable permissions, else 403 "You can't change a role with permissions you don't have." Order: 404
+  cross-tenant → 409 system role → 403 hierarchy (before the assignment count on delete). PUT still also requires the
+  new set to be grantable. See ADR-0004.
+- **Mistyped parameters:** a malformed path id (e.g. not a UUID) is 404; any other mistyped parameter
+  (`?page=abc`, `?actorId=not-a-uuid`) is 400 with a field error.

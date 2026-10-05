@@ -80,6 +80,7 @@ public class AuthorizationService {
     static final String ESCALATION = "You can't grant permissions you don't have.";
     static final String OWNER_ONLY = "Only workspace owners can manage the owner role.";
     static final String SYSTEM_IMMUTABLE = "System roles can't be changed.";
+    static final String HIERARCHY = "You can't change a role with permissions you don't have.";
 
     /** Union of the roles' permissions WITHOUT module gating: what this actor may grant to others. */
     @Transactional(readOnly = true)
@@ -231,10 +232,18 @@ public class AuthorizationService {
         return roles.findById(id).orElseThrow(() -> ApiProblem.notFound("Role not found."));
     }
 
+    /**
+     * A custom role the current actor may change: 404 if not in this tenant, 409 if a system role, and 403 unless the
+     * role's current permissions are all within the actor's grantable set (no weakening or deleting a stronger role).
+     * Reads the managed entity's permissions; {@code Role @Version} turns a concurrent change into a 409 at flush.
+     */
     private Role mutable(UUID id) {
         Role role = find(id);
         if (role.isSystem()) {
             throw ApiProblem.conflict(SYSTEM_IMMUTABLE);
+        }
+        if (!CurrentActor.require().grantablePermissions().containsAll(role.getPermissions())) {
+            throw ApiProblem.forbidden(HIERARCHY);
         }
         return role;
     }

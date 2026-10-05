@@ -13,6 +13,10 @@
 - **Enforcement:** `@PreAuthorize("hasAuthority(...)")` on every non-public handler. A coverage test fails the build if any handler lacks an authorization rule and isn't allowlisted as public.
 - **Escalation guard:**
   - a user can't grant permissions they don't hold;
+  - a user can't change or delete a role stronger than themselves: for `PATCH /roles/{id}`,
+    `PUT /roles/{id}/permissions` and `DELETE /roles/{id}`, the target role's *current* permissions must be a subset
+    of the actor's grantable permissions, otherwise 403 "You can't change a role with permissions you don't have."
+    (PUT also still requires the *new* set to be grantable);
   - only owners can manage the owner role;
   - the last owner can't be removed.
 
@@ -28,3 +32,9 @@
   principal-cache entries after commit, with generation-guarded cache writes so no stale state can be re-cached.
   Besides the per-user generations there is a tenant-level generation `tenant:{t}:principal-gen`, which
   `evictTenant` bumps first, so a tenant-wide eviction also invalidates in-flight cache writes for every user.
+- **Role hierarchy (Plan 3 final fix, product decision):** enforced once in `AuthorizationService.mutable(UUID)`, in
+  the order 404 (not in this tenant) → 409 (system role) → 403 (target not within the actor's grantable set), and
+  before the assignment count on delete, so a lower actor learns nothing about roles it can't manage. It checks the
+  managed entity's permissions inside the transaction; `Role @Version` turns a concurrent change into a 409. Owners
+  hold the whole catalog, so they are never blocked. Not yet covered by the same rule: removing a stronger role from a
+  user, disabling or renaming a more-privileged non-owner, and revoking a more-privileged pending invitation.
