@@ -50,12 +50,31 @@ class RateLimitsTest {
     }
 
     @Test
-    void loginChecksIpAccountAndWorkspaceBuckets() {
+    void loginConsumesIpAndAccountButOnlyPeeksTheWorkspaceBucket() {
         when(limiter.tryConsume(anyString(), any())).thenReturn(new RedisRateLimiter.Decision(true, 0));
-        limits.checkLogin("10.0.0.1", "Acme", "A@B.test");
+        when(limiter.peek(anyString(), any())).thenReturn(new RedisRateLimiter.Decision(true, 0));
+        limits.checkLogin("10.0.0.1", "acme", "a@b.test");
         org.mockito.Mockito.verify(limiter).tryConsume(org.mockito.ArgumentMatchers.eq(RateLimitKeys.ip("login", "10.0.0.1")), any());
         org.mockito.Mockito.verify(limiter).tryConsume(org.mockito.ArgumentMatchers.eq(RateLimitKeys.account("acme", "a@b.test")), any());
+        org.mockito.Mockito.verify(limiter).peek(org.mockito.ArgumentMatchers.eq(RateLimitKeys.workspace("login-workspace", "acme")), any());
+        org.mockito.Mockito.verifyNoMoreInteractions(limiter);
+    }
+
+    @Test
+    void exhaustedWorkspaceFailureBucketRejectsLoginWithRetryAfter() {
+        when(limiter.tryConsume(anyString(), any())).thenReturn(new RedisRateLimiter.Decision(true, 0));
+        when(limiter.peek(anyString(), any())).thenReturn(new RedisRateLimiter.Decision(false, 42));
+        assertThatThrownBy(() -> limits.checkLogin("10.0.0.1", "acme", "a@b.test"))
+                .isInstanceOfSatisfying(RateLimitExceeded.class, e -> assertThat(e.retryAfterSeconds()).isEqualTo(42));
+    }
+
+    @Test
+    void loginFailureConsumesTheWorkspaceBucket() {
+        when(limiter.tryConsume(anyString(), any())).thenReturn(new RedisRateLimiter.Decision(true, 0));
+        limits.recordLoginFailure("acme", "a@b.test");
         org.mockito.Mockito.verify(limiter).tryConsume(org.mockito.ArgumentMatchers.eq(RateLimitKeys.workspace("login-workspace", "acme")), any());
+        limits.recordLoginFailure(null, "a@b.test");
+        org.mockito.Mockito.verifyNoMoreInteractions(limiter);
     }
 
     @Test
@@ -95,7 +114,7 @@ class RateLimitsTest {
     @Test
     void nonDataAccessFailuresPropagateUnwrapped() {
         var redis = mock(org.springframework.data.redis.core.StringRedisTemplate.class);
-        when(redis.execute(any(org.springframework.data.redis.core.script.RedisScript.class), org.mockito.ArgumentMatchers.anyList(), any(), any()))
+        when(redis.execute(any(org.springframework.data.redis.core.script.RedisScript.class), org.mockito.ArgumentMatchers.anyList(), any(), any(), any()))
                 .thenThrow(new IllegalStateException("bug"));
         assertThatThrownBy(() -> new RedisRateLimiter(redis).tryConsume("k", rule)).isInstanceOf(IllegalStateException.class);
     }

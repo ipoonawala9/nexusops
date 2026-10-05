@@ -3,6 +3,7 @@ package com.nexusops.shared.ratelimit;
 import com.nexusops.shared.web.ApiProblem;
 import java.util.OptionalLong;
 import java.util.UUID;
+import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -29,10 +30,10 @@ public class RateLimits {
     }
 
     /**
-     * Login: per-IP, then per-account (workspace+email), then a high per-workspace spraying backstop. All fail closed.
-     * The workspace and email must already be in the canonical form the login lookup uses (the caller owns that
-     * normalization); {@code null} means the value cannot canonicalize, so the login cannot succeed and only the
-     * per-IP bucket is charged.
+     * Login, before authenticating: per-IP, then per-account (workspace+email), then a non-consuming peek at the
+     * per-workspace failure bucket. All fail closed. The workspace and email must already be in the canonical form the
+     * login lookup uses (the caller owns that normalization); {@code null} means the value cannot canonicalize, so the
+     * login cannot succeed and only the per-IP bucket is charged.
      */
     public void checkLogin(String clientIp, String canonicalWorkspace, String canonicalEmail) {
         enforce(RateLimitKeys.ip("login", clientIp), rule("login"));
@@ -40,7 +41,20 @@ public class RateLimits {
             return;
         }
         enforce(RateLimitKeys.account(canonicalWorkspace, canonicalEmail), rule("login-account"));
-        enforce(RateLimitKeys.workspace("login-workspace", canonicalWorkspace), rule("login-workspace"));
+        decide(() -> limiter.peek(RateLimitKeys.workspace("login-workspace", canonicalWorkspace), rule("login-workspace")));
+    }
+
+    /** After a failed authentication: charge one token to the workspace bucket. Successful logins never consume. */
+    public void recordLoginFailure(String canonicalWorkspace, String canonicalEmail) {
+        if (canonicalWorkspace == null || canonicalEmail == null) {
+            return;
+        }
+        try {
+            limiter.tryConsume(RateLimitKeys.workspace("login-workspace", canonicalWorkspace), rule("login-workspace"));
+        } catch (RateLimiterUnavailableException e) {
+            // the request already failed authentication; it still gets its 401, the next attempt's peek fails closed
+            log.warn("Rate limiter unavailable; login failure not counted", e);
+        }
     }
 
     public OptionalLong apiRetryAfter(UUID tenantId, UUID userId) {
@@ -54,9 +68,13 @@ public class RateLimits {
     }
 
     private void enforce(String key, RateLimitRule rule) {
+        decide(() -> limiter.tryConsume(key, rule));
+    }
+
+    private void decide(Supplier<RedisRateLimiter.Decision> call) {
         RedisRateLimiter.Decision decision;
         try {
-            decision = limiter.tryConsume(key, rule);
+            decision = call.get();
         } catch (RateLimiterUnavailableException e) {
             log.warn("Rate limiter unavailable; rejecting public auth request", e);
             throw ApiProblem.serviceUnavailable(UNAVAILABLE);

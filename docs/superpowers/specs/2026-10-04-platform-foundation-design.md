@@ -287,6 +287,12 @@ The built system deviates from the decisions above as follows:
   per IP (10/min), rule `login-account` per `sha256(workspace + "\n" + email)` (10/min) and rule `login-workspace` per
   workspace (100/min, anti-spraying). A per-workspace 10/min limit let any anonymous client lock a whole tenant out
   of login. See ADR-0006.
+  - **The workspace bucket counts failed logins only.** The login peeks it without consuming (429 if empty) and a failed
+    authentication consumes one token; a successful login never does. Residual risk, accepted: an attacker with about
+    10 IPs sending failures can still block a workspace's logins for the window, and hammering one account can lock
+    that one user out. CAPTCHA/step-up is future work.
+  - **The account and workspace keys use the canonical slug and email** the login lookup uses, so control-character
+    padded or case variants share one bucket. Input that can't canonicalize charges only the per-IP bucket.
 - **Rate-limit IP keys are normalized:** IPv6 uses the /64 prefix, IPv4-mapped IPv6 becomes the IPv4 address, and only
   literal IPs are parsed (no DNS). Redis command and connect timeouts are 500 ms.
 - **The principal cache also has a tenant-level generation** `tenant:{t}:principal-gen`, bumped first by

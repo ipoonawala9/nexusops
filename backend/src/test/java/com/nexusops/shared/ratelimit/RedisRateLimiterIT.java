@@ -47,4 +47,19 @@ class RedisRateLimiterIT extends IntegrationTestSupport {
         Thread.sleep(450);
         assertThat(limiter.tryConsume(key, rule).allowed()).isTrue();
     }
+
+    @Test
+    void peekNeverConsumes() {
+        var rule = new RateLimitRule(2, Duration.ofMinutes(1));
+        String key = key();
+        for (int i = 0; i < 5; i++) {
+            assertThat(limiter.peek(key, rule).allowed()).isTrue();
+        }
+        limiter.tryConsume(key, rule);
+        limiter.tryConsume(key, rule);
+        var denied = limiter.peek(key, rule);
+        assertThat(denied.allowed()).isFalse();
+        assertThat(denied.retryAfterSeconds()).isBetween(1L, 60L);
+        assertThat(limiter.tryConsume(key, rule).allowed()).isFalse();
+    }
 }

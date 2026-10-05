@@ -14,6 +14,7 @@ import com.nexusops.identity.web.AuthDtos.SignupResponse;
 import com.nexusops.identity.web.AuthDtos.TokenResponse;
 import com.nexusops.identity.web.AuthDtos.VerifyEmailRequest;
 import com.nexusops.shared.ratelimit.RateLimits;
+import com.nexusops.shared.web.ApiProblem;
 import com.nexusops.tenancy.Slug;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -83,7 +84,16 @@ class AuthController {
         String workspace = Slug.tryNormalize(request.workspace()).orElse(null);
         String email = Emails.tryNormalize(request.email()).orElse(null);
         rateLimits.checkLogin(http.getRemoteAddr(), workspace, email);
-        return tokens(login.login(request.workspace(), request.email(), request.password(), client(http)));
+        AuthResult result;
+        try {
+            result = login.login(request.workspace(), request.email(), request.password(), client(http));
+        } catch (ApiProblem failure) {
+            if (failure.status() == HttpStatus.UNAUTHORIZED) { // bad password, unknown email, disabled user
+                rateLimits.recordLoginFailure(workspace, email);
+            }
+            throw failure;
+        }
+        return tokens(result);
     }
 
     @PostMapping("/refresh")
