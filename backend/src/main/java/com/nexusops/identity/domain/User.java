@@ -107,6 +107,33 @@ public class User extends TenantOwnedEntity {
         updatedAt = Instant.now();
     }
 
+    public void rename(String newFirstName, String newLastName) {
+        if (newFirstName != null) {
+            this.firstName = newFirstName;
+        }
+        if (newLastName != null) {
+            this.lastName = newLastName;
+        }
+        this.updatedAt = Instant.now();
+    }
+
+    /** Disabling also invalidates every outstanding access token (token version bump). */
+    public void disable() {
+        this.status = UserStatus.DISABLED;
+        bumpTokenVersion();
+    }
+
+    public void enable() {
+        this.status = UserStatus.ACTIVE;
+        this.updatedAt = Instant.now();
+    }
+
+    public void replaceRoles(Set<UUID> newRoleIds) {
+        this.roleIds.clear();
+        this.roleIds.addAll(newRoleIds);
+        this.updatedAt = Instant.now();
+    }
+
     public boolean isEmailVerified() {
         return emailVerifiedAt != null;
     }
@@ -117,5 +144,7 @@ public class User extends TenantOwnedEntity {
     public String getLastName() { return lastName; }
     public UserStatus getStatus() { return status; }
     public int getTokenVersion() { return tokenVersion; }
+    public Instant getLastLoginAt() { return lastLoginAt; }
+    public Instant getCreatedAt() { return createdAt; }
     public Set<UUID> getRoleIds() { return Set.copyOf(roleIds); }
 }
