@@ -50,7 +50,7 @@ public class AuditService {
 
     private void insert(AuditEntry entry) {
         UUID tenantId = TenantContext.tenantId().orElse(null);
-        UUID actorId = TenantContext.userId().orElse(null);
+        UUID actorId = entry.actorId() != null ? entry.actorId() : TenantContext.userId().orElse(null);
         ActorType actorType = entry.actorType() != null ? entry.actorType()
                 : actorId != null ? ActorType.USER : ActorType.ANONYMOUS;
         HttpServletRequest request = currentRequest();

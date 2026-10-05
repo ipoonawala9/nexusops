@@ -1,9 +1,8 @@
-package com.nexusops.identity;
+package com.nexusops.shared.security;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.nexusops.identity.application.PasswordPolicy;
 import com.nexusops.shared.web.ApiProblem;
 import org.junit.jupiter.api.Test;
 

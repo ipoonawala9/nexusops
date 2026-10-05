@@ -9,6 +9,7 @@ import com.nexusops.identity.domain.UserRepository;
 import com.nexusops.identity.domain.UserStatus;
 import com.nexusops.identity.security.AccessTokenService;
 import com.nexusops.identity.security.JwtProperties;
+import com.nexusops.shared.Emails;
 import com.nexusops.shared.Ids;
 import com.nexusops.shared.TenantContext;
 import com.nexusops.shared.web.ApiProblem;

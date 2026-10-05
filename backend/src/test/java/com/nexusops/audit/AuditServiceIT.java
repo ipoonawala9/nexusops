@@ -90,4 +90,26 @@ class AuditServiceIT extends IntegrationTestSupport {
         assertThat(after).contains("a@b.test").doesNotContain("argon2id").doesNotContain("passwordHash")
                 .doesNotContain("refreshToken").doesNotContain("apiSecret");
     }
+
+    @Test
+    void recordsAPlatformActorWithOrWithoutATenant() {
+        UUID operator = UUID.randomUUID();
+        tx.executeWithoutResult(s -> audit.record(
+                AuditEntry.of("PlatformThingDone", "PlatformUser", operator).asPlatformActor(operator)));
+        Map<String, Object> global = OwnerJdbc.superuser().queryForMap(
+                "select * from audit_events where action = 'PlatformThingDone' order by occurred_at desc limit 1");
+        assertThat(global.get("tenant_id")).isNull();
+        assertThat(global.get("actor_type")).isEqualTo("PLATFORM");
+        assertThat(global.get("actor_id")).isEqualTo(operator);
+
+        UUID boundUser = UUID.randomUUID();
+        try (var scope = TenantContext.open(tenant, boundUser)) {
+            tx.executeWithoutResult(s -> audit.record(
+                    AuditEntry.of("PlatformTenantThingDone", "Tenant", tenant).asPlatformActor(operator)));
+        }
+        Map<String, Object> scoped = onlyRow("PlatformTenantThingDone");
+        assertThat(scoped.get("tenant_id")).isEqualTo(tenant);
+        assertThat(scoped.get("actor_type")).isEqualTo("PLATFORM");
+        assertThat(scoped.get("actor_id")).isEqualTo(operator); // the operator, not whoever TenantContext names
+    }
 }
