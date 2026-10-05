@@ -2,7 +2,6 @@ package com.nexusops.shared.ratelimit;
 
 import com.nexusops.shared.cache.TenantKeys;
 import java.net.InetAddress;
-import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -16,6 +15,9 @@ public final class RateLimitKeys {
 
     private static final Pattern IP = Pattern.compile("[0-9A-Fa-f:.]{2,45}");
 
+    private static final Pattern IPV4 = Pattern.compile(
+            "^(25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)(\\.(25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)){3}$");
+
     private RateLimitKeys() {}
 
     public static String ip(String rule, String ip) {
@@ -27,19 +29,25 @@ public final class RateLimitKeys {
         if (ip == null || !IP.matcher(ip).matches()) {
             return "unknown";
         }
+        InetAddress address;
         try {
-            // Input is restricted to hex digits, ':' and '.', so this is a literal parse and never a DNS lookup.
-            InetAddress address = InetAddress.getByName(ip);
-            byte[] b = address.getAddress();
-            if (b.length == 4) { // plain IPv4, or IPv4-mapped IPv6 (the JDK already unwraps ::ffff:a.b.c.d)
-                return address.getHostAddress();
+            // Never resolves: only a strict dotted-quad or an input containing ':' (IPv6 literal) is parsed, and
+            // InetAddress.ofLiteral rejects anything that is not a literal instead of falling back to DNS.
+            if (ip.indexOf(':') >= 0 || IPV4.matcher(ip).matches()) {
+                address = InetAddress.ofLiteral(ip);
+            } else {
+                return "unknown";
             }
-            return "%x:%x:%x:%x::/64".formatted(
-                    ((b[0] & 0xff) << 8) | (b[1] & 0xff), ((b[2] & 0xff) << 8) | (b[3] & 0xff),
-                    ((b[4] & 0xff) << 8) | (b[5] & 0xff), ((b[6] & 0xff) << 8) | (b[7] & 0xff));
-        } catch (UnknownHostException | RuntimeException e) {
+        } catch (IllegalArgumentException e) {
             return "unknown";
         }
+        byte[] b = address.getAddress();
+        if (b.length == 4) { // plain IPv4, or IPv4-mapped IPv6 (the JDK already unwraps ::ffff:a.b.c.d)
+            return address.getHostAddress();
+        }
+        return "%x:%x:%x:%x::/64".formatted(
+                ((b[0] & 0xff) << 8) | (b[1] & 0xff), ((b[2] & 0xff) << 8) | (b[3] & 0xff),
+                ((b[4] & 0xff) << 8) | (b[5] & 0xff), ((b[6] & 0xff) << 8) | (b[7] & 0xff));
     }
 
     /** Hashed so arbitrary user input never becomes a raw key (and key length stays bounded). */

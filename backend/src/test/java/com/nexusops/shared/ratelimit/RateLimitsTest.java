@@ -75,6 +75,22 @@ class RateLimitsTest {
     }
 
     @Test
+    void nonLiteralIpsAreUnknownAndNeverResolved() {
+        // Strict-literal code path (no resolver is reachable for these inputs); asserted via the "unknown" result.
+        for (String bad : new String[] {"dead.beef", "cafe", "ab", "a.b.c", "1.2.3", "256.1.1.1", "01.2.3.4"}) {
+            assertThat(RateLimitKeys.ip("r", bad)).as(bad).isEqualTo("rl:ip:unknown:r");
+        }
+    }
+
+    @Test
+    void nonDataAccessFailuresPropagateUnwrapped() {
+        var redis = mock(org.springframework.data.redis.core.StringRedisTemplate.class);
+        when(redis.execute(any(org.springframework.data.redis.core.script.RedisScript.class), org.mockito.ArgumentMatchers.anyList(), any(), any()))
+                .thenThrow(new IllegalStateException("bug"));
+        assertThatThrownBy(() -> new RedisRateLimiter(redis).tryConsume("k", rule)).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
     void ruleRejectsNonPositiveCapacityOrWindow() {
         assertThatThrownBy(() -> new RateLimitRule(0, Duration.ofMinutes(1))).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new RateLimitRule(1, Duration.ZERO)).isInstanceOf(IllegalArgumentException.class);
