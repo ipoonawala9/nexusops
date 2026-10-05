@@ -17,6 +17,7 @@ import org.testcontainers.utility.MountableFile;
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
+@org.springframework.context.annotation.Import(TestBeans.class)
 public abstract class IntegrationTestSupport {
 
     public static final String OWNER_PASSWORD = "owner_test";

@@ -28,6 +28,10 @@ spring:
     problemdetails:
       enabled: true
 
+nexusops:
+  mail:
+    from: "NexusOps <no-reply@nexusops.local>"
+
 server:
   shutdown: graceful
   error:

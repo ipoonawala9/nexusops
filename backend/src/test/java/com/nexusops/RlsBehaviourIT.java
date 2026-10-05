@@ -7,7 +7,10 @@ import com.nexusops.support.IntegrationTestSupport;
 import com.nexusops.support.OwnerJdbc;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
@@ -39,13 +42,17 @@ class RlsBehaviourIT extends IntegrationTestSupport {
                 + "values (?, ?, 'b@b.test', 'x', 'B', 'B', 'ACTIVE', ?, ?)", USER_B, TENANT_B, now, now);
     }
 
-    /** One connection so set_config persists across statements, like a checked-out pooled connection. */
+    private static final Map<Optional<UUID>, JdbcTemplate> APP_CONNECTIONS = new ConcurrentHashMap<>();
+
+    /** One cached connection per tenant (null = no tenant) so set_config persists across statements without leaking connections. */
     private static JdbcTemplate appConnectionAs(UUID tenant) {
-        var ds = new SingleConnectionDataSource(POSTGRES.getJdbcUrl(), "nexusops_app", APP_PASSWORD, true);
-        var jdbc = new JdbcTemplate(ds);
-        jdbc.queryForObject("select set_config('app.tenant_id', ?, false)", String.class,
-                tenant == null ? "" : tenant.toString());
-        return jdbc;
+        return APP_CONNECTIONS.computeIfAbsent(Optional.ofNullable(tenant), key -> {
+            var ds = new SingleConnectionDataSource(POSTGRES.getJdbcUrl(), "nexusops_app", APP_PASSWORD, true);
+            var jdbc = new JdbcTemplate(ds);
+            jdbc.queryForObject("select set_config('app.tenant_id', ?, false)", String.class,
+                    key.map(UUID::toString).orElse(""));
+            return jdbc;
+        });
     }
 
     @Test
