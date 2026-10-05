@@ -83,6 +83,7 @@ public class JwtKeyConfig {
                     .build();
             OAuth2TokenValidator<Jwt> validator = new DelegatingOAuth2TokenValidator<>(
                     JwtValidators.createDefaultWithIssuer(properties.issuer()),
+                    new JwtClaimValidator<Object>("exp", java.util.Objects::nonNull),
                     new JwtClaimValidator<List<String>>("aud", aud -> aud != null && aud.contains(properties.audience())),
                     new JwtClaimValidator<Object>("tid", tid -> tid instanceof String s && !s.isBlank()),
                     new JwtClaimValidator<Object>("tv", tv -> tv instanceof Number),

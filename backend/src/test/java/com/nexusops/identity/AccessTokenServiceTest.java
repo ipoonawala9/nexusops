@@ -97,6 +97,12 @@ class AccessTokenServiceTest {
                 .isInstanceOf(JwtException.class);
     }
 
+    @Test
+    void rejectsTokensWithoutExpiry() {
+        assertThatThrownBy(() -> decoder.decode(sign(b -> b.claims(c -> c.remove("exp")))))
+                .isInstanceOf(JwtException.class);
+    }
+
     private String sign(java.util.function.Consumer<JwtClaimsSet.Builder> tweak) {
         var builder = JwtClaimsSet.builder().subject(user.toString()).issuer("nexusops")
                 .audience(List.of("nexusops-tenant")).issuedAt(Instant.now()).expiresAt(Instant.now().plusSeconds(600))
