@@ -12,6 +12,8 @@ nexusops:
   rate-limits:
     rules:
       login: { capacity: 100000, window: 1m }
+      login-account: { capacity: 100000, window: 1m }
+      login-workspace: { capacity: 100000, window: 1m }
       signup: { capacity: 100000, window: 1m }
       verify-email: { capacity: 100000, window: 1m }
       resend-verification: { capacity: 100000, window: 1m }

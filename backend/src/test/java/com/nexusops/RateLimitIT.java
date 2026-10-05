@@ -22,6 +22,8 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 @AutoConfigureMockMvc
 @TestPropertySource(properties = {
         "nexusops.rate-limits.rules.login.capacity=3",
+        "nexusops.rate-limits.rules.login-account.capacity=3",
+        "nexusops.rate-limits.rules.login-workspace.capacity=5",
         "nexusops.rate-limits.rules.verify-email.capacity=2",
         "nexusops.rate-limits.rules.api.capacity=5"
 })
@@ -29,6 +31,13 @@ class RateLimitIT extends IntegrationTestSupport {
 
     @Autowired MockMvc mvc;
     @Autowired RecordingMailSender mail;
+    @Autowired org.springframework.boot.data.redis.autoconfigure.DataRedisProperties redisProperties;
+
+    @Test
+    void redisTimeoutsAreBounded() {
+        org.assertj.core.api.Assertions.assertThat(redisProperties.getTimeout()).isEqualTo(java.time.Duration.ofMillis(500));
+        org.assertj.core.api.Assertions.assertThat(redisProperties.getConnectTimeout()).isEqualTo(java.time.Duration.ofMillis(500));
+    }
 
     private static MockHttpServletRequestBuilder from(MockHttpServletRequestBuilder request, String ip) {
         return request.with(r -> {
@@ -59,13 +68,29 @@ class RateLimitIT extends IntegrationTestSupport {
                 .andExpect(jsonPath("$.requestId").exists());
     }
 
+    private ResultActions loginAs(String ip, String workspace, String email) throws Exception {
+        return mvc.perform(from(post("/api/v1/auth/login"), ip).contentType(MediaType.APPLICATION_JSON).content("""
+                {"workspace":"%s","email":"%s","password":"whatever-123456"}""".formatted(workspace, email)));
+    }
+
     @Test
-    void loginIsLimitedPerWorkspaceAcrossIps() throws Exception {
+    void loginIsLimitedPerAccountAcrossIps() throws Exception {
         String workspace = "target-" + UUID.randomUUID().toString().substring(0, 8);
         for (int i = 0; i < 3; i++) {
-            login(uniqueIp(), workspace).andExpect(status().isUnauthorized());
+            loginAs(uniqueIp(), workspace, "victim@b.test").andExpect(status().isUnauthorized());
         }
-        login(uniqueIp(), workspace).andExpect(status().isTooManyRequests());
+        loginAs(uniqueIp(), workspace, "victim@b.test").andExpect(status().isTooManyRequests());
+        // another account in the same workspace is unaffected
+        loginAs(uniqueIp(), workspace, "other@b.test").andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void workspaceBucketCatchesSprayingAcrossAccounts() throws Exception {
+        String workspace = "spray-" + UUID.randomUUID().toString().substring(0, 8);
+        for (int i = 0; i < 5; i++) {
+            loginAs(uniqueIp(), workspace, "user" + i + "@b.test").andExpect(status().isUnauthorized());
+        }
+        loginAs(uniqueIp(), workspace, "user5@b.test").andExpect(status().isTooManyRequests());
     }
 
     @Test

@@ -28,8 +28,11 @@ public class RateLimits {
         enforce(RateLimitKeys.ip(rule, clientIp), rule(rule));
     }
 
-    public void checkLoginWorkspace(String rawWorkspace) {
-        enforce(RateLimitKeys.workspace("login", rawWorkspace), rule("login"));
+    /** Login: per-IP, then per-account (workspace+email), then a high per-workspace spraying backstop. All fail closed. */
+    public void checkLogin(String clientIp, String rawWorkspace, String rawEmail) {
+        enforce(RateLimitKeys.ip("login", clientIp), rule("login"));
+        enforce(RateLimitKeys.account(rawWorkspace, rawEmail), rule("login-account"));
+        enforce(RateLimitKeys.workspace("login-workspace", rawWorkspace), rule("login-workspace"));
     }
 
     public OptionalLong apiRetryAfter(UUID tenantId, UUID userId) {

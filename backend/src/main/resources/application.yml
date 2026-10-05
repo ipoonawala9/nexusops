@@ -21,6 +21,8 @@ spring:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6380}
+      timeout: 500ms
+      connect-timeout: 500ms
   mail:
     host: ${MAIL_HOST:localhost}
     port: ${MAIL_PORT:1025}
@@ -51,6 +53,8 @@ nexusops:
   rate-limits:
     rules:
       login: { capacity: 10, window: 1m }
+      login-account: { capacity: 10, window: 1m }
+      login-workspace: { capacity: 100, window: 1m }
       signup: { capacity: 5, window: 1m }
       verify-email: { capacity: 5, window: 1m }
       resend-verification: { capacity: 5, window: 1m }

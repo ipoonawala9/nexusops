@@ -1,6 +1,7 @@
 package com.nexusops.shared.ratelimit;
 
 import java.util.List;
+import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.data.redis.core.script.RedisScript;
@@ -54,7 +55,7 @@ public class RedisRateLimiter {
             long allowed = ((Number) result.get(0)).longValue();
             long retry = ((Number) result.get(1)).longValue();
             return new Decision(allowed == 1L, retry);
-        } catch (RuntimeException e) {
+        } catch (DataAccessException e) {
             throw new RateLimiterUnavailableException(e);
         }
     }

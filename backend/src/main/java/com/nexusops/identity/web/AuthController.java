@@ -77,8 +77,7 @@ class AuthController {
 
     @PostMapping("/login")
     ResponseEntity<TokenResponse> login(@Valid @RequestBody LoginRequest request, HttpServletRequest http) {
-        rateLimits.checkPublic("login", http.getRemoteAddr());
-        rateLimits.checkLoginWorkspace(request.workspace());
+        rateLimits.checkLogin(http.getRemoteAddr(), request.workspace(), request.email());
         return tokens(login.login(request.workspace(), request.email(), request.password(), client(http)));
     }
 
