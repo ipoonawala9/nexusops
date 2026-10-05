@@ -31,6 +31,15 @@ spring:
 nexusops:
   mail:
     from: "NexusOps <no-reply@nexusops.local>"
+  security:
+    jwt:
+      issuer: nexusops
+      audience: nexusops-tenant
+      access-token-ttl: 15m
+      refresh-token-ttl: 14d
+      private-key: ${JWT_PRIVATE_KEY:}
+      public-key: ${JWT_PUBLIC_KEY:}
+      ephemeral-keys: false
 
 server:
   shutdown: graceful

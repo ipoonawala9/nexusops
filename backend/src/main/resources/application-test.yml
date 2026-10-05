@@ -2,3 +2,8 @@
 logging:
   level:
     org.testcontainers: WARN
+
+nexusops:
+  security:
+    jwt:
+      ephemeral-keys: true

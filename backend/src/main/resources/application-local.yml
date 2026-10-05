@@ -7,3 +7,8 @@ spring:
 # 8080 is commonly taken on dev machines; containers override with SERVER_PORT=8080.
 server:
   port: ${SERVER_PORT:8081}
+
+nexusops:
+  security:
+    jwt:
+      ephemeral-keys: true
