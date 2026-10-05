@@ -9,6 +9,8 @@ nexusops:
   security:
     jwt:
       ephemeral-keys: true
+  platform:
+    totp-key: dGVzdC1vbmx5LXRvdHAta2V5LTMyLWJ5dGVzISEhISE=
   rate-limits:
     rules:
       login: { capacity: 100000, window: 1m }

@@ -49,6 +49,12 @@ nexusops:
       public-key: ${JWT_PUBLIC_KEY:}
       ephemeral-keys: false
     allowed-origins: ${ALLOWED_ORIGINS:http://localhost:5173,http://localhost:3000}
+  platform:
+    audience: nexusops-platform
+    access-token-ttl: 15m
+    session-max-age: 8h
+    totp-issuer: NexusOps
+    totp-key: ${PLATFORM_TOTP_KEY:}
 
   rate-limits:
     rules:
