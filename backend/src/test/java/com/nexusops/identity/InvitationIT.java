@@ -16,7 +16,13 @@ import com.nexusops.support.TestRoles;
 import com.nexusops.support.TestTenants;
 import com.nexusops.support.TestTenants.Session;
 import com.nexusops.support.TestTenants.Workspace;
+import com.nexusops.identity.domain.InvitationRepository;
+import com.nexusops.shared.TenantContext;
+import java.time.Instant;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.UUID;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.BeforeEach;
@@ -26,6 +32,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @AutoConfigureMockMvc
 class InvitationIT extends IntegrationTestSupport {
@@ -33,6 +40,8 @@ class InvitationIT extends IntegrationTestSupport {
     @Autowired MockMvc mvc;
     @Autowired RecordingMailSender mail;
     @Autowired TestMembers members;
+    @Autowired InvitationRepository invitationRepo;
+    @Autowired TransactionTemplate tx;
 
     Workspace ws;
     Session owner;
@@ -113,8 +122,36 @@ class InvitationIT extends IntegrationTestSupport {
         UUID second = idOf(invite(owner, "b@x.test", support).andExpect(status().isCreated()));
         invite(owner, "c@x.test", support).andExpect(status().isConflict())
                 .andExpect(jsonPath("$.detail").value("Your plan allows 3 users. Upgrade to add more."));
-        mvc.perform(delete("/api/v1/invitations/" + second).header("Authorization", "Bearer " + owner.accessToken()));
+        mvc.perform(delete("/api/v1/invitations/" + second).header("Authorization", "Bearer " + owner.accessToken()))
+                .andExpect(status().isNoContent());
         invite(owner, "c@x.test", support).andExpect(status().isCreated());
+    }
+
+    @Test
+    void revokeWaitsForARowLockAndThenSeesTheCommittedState() throws Exception {
+        UUID id = idOf(invite(owner, "lock@x.test", support));
+        var holding = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
+        var pool = Executors.newFixedThreadPool(2);
+        // Stands in for a concurrent accept: locks the row, changes it, commits only when released.
+        var holder = pool.submit(() -> TenantContext.runAs(ws.tenantId(), () -> tx.executeWithoutResult(s -> {
+            invitationRepo.findForUpdateById(id).orElseThrow().revoke(Instant.now());
+            holding.countDown();
+            try {
+                release.await(10, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        })));
+        assertThat(holding.await(5, TimeUnit.SECONDS)).isTrue();
+        var revoke = pool.submit(() -> mvc.perform(delete("/api/v1/invitations/" + id)
+                .header("Authorization", "Bearer " + owner.accessToken())).andReturn().getResponse().getStatus());
+        Thread.sleep(500);
+        assertThat(revoke.isDone()).as("revoke must block on the row lock").isFalse();
+        release.countDown();
+        holder.get(5, TimeUnit.SECONDS);
+        assertThat(revoke.get(10, TimeUnit.SECONDS)).as("revoke re-reads the committed state").isEqualTo(409);
+        pool.shutdown();
     }
 
     @Test

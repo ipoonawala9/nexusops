@@ -64,7 +64,7 @@ public class InvitationService {
             throw ApiProblem.conflictField("email", "This person is already a member of the workspace.");
         }
         Instant now = Instant.now();
-        invitations.findOpenByEmail(email).ifPresent(open -> {
+        invitations.findOpenByEmailForUpdate(email).ifPresent(open -> {
             if (open.isPending(now)) {
                 throw ApiProblem.conflictField("email", "An invitation is already pending for this email.");
             }
@@ -110,7 +110,7 @@ public class InvitationService {
     public void revoke(UUID id) {
         CurrentUser.require();
         Instant now = Instant.now();
-        Invitation invitation = invitations.findById(id).orElseThrow(() -> ApiProblem.notFound("Invitation not found."));
+        Invitation invitation = invitations.findForUpdateById(id).orElseThrow(() -> ApiProblem.notFound("Invitation not found."));
         if (!invitation.isPending(now)) {
             throw ApiProblem.conflict("This invitation is no longer pending.");
         }
