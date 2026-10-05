@@ -8,4 +8,8 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     /** Callers pass an already-normalized (lower-case, trimmed) address. */
     Optional<User> findByEmail(String email);
+
+    boolean existsByEmail(String email);
+
+    long countByStatus(UserStatus status);
 }
