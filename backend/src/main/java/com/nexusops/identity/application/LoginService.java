@@ -56,7 +56,7 @@ public class LoginService {
 
     public AuthResult login(String workspace, String rawEmail, String password, ClientInfo client) {
         Optional<TenantSummary> tenant = tenants.findBySlug(workspace);
-        String email = normalizeOrNull(rawEmail);
+        String email = Emails.tryNormalize(rawEmail).orElse(null);
         if (tenant.isEmpty() || email == null) {
             passwordEncoder.matches(password, dummyHash);
             Map<String, Object> metadata = new HashMap<>();
@@ -112,14 +112,6 @@ public class LoginService {
     private ApiProblem fail(String reason, UUID userId) {
         audit.recordIndependently(AuditEntry.of("LoginFailed", "User", userId).withMetadata(Map.of("reason", reason)));
         return ApiProblem.unauthorized(INVALID_CREDENTIALS);
-    }
-
-    private static String normalizeOrNull(String rawEmail) {
-        try {
-            return Emails.normalize(rawEmail);
-        } catch (ApiProblem invalid) {
-            return null;
-        }
     }
 
     private static String truncate(String value) {

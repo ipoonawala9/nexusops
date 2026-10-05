@@ -2,6 +2,7 @@ package com.nexusops.identity.web;
 
 import com.nexusops.identity.application.AuthResult;
 import com.nexusops.identity.application.ClientInfo;
+import com.nexusops.identity.application.Emails;
 import com.nexusops.identity.application.LoginService;
 import com.nexusops.identity.application.RefreshService;
 import com.nexusops.identity.application.SignupCommand;
@@ -13,6 +14,7 @@ import com.nexusops.identity.web.AuthDtos.SignupResponse;
 import com.nexusops.identity.web.AuthDtos.TokenResponse;
 import com.nexusops.identity.web.AuthDtos.VerifyEmailRequest;
 import com.nexusops.shared.ratelimit.RateLimits;
+import com.nexusops.tenancy.Slug;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.time.Duration;
@@ -77,7 +79,10 @@ class AuthController {
 
     @PostMapping("/login")
     ResponseEntity<TokenResponse> login(@Valid @RequestBody LoginRequest request, HttpServletRequest http) {
-        rateLimits.checkLogin(http.getRemoteAddr(), request.workspace(), request.email());
+        // Rate-limit keys use the same canonical workspace/email the login lookup uses, so padded variants share a bucket.
+        String workspace = Slug.tryNormalize(request.workspace()).orElse(null);
+        String email = Emails.tryNormalize(request.email()).orElse(null);
+        rateLimits.checkLogin(http.getRemoteAddr(), workspace, email);
         return tokens(login.login(request.workspace(), request.email(), request.password(), client(http)));
     }
 

@@ -28,11 +28,19 @@ public class RateLimits {
         enforce(RateLimitKeys.ip(rule, clientIp), rule(rule));
     }
 
-    /** Login: per-IP, then per-account (workspace+email), then a high per-workspace spraying backstop. All fail closed. */
-    public void checkLogin(String clientIp, String rawWorkspace, String rawEmail) {
+    /**
+     * Login: per-IP, then per-account (workspace+email), then a high per-workspace spraying backstop. All fail closed.
+     * The workspace and email must already be in the canonical form the login lookup uses (the caller owns that
+     * normalization); {@code null} means the value cannot canonicalize, so the login cannot succeed and only the
+     * per-IP bucket is charged.
+     */
+    public void checkLogin(String clientIp, String canonicalWorkspace, String canonicalEmail) {
         enforce(RateLimitKeys.ip("login", clientIp), rule("login"));
-        enforce(RateLimitKeys.account(rawWorkspace, rawEmail), rule("login-account"));
-        enforce(RateLimitKeys.workspace("login-workspace", rawWorkspace), rule("login-workspace"));
+        if (canonicalWorkspace == null || canonicalEmail == null) {
+            return;
+        }
+        enforce(RateLimitKeys.account(canonicalWorkspace, canonicalEmail), rule("login-account"));
+        enforce(RateLimitKeys.workspace("login-workspace", canonicalWorkspace), rule("login-workspace"));
     }
 
     public OptionalLong apiRetryAfter(UUID tenantId, UUID userId) {

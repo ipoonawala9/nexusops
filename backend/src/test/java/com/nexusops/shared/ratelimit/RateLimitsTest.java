@@ -59,6 +59,16 @@ class RateLimitsTest {
     }
 
     @Test
+    void nonCanonicalLoginChargesOnlyTheIpBucket() {
+        when(limiter.tryConsume(anyString(), any())).thenReturn(new RedisRateLimiter.Decision(true, 0));
+        limits.checkLogin("10.0.0.1", null, "a@b.test");
+        limits.checkLogin("10.0.0.1", "acme", null);
+        org.mockito.Mockito.verify(limiter, org.mockito.Mockito.times(2))
+                .tryConsume(org.mockito.ArgumentMatchers.eq(RateLimitKeys.ip("login", "10.0.0.1")), any());
+        org.mockito.Mockito.verifyNoMoreInteractions(limiter);
+    }
+
+    @Test
     void accountKeysAreNormalizedAndHashed() {
         assertThat(RateLimitKeys.account(" ACME ", " A@B.Test ")).isEqualTo(RateLimitKeys.account("acme", "a@b.test"))
                 .startsWith("rl:acct:").endsWith(":login").doesNotContain("acme").doesNotContain("b.test");

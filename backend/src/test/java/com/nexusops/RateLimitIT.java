@@ -85,6 +85,24 @@ class RateLimitIT extends IntegrationTestSupport {
     }
 
     @Test
+    void controlCharPaddedWorkspaceVariantsShareTheAccountBucket() throws Exception {
+        var ws = TestTenants.signupAndVerify(mvc, mail, TestTenants.uniqueSlug("rl-pad"));
+        String slug = ws.slug();
+        // JSON escapes: each variant canonicalizes (Slug.normalize trims chars <= U+0020) to the same real workspace.
+        String[] variants = {slug, slug + "\\u0001", "\\u0002" + slug};
+        for (String variant : variants) {
+            loginAs(uniqueIp(), variant, ws.email()).andExpect(status().isUnauthorized());
+        }
+        loginAs(uniqueIp(), "\\u0003" + slug + "\\u0004", ws.email())
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().exists("Retry-After"));
+        // the bucket is keyed by the canonical account: the correct password from a fresh IP is limited too
+        mvc.perform(from(post("/api/v1/auth/login"), uniqueIp()).contentType(MediaType.APPLICATION_JSON).content("""
+                {"workspace":"%s\\u0005","email":" %s ","password":"%s"}""".formatted(slug, ws.email().toUpperCase(), ws.password())))
+                .andExpect(status().isTooManyRequests());
+    }
+
+    @Test
     void workspaceBucketCatchesSprayingAcrossAccounts() throws Exception {
         String workspace = "spray-" + UUID.randomUUID().toString().substring(0, 8);
         for (int i = 0; i < 5; i++) {
