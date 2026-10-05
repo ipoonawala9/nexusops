@@ -67,6 +67,8 @@ nexusops:
       invitation-accept: { capacity: 5, window: 1m }
       invitation-preview: { capacity: 20, window: 1m }
       refresh: { capacity: 30, window: 1m }
+      platform-login: { capacity: 10, window: 1m }
+      platform-login-account: { capacity: 5, window: 1m }
       api: { capacity: 300, window: 1m }
 
 server:
