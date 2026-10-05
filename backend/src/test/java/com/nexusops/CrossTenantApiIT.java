@@ -39,6 +39,7 @@ class CrossTenantApiIT extends IntegrationTestSupport {
 
     Session ownerA;
     Session ownerB;
+    Workspace a;
     Workspace b;
     UUID roleB;
     UUID userB;
@@ -46,7 +47,7 @@ class CrossTenantApiIT extends IntegrationTestSupport {
 
     @BeforeEach
     void twoTenants() throws Exception {
-        Workspace a = TestTenants.signupAndVerify(mvc, mail, TestTenants.uniqueSlug("xa"));
+        a = TestTenants.signupAndVerify(mvc, mail, TestTenants.uniqueSlug("xa"));
         b = TestTenants.signupAndVerify(mvc, mail, TestTenants.uniqueSlug("xb"));
         ownerA = TestTenants.login(mvc, a);
         ownerB = TestTenants.login(mvc, b);
@@ -81,8 +82,16 @@ class CrossTenantApiIT extends IntegrationTestSupport {
         as(ownerA, delete("/api/v1/roles/" + roleB)).andExpect(status().isNotFound());
         as(ownerA, delete("/api/v1/invitations/" + invitationB)).andExpect(status().isNotFound());
 
-        as(ownerB, get("/api/v1/users/" + userB)).andExpect(status().isOk()).andExpect(jsonPath("$.firstName").value("Mem"));
-        as(ownerB, get("/api/v1/roles/" + roleB)).andExpect(jsonPath("$.name").value("SecretB"));
+        // the probes must have left tenant B completely untouched
+        as(ownerB, get("/api/v1/users/" + userB)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.firstName").value("Mem"))
+                .andExpect(jsonPath("$.status").value("ACTIVE"))
+                .andExpect(jsonPath("$.roles[*].id", Matchers.hasItem(roleB.toString())));
+        as(ownerB, get("/api/v1/roles/" + roleB)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("SecretB"))
+                .andExpect(jsonPath("$.permissions", Matchers.contains("identity.user.read")));
+        as(ownerB, get("/api/v1/invitations"))
+                .andExpect(jsonPath("$[?(@.id == '" + invitationB + "')].status", Matchers.contains("PENDING")));
     }
 
     @Test
@@ -101,10 +110,43 @@ class CrossTenantApiIT extends IntegrationTestSupport {
                 .andExpect(jsonPath("$.total").value(1));
         as(ownerA, get("/api/v1/roles")).andExpect(jsonPath("$[*].id", Matchers.not(Matchers.hasItem(roleB.toString()))));
         as(ownerA, get("/api/v1/invitations")).andExpect(jsonPath("$", Matchers.empty()));
+        // positive controls: the audit list has the right shape, so the negative assertions below are meaningful
+        as(ownerA, get("/api/v1/audit-events").param("size", "100"))
+                .andExpect(jsonPath("$.items", Matchers.not(Matchers.empty())))
+                .andExpect(jsonPath("$.items[*].action", Matchers.hasItem("TenantCreated")))
+                .andExpect(jsonPath("$.items[*].action", Matchers.hasItem("LoginSucceeded")));
+        as(ownerB, get("/api/v1/audit-events").param("size", "100"))
+                .andExpect(jsonPath("$.items[*].entityId", Matchers.hasItem(roleB.toString())))
+                .andExpect(jsonPath("$.items[*].entityId", Matchers.hasItem(invitationB.toString())));
         as(ownerA, get("/api/v1/audit-events").param("size", "100"))
                 .andExpect(jsonPath("$.items[*].entityId", Matchers.not(Matchers.hasItem(roleB.toString()))))
                 .andExpect(jsonPath("$.items[*].entityId", Matchers.not(Matchers.hasItem(invitationB.toString()))));
         as(ownerA, get("/api/v1/tenant/modules")).andExpect(jsonPath("$[?(@.code == 'CRM')].enabled", Matchers.contains(false)));
-        as(ownerA, get("/api/v1/me")).andExpect(jsonPath("$.modules", Matchers.empty()));
+        as(ownerA, get("/api/v1/me")).andExpect(jsonPath("$.tenant.slug").value(a.slug()))
+                .andExpect(jsonPath("$.modules", Matchers.empty()));
+    }
+
+    @Test
+    void anotherTenantsModuleToggleDoesNotLeak() throws Exception {
+        as(ownerA, put("/api/v1/tenant/modules/HRMS").contentType(MediaType.APPLICATION_JSON).content("{\"enabled\":true}"))
+                .andExpect(status().isOk());
+        as(ownerB, get("/api/v1/tenant/modules"))
+                .andExpect(jsonPath("$[?(@.code == 'HRMS')].enabled", Matchers.contains(false)))
+                .andExpect(jsonPath("$[?(@.code == 'CRM')].enabled", Matchers.contains(true)));
+    }
+
+    @Test
+    void invitationTokenWithSwappedTenantPrefixIsRejected() throws Exception {
+        String token = mail.lastTokenFor("invitee-b@x.test");
+        String forged = a.tenantId() + token.substring(36);
+        String invalid = "This invitation link is invalid or has expired.";
+        mvc.perform(get("/api/v1/invitations/preview").param("token", forged))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.detail").value(invalid));
+        mvc.perform(post("/api/v1/invitations/accept").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"token\":\"" + forged + "\",\"firstName\":\"X\",\"lastName\":\"Y\",\"password\":\"" + TestTenants.PASSWORD + "\"}"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.detail").value(invalid));
+        // positive control: the genuine token previews B's workspace
+        mvc.perform(get("/api/v1/invitations/preview").param("token", token))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.workspace").value(b.slug()));
     }
 }
