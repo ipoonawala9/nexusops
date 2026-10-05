@@ -24,6 +24,9 @@ spring:
   mail:
     host: ${MAIL_HOST:localhost}
     port: ${MAIL_PORT:1025}
+  task:
+    execution:
+      mode: force
   mvc:
     problemdetails:
       enabled: true
