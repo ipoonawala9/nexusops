@@ -15,6 +15,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
  */
 class RlsCoverageIT extends IntegrationTestSupport {
 
+    static final Set<String> PLATFORM_TABLES = Set.of("platform_users", "platform_refresh_tokens");
     static final Set<String> GLOBAL_TABLES =
             Set.of("flyway_schema_history", "plans", "modules", "permissions", "tenants");
 
@@ -28,7 +29,8 @@ class RlsCoverageIT extends IntegrationTestSupport {
     void expectedTenantTablesExist() {
         List<String> tables = jdbc.queryForList(
                 "select tablename from pg_tables where schemaname = 'public'", String.class);
-        assertThat(tables).containsAll(EXPECTED_TENANT_TABLES).containsAll(GLOBAL_TABLES);
+        assertThat(tables).containsAll(EXPECTED_TENANT_TABLES).containsAll(GLOBAL_TABLES)
+                .containsAll(PLATFORM_TABLES);
     }
 
     @Test
