@@ -1,10 +1,12 @@
 package com.nexusops.support;
 
+import java.sql.Connection;
+import java.sql.SQLException;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
+
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
-import org.springframework.jdbc.datasource.SingleConnectionDataSource;
+import org.springframework.jdbc.datasource.DelegatingDataSource;
 
 /**
  * Test-only connections that bypass the application's DataSource. NOTE: FORCE RLS applies to the
@@ -14,7 +16,6 @@ public final class OwnerJdbc {
 
     private OwnerJdbc() {}
 
-    private static final ConcurrentHashMap<UUID, JdbcTemplate> OWNER_AS = new ConcurrentHashMap<>();
     private static volatile JdbcTemplate jdbc;
     private static volatile JdbcTemplate superuser;
     private static volatile JdbcTemplate rawApp;
@@ -29,16 +30,30 @@ public final class OwnerJdbc {
     }
 
     /**
-     * Single owner connection with app.tenant_id set, for setup/inspection of one tenant's rows.
-     * One connection is cached per tenant (the connection is dedicated, so the setting never changes).
+     * Owner connection with app.tenant_id set, for setup/inspection of one tenant's rows. Every
+     * operation gets a fresh connection with the setting applied, closed again after the operation,
+     * so no connection outlives a call.
      */
     public static JdbcTemplate ownerAs(UUID tenantId) {
-        return OWNER_AS.computeIfAbsent(tenantId, id -> {
-            var ds = new SingleConnectionDataSource(IntegrationTestSupport.POSTGRES.getJdbcUrl(), "nexusops_owner",
-                    IntegrationTestSupport.OWNER_PASSWORD, true);
-            var template = new JdbcTemplate(ds);
-            template.queryForObject("select set_config('app.tenant_id', ?, false)", String.class, id.toString());
-            return template;
+        return tenantScoped("nexusops_owner", IntegrationTestSupport.OWNER_PASSWORD, tenantId.toString());
+    }
+
+    /** Template over per-operation connections that have app.tenant_id set to {@code tenantSetting} ("" = no tenant). */
+    public static JdbcTemplate tenantScoped(String user, String password, String tenantSetting) {
+        var target = new DriverManagerDataSource(IntegrationTestSupport.POSTGRES.getJdbcUrl(), user, password);
+        return new JdbcTemplate(new DelegatingDataSource(target) {
+            @Override
+            public Connection getConnection() throws SQLException {
+                Connection connection = super.getConnection();
+                try (var ps = connection.prepareStatement("select set_config('app.tenant_id', ?, false)")) {
+                    ps.setString(1, tenantSetting);
+                    ps.execute();
+                } catch (SQLException | RuntimeException e) {
+                    connection.close();
+                    throw e;
+                }
+                return connection;
+            }
         });
     }
 

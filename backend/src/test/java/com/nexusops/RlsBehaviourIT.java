@@ -7,16 +7,12 @@ import com.nexusops.support.IntegrationTestSupport;
 import com.nexusops.support.OwnerJdbc;
 import java.sql.Timestamp;
 import java.time.Instant;
-import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.datasource.SingleConnectionDataSource;
 
 /** Proves the database layer alone isolates tenants, independent of application code. */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
@@ -42,17 +38,9 @@ class RlsBehaviourIT extends IntegrationTestSupport {
                 + "values (?, ?, 'b@b.test', 'x', 'B', 'B', 'ACTIVE', ?, ?)", USER_B, TENANT_B, now, now);
     }
 
-    private static final Map<Optional<UUID>, JdbcTemplate> APP_CONNECTIONS = new ConcurrentHashMap<>();
-
-    /** One cached connection per tenant (null = no tenant) so set_config persists across statements without leaking connections. */
+    /** Per-operation connections (closed after each call) with app.tenant_id set; null = no tenant. */
     private static JdbcTemplate appConnectionAs(UUID tenant) {
-        return APP_CONNECTIONS.computeIfAbsent(Optional.ofNullable(tenant), key -> {
-            var ds = new SingleConnectionDataSource(POSTGRES.getJdbcUrl(), "nexusops_app", APP_PASSWORD, true);
-            var jdbc = new JdbcTemplate(ds);
-            jdbc.queryForObject("select set_config('app.tenant_id', ?, false)", String.class,
-                    key.map(UUID::toString).orElse(""));
-            return jdbc;
-        });
+        return OwnerJdbc.tenantScoped("nexusops_app", APP_PASSWORD, tenant == null ? "" : tenant.toString());
     }
 
     @Test
