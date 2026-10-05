@@ -9,3 +9,7 @@ springdoc:
     enabled: false
   swagger-ui:
     enabled: false
+
+nexusops:
+  security:
+    allowed-origins: ${ALLOWED_ORIGINS}

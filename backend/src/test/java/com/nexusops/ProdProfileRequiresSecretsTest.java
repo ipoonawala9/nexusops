@@ -16,4 +16,14 @@ class ProdProfileRequiresSecretsTest {
                 .hasStackTraceContaining("Missing required secret")
                 .hasStackTraceContaining("DB_APP_PASSWORD");
     }
+
+    @Test
+    void prodProfileFailsFastWithoutAllowedOrigins() {
+        assertThatThrownBy(() -> new SpringApplicationBuilder(NexusOpsApplication.class)
+                        .profiles("prod")
+                        .run("--spring.main.web-application-type=none",
+                                "--spring.datasource.password=x", "--spring.flyway.password=y"))
+                .hasStackTraceContaining("Missing required secret")
+                .hasStackTraceContaining("ALLOWED_ORIGINS");
+    }
 }

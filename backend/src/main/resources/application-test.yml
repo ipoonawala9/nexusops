@@ -4,6 +4,8 @@ logging:
     org.testcontainers: WARN
 
 nexusops:
+  mail:
+    async: false
   security:
     jwt:
       ephemeral-keys: true

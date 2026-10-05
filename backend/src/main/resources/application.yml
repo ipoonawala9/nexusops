@@ -33,6 +33,7 @@ nexusops:
     base-url: ${APP_BASE_URL:http://localhost:5173}
   mail:
     from: "NexusOps <no-reply@nexusops.local>"
+    async: true
   security:
     jwt:
       issuer: nexusops
@@ -45,6 +46,7 @@ nexusops:
     allowed-origins: ${ALLOWED_ORIGINS:http://localhost:5173,http://localhost:3000}
 
 server:
+  forward-headers-strategy: native
   shutdown: graceful
   error:
     include-stacktrace: never
