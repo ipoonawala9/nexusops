@@ -20,7 +20,7 @@ class RlsCoverageIT extends IntegrationTestSupport {
 
     static final Set<String> EXPECTED_TENANT_TABLES = Set.of(
             "tenant_modules", "users", "refresh_tokens", "email_verifications",
-            "roles", "role_permissions", "user_roles", "audit_events");
+            "roles", "role_permissions", "user_roles", "audit_events", "invitations");
 
     @Autowired JdbcTemplate jdbc;
 

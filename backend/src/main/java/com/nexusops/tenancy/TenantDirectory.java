@@ -2,20 +2,26 @@ package com.nexusops.tenancy;
 
 import com.nexusops.audit.AuditEntry;
 import com.nexusops.audit.AuditService;
+import com.nexusops.shared.Ids;
 import com.nexusops.shared.TenantContext;
+import com.nexusops.shared.db.TenantLocks;
 import com.nexusops.shared.web.ApiProblem;
+import com.nexusops.tenancy.domain.ModuleDefinitionRepository;
 import com.nexusops.tenancy.domain.Tenant;
+import com.nexusops.tenancy.domain.TenantModule;
 import com.nexusops.tenancy.domain.TenantModuleRepository;
 import com.nexusops.tenancy.domain.TenantRepository;
 import java.time.DateTimeException;
 import java.time.ZoneId;
 import java.util.Currency;
+import java.util.HashSet;
 import java.util.IllformedLocaleException;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,11 +36,23 @@ public class TenantDirectory {
     private final TenantRepository tenants;
     private final TenantModuleRepository modules;
     private final AuditService audit;
+    private final ModuleDefinitionRepository catalog;
+    private final ApplicationEventPublisher events;
+    private final TenantLocks locks;
 
-    TenantDirectory(TenantRepository tenants, TenantModuleRepository modules, AuditService audit) {
+    TenantDirectory(
+            TenantRepository tenants,
+            TenantModuleRepository modules,
+            AuditService audit,
+            ModuleDefinitionRepository catalog,
+            ApplicationEventPublisher events,
+            TenantLocks locks) {
         this.tenants = tenants;
         this.modules = modules;
         this.audit = audit;
+        this.catalog = catalog;
+        this.events = events;
+        this.locks = locks;
     }
 
     /** Pre-auth: resolve a workspace by (leniently normalized) slug. Invalid input simply finds nothing. */
@@ -94,6 +112,48 @@ public class TenantDirectory {
     public List<String> enabledModules() {
         TenantContext.requireTenantId();
         return modules.findEnabledCodes();
+    }
+
+    @Transactional(readOnly = true)
+    public PlanLimits currentLimits() {
+        var row = tenants.findPlanLimits(TenantContext.requireTenantId());
+        return new PlanLimits(parse(row.getMaxUsers()), parse(row.getMaxModules()));
+    }
+
+    @Transactional(readOnly = true)
+    public List<ModuleState> modules() {
+        TenantContext.requireTenantId();
+        var enabled = new HashSet<>(modules.findEnabledCodes());
+        return catalog.findAllByOrderByCodeAsc().stream()
+                .map(m -> new ModuleState(m.getCode(), m.getName(), enabled.contains(m.getCode())))
+                .toList();
+    }
+
+    @Transactional
+    public ModuleState setModuleEnabled(String code, boolean enabled) {
+        UUID tenantId = TenantContext.requireTenantId();
+        var definition = catalog.findById(code).orElseThrow(() -> ApiProblem.notFound("Module not found."));
+        locks.lock("modules");
+        var module = modules.findByModuleCode(code)
+                .orElseGet(() -> modules.save(new TenantModule(Ids.newId(), code, false)));
+        if (module.isEnabled() == enabled) {
+            return new ModuleState(code, definition.getName(), enabled);
+        }
+        if (enabled) {
+            Integer max = currentLimits().maxModules();
+            if (max != null && modules.countByEnabledTrue() >= max) {
+                throw ApiProblem.conflict("Your plan allows " + max + " modules. Upgrade to enable more.");
+            }
+        }
+        module.setEnabled(enabled);
+        modules.flush();
+        audit.record(AuditEntry.of(enabled ? "ModuleEnabled" : "ModuleDisabled", "Module", code));
+        events.publishEvent(new ModulesChanged(tenantId));
+        return new ModuleState(code, definition.getName(), enabled);
+    }
+
+    private static Integer parse(String value) {
+        return value == null || value.isBlank() ? null : Integer.valueOf(value);
     }
 
     private Tenant currentTenant() {

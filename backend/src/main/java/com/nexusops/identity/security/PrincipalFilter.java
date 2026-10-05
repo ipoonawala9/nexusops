@@ -1,6 +1,7 @@
 package com.nexusops.identity.security;
 
 import com.nexusops.shared.TenantContext;
+import com.nexusops.shared.ratelimit.RateLimits;
 import com.nexusops.shared.security.ProblemDetailSecurityHandlers;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -28,10 +29,12 @@ public class PrincipalFilter extends OncePerRequestFilter {
 
     private final PrincipalStateCache principals;
     private final ProblemDetailSecurityHandlers problems;
+    private final RateLimits rateLimits;
 
-    PrincipalFilter(PrincipalStateCache principals, ProblemDetailSecurityHandlers problems) {
+    PrincipalFilter(PrincipalStateCache principals, ProblemDetailSecurityHandlers problems, RateLimits rateLimits) {
         this.principals = principals;
         this.problems = problems;
+        this.rateLimits = rateLimits;
     }
 
     @Override
@@ -66,9 +69,18 @@ public class PrincipalFilter extends OncePerRequestFilter {
                         "SUSPENDED".equals(state.tenantStatus()) ? "Workspace suspended." : "Workspace is not active.");
                 return;
             }
+            var retryAfter = rateLimits.apiRetryAfter(tenantId, userId);
+            if (retryAfter.isPresent()) {
+                response.setHeader(org.springframework.http.HttpHeaders.RETRY_AFTER, String.valueOf(retryAfter.getAsLong()));
+                reject(response, HttpStatus.TOO_MANY_REQUESTS, "Too Many Requests",
+                        "Too many requests. Try again in " + retryAfter.getAsLong() + " seconds.");
+                return;
+            }
             List<SimpleGrantedAuthority> authorities = state.permissions().stream().map(SimpleGrantedAuthority::new).toList();
             var context = SecurityContextHolder.createEmptyContext();
-            context.setAuthentication(new JwtAuthenticationToken(jwt, authorities, userId.toString()));
+            var authenticated = new JwtAuthenticationToken(jwt, authorities, userId.toString());
+            authenticated.setDetails(new com.nexusops.shared.security.ActorDetails(state.roleIds(), state.grantablePermissions()));
+            context.setAuthentication(authenticated);
             SecurityContextHolder.setContext(context);
             chain.doFilter(request, response);
         }

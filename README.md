@@ -42,6 +42,28 @@ curl -s -c /tmp/nx.cookies -X POST localhost:8081/api/v1/auth/login -H 'Content-
   -d '{"workspace":"acme","email":"ada@acme.test","password":"correct horse battery staple"}'
 curl -s localhost:8081/api/v1/me -H "Authorization: Bearer <accessToken>"
 ```
+### Invite a teammate
+```bash
+TOKEN=<accessToken from the owner login above>
+# 1. the owner creates a role (permission codes: GET /api/v1/permissions)
+curl -s -X POST localhost:8081/api/v1/roles -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"name":"Support","description":"Read-only support","permissions":["identity.user.read","tenant.settings.read"]}'
+# 2. the owner invites someone with that role (roleId from the response above)
+curl -s -X POST localhost:8081/api/v1/invitations -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"email":"sam@acme.test","roleId":"<roleId>"}'
+# 3. read the invitation token from the email in Mailpit (http://localhost:8025)
+# 4. the invitee previews the invitation, then accepts it
+curl -s "localhost:8081/api/v1/invitations/preview?token=<token>"
+curl -s -X POST localhost:8081/api/v1/invitations/accept -H 'Content-Type: application/json' \
+  -d '{"token":"<token>","firstName":"Sam","lastName":"Support","password":"another long passphrase"}'
+# 5. the invitee logs in
+curl -s -X POST localhost:8081/api/v1/auth/login -H 'Content-Type: application/json' \
+  -d '{"workspace":"acme","email":"sam@acme.test","password":"another long passphrase"}'
+```
+The API is rate-limited (defaults from spec §9, e.g. 10 logins per minute per IP and per account, 300 API calls per
+minute per user); exceeding a limit returns `429` with a `Retry-After` header. Change the local defaults through
+`nexusops.rate-limits.rules.*`.
+
 The API contract is in `docs/api/openapi.json`; Swagger UI at http://localhost:8081/swagger-ui.html.
 
 ## Tests

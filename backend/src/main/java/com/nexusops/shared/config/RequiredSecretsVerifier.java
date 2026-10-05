@@ -22,6 +22,7 @@ class RequiredSecretsVerifier implements BeanFactoryPostProcessor, EnvironmentAw
     static {
         REQUIRED.put("spring.datasource.password", "DB_APP_PASSWORD");
         REQUIRED.put("spring.flyway.password", "DB_OWNER_PASSWORD");
+        REQUIRED.put("nexusops.security.allowed-origins", "ALLOWED_ORIGINS");
     }
 
     private Environment environment;

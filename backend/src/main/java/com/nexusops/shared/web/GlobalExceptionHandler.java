@@ -13,8 +13,10 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 /**
@@ -44,12 +46,25 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                     .map(e -> Map.of("field", e.field(), "message", e.message()))
                     .toList());
         }
-        return ResponseEntity.status(ex.status()).body(problem);
+        var response = ResponseEntity.status(ex.status());
+        if (ex instanceof com.nexusops.shared.ratelimit.RateLimitExceeded limited) {
+            response.header(HttpHeaders.RETRY_AFTER, String.valueOf(limited.retryAfterSeconds()));
+        }
+        return response.body(problem);
     }
 
     @ExceptionHandler(org.springframework.orm.ObjectOptimisticLockingFailureException.class)
     ResponseEntity<ProblemDetail> handleOptimisticLock(Exception ex) {
         return problem(HttpStatus.CONFLICT, "Conflict", "This record was changed by someone else. Reload and try again.");
+    }
+
+    /** A malformed path id (e.g. not a UUID) names no resource: 404. Any other mistyped parameter is a 400 field error. */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    ResponseEntity<ProblemDetail> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
+        if (ex.getParameter().hasParameterAnnotation(PathVariable.class)) {
+            return problem(HttpStatus.NOT_FOUND, "Not Found", "Resource not found.");
+        }
+        return handleApiProblem(ApiProblem.badRequestField(ex.getName(), "Invalid value."));
     }
 
     @ExceptionHandler(Exception.class)

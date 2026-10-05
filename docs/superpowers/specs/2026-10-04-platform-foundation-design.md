@@ -121,6 +121,8 @@ Conventions:
 | V4 audit | `audit_events(id, tenant_id NULL, actor_type, actor_id, action, entity_type, entity_id, occurred_at, ip, user_agent, request_id, correlation_id, before jsonb, after jsonb, metadata jsonb)`. A trigger blocks UPDATE/DELETE, and the app role gets INSERT/SELECT only |
 | V5 rls | Policies + grants described in §4.2 |
 
+Note on the `tenants` row (V1): slug rule superseded by V5: `^[a-z0-9]+(-[a-z0-9]+)*$` and length 3–40.
+
 Composite FKs include `tenant_id`, so a row cannot reference another tenant's row. Example: `user_roles(tenant_id, role_id) → roles(tenant_id, id)`.
 
 Lookups by token hash must work before the tenant is known (refresh, verification, invitation). Two parts make that possible:
@@ -173,7 +175,7 @@ A Redis token bucket implemented as an atomic Lua script. The filter runs before
 
 | Route class | Key | Default |
 |---|---|---|
-| login / platform login | `ip:{ip}:rl:login` and `tenant-slug:{slug}:rl:login` | 10/min |
+| login / platform login | per IP `rl:ip:{ip}:login`; per account `rl:acct:{sha256(workspace+email)}:login`; per workspace `rl:ws:{sha256(workspace)}:login-workspace`, failed logins only (see §16 / ADR-0006) | 10/min per IP; 10/min per account; 100/min per workspace |
 | signup, invitation accept, verify | `ip:{ip}:rl:{route}` | 5/min |
 | refresh | `ip:{ip}:rl:refresh` | 30/min |
 | authenticated API | `tenant:{tid}:user:{uid}:rl:api` | 300/min |
@@ -261,3 +263,52 @@ Exceeding a limit returns 429 ProblemDetail + `Retry-After`. Limits are configur
 5. **Added `POST /auth/resend-verification`.** It always returns 202, so it can't be used to discover accounts. Without it, a lost email leaves the workspace stuck.
 6. **Principal cache TTL is 60 s instead of 5 min.** It is explicitly evicted on every user, role or tenant change. The short TTL bounds how stale it can get if an eviction is missed.
 7. **Refresh-reuse grace window of 10 s.** Re-presenting a token that was rotated less than 10 s ago returns 401 *without* revoking the family. Two browser tabs share one cookie jar, so the losing tab's next attempt carries the new cookie. Any reuse after the grace window revokes the whole family and is audited.
+
+
+## 16. Deltas adopted in Plan 3
+
+1. **Plan limits are enforced now** (your decision, 2026-10-05). Free allows 3 users and 2 modules.
+   - The user count is ACTIVE users plus pending, unexpired invitations.
+   - Limits come from `plans.limits`; a `null` value means unlimited.
+2. **Pre-auth rate-limit keys are not tenant-prefixed.** No tenant is known at that point. They use `rl:ip:{ip}:{route}` and `rl:ws:{sha256(slug)}:login`, built only by `RateLimitKeys`. Authenticated API keys stay tenant-prefixed: `tenant:{tid}:user:{uid}:rl:api`.
+3. **The principal cache uses a generation counter.** Each entry has a `…:principal-gen` key. Eviction increments it, and writes only land when the generation is unchanged. This closes Plan 2's evict-then-repopulate race without delayed deletes.
+4. **Owner-set changes serialize per tenant.** They run under `pg_advisory_xact_lock(hashtext('owners:' || tenant_id))`. Two owners demoting or disabling each other at the same moment can't leave a workspace with no active owner.
+5. **A role can't be deleted while it is assigned.** The API returns 409, and the caller must unassign it first. That's safer than silently stripping access through `ON DELETE CASCADE`.
+6. **`PATCH /users/{id}` has one route with two permissions.** Changing names needs `identity.user.update`, and changing status needs `identity.user.disable`. The route's `@PreAuthorize` requires either one, and the service checks the specific one.
+7. **Mail delivery runs on a bounded `mailExecutor`.** That's async in every profile except `test`, which runs it synchronously so tests stay deterministic. This fixes Plan 2's resend timing side channel and the DB connection being held during SMTP.
+8. **Client IP comes from Tomcat's `RemoteIpValve`** (`server.forward-headers-strategy: native`), which only trusts internal proxy ranges. nginx now **overwrites** `X-Forwarded-For` with `$remote_addr`.
+9. **Escalation uses grantable permissions**, not effective ones. `PrincipalState` carries the actor's `roleIds` and the unfiltered `grantablePermissions`. `PrincipalFilter` exposes them as `ActorDetails` on the authentication, so modules don't need cross-module lookups.
+
+### Changes during implementation
+
+The built system deviates from the decisions above as follows:
+
+- **Login rate limiting uses three buckets** instead of the per-IP plus per-workspace pair in decision 2: rule `login`
+  per IP (10/min), rule `login-account` per `sha256(workspace + "\n" + email)` (10/min) and rule `login-workspace` per
+  workspace (100/min, anti-spraying). A per-workspace 10/min limit let any anonymous client lock a whole tenant out
+  of login. See ADR-0006.
+  - **The workspace bucket counts failed logins only.** The login peeks it without consuming (429 if empty) and a failed
+    authentication consumes one token; a successful login never does. Residual risk, accepted: an attacker with about
+    10 IPs sending failures can still block a workspace's logins for the window, and hammering one account can lock
+    that one user out. CAPTCHA/step-up is future work.
+  - **The account and workspace keys use the canonical slug and email** the login lookup uses, so control-character
+    padded or case variants share one bucket. Input that can't canonicalize charges only the per-IP bucket.
+- **Rate-limit IP keys are normalized:** IPv6 uses the /64 prefix, IPv4-mapped IPv6 becomes the IPv4 address, and only
+  literal IPs are parsed (no DNS). Redis command and connect timeouts are 500 ms.
+- **The principal cache also has a tenant-level generation** `tenant:{t}:principal-gen`, bumped first by
+  `evictTenant`, in addition to the per-user generations (decision 3).
+- **`spring.task.execution.mode: force`** keeps Boot's `applicationTaskExecutor` alongside the bounded `mailExecutor`
+  (decision 7).
+- **Owners-only also covers re-enabling a disabled owner:** it requires an owner, like assigning or removing the
+  owner role.
+- **A role manager can't weaken or delete a more-powerful role** (your decision, 2026-10-05). For `PATCH /roles/{id}`,
+  `PUT /roles/{id}/permissions` and `DELETE /roles/{id}`, the target role's current permissions must be within the
+  actor's grantable permissions, else 403 "You can't change a role with permissions you don't have." Order: 404
+  cross-tenant → 409 system role → 403 hierarchy (before the assignment count on delete). PUT still also requires the
+  new set to be grantable. See ADR-0004.
+- **A user can't disable, re-enable or change the roles of a more-privileged user** (your decision, 2026-10-06). For
+  status changes via `PATCH /users/{id}` and for `PUT /users/{id}/roles`, the target user's current permissions must be
+  within the actor's grantable permissions, else 403 "You can't manage a user with permissions you don't have." Owner
+  targets keep the owners-only 403 first. Peers with identical permissions may manage each other. See ADR-0004.
+- **Mistyped parameters:** a malformed path id (e.g. not a UUID) is 404; any other mistyped parameter
+  (`?page=abc`, `?actorId=not-a-uuid`) is 400 with a field error.

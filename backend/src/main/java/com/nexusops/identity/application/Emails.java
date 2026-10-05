@@ -2,6 +2,7 @@ package com.nexusops.identity.application;
 
 import com.nexusops.shared.web.ApiProblem;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.regex.Pattern;
 
 public final class Emails {
@@ -16,5 +17,14 @@ public final class Emails {
             throw ApiProblem.badRequestField("email", "Enter a valid email address.");
         }
         return email;
+    }
+
+    /** Null-safe variant for pre-auth paths: invalid input is simply empty. */
+    public static Optional<String> tryNormalize(String raw) {
+        try {
+            return Optional.of(normalize(raw));
+        } catch (ApiProblem invalid) {
+            return Optional.empty();
+        }
     }
 }

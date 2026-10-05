@@ -32,6 +32,13 @@ class EndpointAuthorizationCoverageTest extends IntegrationTestSupport {
             }
             boolean secured = AnnotatedElementUtils.hasAnnotation(handler.getMethod(), PreAuthorize.class)
                     || AnnotatedElementUtils.hasAnnotation(handler.getBeanType(), PreAuthorize.class);
+            var preAuthorize = AnnotatedElementUtils.findMergedAnnotation(handler.getMethod(), PreAuthorize.class);
+            if (preAuthorize == null) {
+                preAuthorize = AnnotatedElementUtils.findMergedAnnotation(handler.getBeanType(), PreAuthorize.class);
+            }
+            if (preAuthorize != null && preAuthorize.value().replace(" ", "").matches("(?i)permitAll\\(\\)|true")) {
+                violations.add(handler.getMethod() + " (@PreAuthorize is trivially open: " + preAuthorize.value() + ")");
+            }
             var methods = info.getMethodsCondition().getMethods();
             for (String path : info.getPatternValues()) {
                 if (methods.isEmpty()) {

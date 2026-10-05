@@ -23,4 +23,16 @@ public class TenantModule extends TenantOwnedEntity {
         this.moduleCode = moduleCode;
         this.enabled = enabled;
     }
+
+    public String getModuleCode() {
+        return moduleCode;
+    }
+
+    public boolean isEnabled() {
+        return enabled;
+    }
+
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
+    }
 }

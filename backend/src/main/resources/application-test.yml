@@ -4,6 +4,20 @@ logging:
     org.testcontainers: WARN
 
 nexusops:
+  mail:
+    async: false
   security:
     jwt:
       ephemeral-keys: true
+  rate-limits:
+    rules:
+      login: { capacity: 100000, window: 1m }
+      login-account: { capacity: 100000, window: 1m }
+      login-workspace: { capacity: 100000, window: 1m }
+      signup: { capacity: 100000, window: 1m }
+      verify-email: { capacity: 100000, window: 1m }
+      resend-verification: { capacity: 100000, window: 1m }
+      invitation-accept: { capacity: 100000, window: 1m }
+      invitation-preview: { capacity: 100000, window: 1m }
+      refresh: { capacity: 100000, window: 1m }
+      api: { capacity: 100000, window: 1m }
