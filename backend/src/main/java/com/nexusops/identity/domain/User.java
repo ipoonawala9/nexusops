@@ -83,6 +83,14 @@ public class User extends TenantOwnedEntity {
         return user;
     }
 
+    /** A person who accepted an invitation: active, email proven by the invitation link, holding one role. */
+    public static User joinFromInvitation(UUID id, String email, String passwordHash, String firstName, String lastName,
+            UUID roleId, Instant now) {
+        User user = registerOwner(id, email, passwordHash, firstName, lastName, roleId);
+        user.markEmailVerified(now);
+        return user;
+    }
+
     public void markEmailVerified(Instant now) {
         if (emailVerifiedAt == null) {
             emailVerifiedAt = now;

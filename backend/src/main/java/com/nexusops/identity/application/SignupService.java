@@ -66,8 +66,8 @@ public class SignupService {
     public SignupResult signup(SignupCommand command) {
         String email = Emails.normalize(command.email());
         passwordPolicy.check(command.password(), email);
-        String firstName = requireName(command.firstName(), "firstName");
-        String lastName = requireName(command.lastName(), "lastName");
+        String firstName = Names.require(command.firstName(), "firstName");
+        String lastName = Names.require(command.lastName(), "lastName");
         String passwordHash = passwordEncoder.encode(command.password()); // slow: outside the transaction
 
         UUID tenantId = Ids.newId();
@@ -138,14 +138,6 @@ public class SignupService {
 
                 This link expires in 24 hours. If you didn't create this workspace, you can ignore this email.
                 """.formatted(firstName, slug, link))));
-    }
-
-    private static String requireName(String raw, String field) {
-        String name = raw == null ? "" : raw.strip();
-        if (name.isEmpty() || name.length() > 80) {
-            throw ApiProblem.badRequestField(field, "Enter between 1 and 80 characters.");
-        }
-        return name;
     }
 
     private static ApiProblem invalidLink() {
