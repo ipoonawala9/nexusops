@@ -59,6 +59,11 @@ management:
     health:
       probes:
         enabled: true
+  health:
+    # Mail is non-critical (sent after commit, failures only logged); an SMTP
+    # outage must not make the service report DOWN / 503 and get pulled by the LB.
+    mail:
+      enabled: false
 
 springdoc:
   api-docs:
