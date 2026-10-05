@@ -15,19 +15,42 @@ import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.Cursor;
 import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Per-request principal state with a short Redis TTL. Explicit eviction keeps it fresh; if Redis is
- * unavailable we fall back to the database (still correct, just slower).
+ * Per-request principal state with a short Redis TTL.
+ *
+ * <p>Race-free invalidation: every entry has a generation counter ({@code …:principal-gen}). Eviction
+ * increments it and deletes the entry; a request that loaded state from the database may only store it
+ * if the generation it read BEFORE loading is still current. So a request that read the old token
+ * version just before a logout-all/disable can never re-populate the cache with stale state.
+ * Redis failures fall back to the database (correct, just slower).
  */
 @Component
 public class PrincipalStateCache {
 
     private static final Logger log = LoggerFactory.getLogger(PrincipalStateCache.class);
     static final Duration TTL = Duration.ofSeconds(60);
+    static final Duration GENERATION_TTL = Duration.ofHours(1);
+
+    private static final RedisScript<Long> STORE_IF_GENERATION = new DefaultRedisScript<>("""
+            local current = redis.call('GET', KEYS[2]) or '0'
+            if current == ARGV[1] then
+              redis.call('SET', KEYS[1], ARGV[2], 'PX', ARGV[3])
+              return 1
+            end
+            return 0
+            """, Long.class);
+
+    private static final RedisScript<Long> BUMP_AND_DELETE = new DefaultRedisScript<>("""
+            redis.call('INCR', KEYS[2])
+            redis.call('PEXPIRE', KEYS[2], ARGV[1])
+            return redis.call('DEL', KEYS[1])
+            """, Long.class);
 
     private final StringRedisTemplate redis;
     private final JsonMapper json;
@@ -52,19 +75,25 @@ public class PrincipalStateCache {
             throw new IllegalStateException("Principal lookup outside its tenant scope");
         }
         String key = key(tenantId, userId);
+        String generationKey = generationKey(tenantId, userId);
+        String seenGeneration = null;
         try {
             String cached = redis.opsForValue().get(key);
             if (cached != null) {
                 return json.readValue(cached, PrincipalState.class);
             }
+            String generation = redis.opsForValue().get(generationKey);
+            seenGeneration = generation == null ? "0" : generation;
         } catch (RuntimeException e) {
             log.warn("Principal cache read failed; using database", e);
         }
         PrincipalState state = load(userId);
-        try {
-            redis.opsForValue().set(key, json.writeValueAsString(state), TTL);
-        } catch (RuntimeException e) {
-            log.warn("Principal cache write failed", e);
+        if (seenGeneration != null) {
+            try {
+                storeIfGeneration(key, generationKey, seenGeneration, json.writeValueAsString(state));
+            } catch (RuntimeException e) {
+                log.warn("Principal cache write failed", e);
+            }
         }
         return state;
     }
@@ -72,19 +101,30 @@ public class PrincipalStateCache {
     /** Best-effort: a Redis failure is logged, not thrown (entries expire within {@link #TTL} anyway). */
     public void evict(UUID tenantId, UUID userId) {
         try {
-            redis.delete(key(tenantId, userId));
+            bumpAndDelete(key(tenantId, userId));
         } catch (RuntimeException e) {
             log.warn("Principal cache eviction failed; entry expires within TTL", e);
         }
     }
 
-    /** Best-effort: a Redis failure is logged, not thrown (entries expire within {@link #TTL} anyway). */
+    /** Evicts every principal entry of one tenant (and nothing else under its prefix, e.g. rate-limit buckets). */
     public void evictTenant(UUID tenantId) {
-        try (Cursor<String> keys = redis.scan(ScanOptions.scanOptions().match(TenantKeys.tenantPattern(tenantId)).count(500).build())) {
-            keys.forEachRemaining(redis::delete);
+        String pattern = TenantKeys.key(tenantId, "user") + ":*:principal";
+        try (Cursor<String> keys = redis.scan(ScanOptions.scanOptions().match(pattern).count(500).build())) {
+            keys.forEachRemaining(this::bumpAndDelete);
         } catch (RuntimeException e) {
             log.warn("Tenant principal cache eviction failed; entries expire within TTL", e);
         }
+    }
+
+    boolean storeIfGeneration(String key, String generationKey, String seenGeneration, String value) {
+        Long stored = redis.execute(STORE_IF_GENERATION, List.of(key, generationKey),
+                seenGeneration, value, String.valueOf(TTL.toMillis()));
+        return stored != null && stored == 1L;
+    }
+
+    private void bumpAndDelete(String key) {
+        redis.execute(BUMP_AND_DELETE, List.of(key, key + "-gen"), String.valueOf(GENERATION_TTL.toMillis()));
     }
 
     private PrincipalState load(UUID userId) {
@@ -101,7 +141,11 @@ public class PrincipalStateCache {
         });
     }
 
-    private static String key(UUID tenantId, UUID userId) {
+    static String key(UUID tenantId, UUID userId) {
         return TenantKeys.key(tenantId, "user", userId.toString(), "principal");
+    }
+
+    static String generationKey(UUID tenantId, UUID userId) {
+        return key(tenantId, userId) + "-gen";
     }
 }
