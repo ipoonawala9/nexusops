@@ -33,6 +33,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class TenantDirectory {
 
+    static final String SUSPEND_NOT_ACTIVE = "Only an active workspace can be suspended.";
+    static final String REACTIVATE_NOT_SUSPENDED = "Only a suspended workspace can be reactivated.";
+
     private final TenantRepository tenants;
     private final TenantModuleRepository modules;
     private final AuditService audit;
@@ -150,6 +153,51 @@ public class TenantDirectory {
         audit.record(AuditEntry.of(enabled ? "ModuleEnabled" : "ModuleDisabled", "Module", code));
         events.publishEvent(new ModulesChanged(tenantId));
         return new ModuleState(code, definition.getName(), enabled);
+    }
+
+    /**
+     * Platform only (ADR-0007): suspends the tenant bound in TenantContext on behalf of a platform operator.
+     * Members are blocked on their next request: TenantStatusChanged evicts the principal cache after commit.
+     * Concurrent status changes fail on Tenant's @Version (409).
+     */
+    @Transactional
+    public TenantSummary suspendCurrent(UUID platformUserId, String rawReason) {
+        String reason = requireReason(rawReason);
+        Tenant tenant = currentTenant();
+        if (tenant.toSummary().status() != TenantStatus.ACTIVE) {
+            throw ApiProblem.conflict(SUSPEND_NOT_ACTIVE);
+        }
+        tenant.suspend();
+        return statusChanged(tenant, "TenantSuspended", platformUserId, reason);
+    }
+
+    /** Platform only (ADR-0007): reactivates the suspended tenant bound in TenantContext. */
+    @Transactional
+    public TenantSummary reactivateCurrent(UUID platformUserId, String rawReason) {
+        String reason = requireReason(rawReason);
+        Tenant tenant = currentTenant();
+        if (tenant.toSummary().status() != TenantStatus.SUSPENDED) {
+            throw ApiProblem.conflict(REACTIVATE_NOT_SUSPENDED);
+        }
+        tenant.reactivate();
+        return statusChanged(tenant, "TenantReactivated", platformUserId, reason);
+    }
+
+    private TenantSummary statusChanged(Tenant tenant, String action, UUID platformUserId, String reason) {
+        tenants.flush();
+        audit.record(AuditEntry.of(action, "Tenant", tenant.getId())
+                .withMetadata(Map.of("reason", reason))
+                .asPlatformActor(platformUserId));
+        events.publishEvent(new TenantStatusChanged(tenant.getId()));
+        return tenant.toSummary();
+    }
+
+    private static String requireReason(String raw) {
+        String reason = raw == null ? "" : raw.strip();
+        if (reason.isEmpty() || reason.length() > 500) {
+            throw ApiProblem.badRequestField("reason", "Enter a reason between 1 and 500 characters.");
+        }
+        return reason;
     }
 
     private static Integer parse(String value) {
