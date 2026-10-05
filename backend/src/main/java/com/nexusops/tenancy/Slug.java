@@ -9,7 +9,9 @@ import java.util.regex.Pattern;
 /** Workspace slugs: trimmed, lower-cased, 3–40 chars of [a-z0-9] with single inner hyphens, not reserved. */
 public final class Slug {
 
-    private static final Pattern VALID = Pattern.compile("^[a-z0-9](-?[a-z0-9]){2,39}$");
+    private static final Pattern VALID = Pattern.compile("^[a-z0-9]+(-[a-z0-9]+)*$");
+    private static final int MIN_LENGTH = 3;
+    private static final int MAX_LENGTH = 40;
     private static final Set<String> RESERVED = Set.of(
             "api", "app", "admin", "www", "platform", "auth", "login", "signup", "static", "assets",
             "mail", "support", "help", "status", "nexusops");
@@ -21,7 +23,7 @@ public final class Slug {
             throw ApiProblem.badRequestField("slug", "Workspace URL is required.");
         }
         String slug = raw.trim().toLowerCase(Locale.ROOT);
-        if (!VALID.matcher(slug).matches()) {
+        if (slug.length() < MIN_LENGTH || slug.length() > MAX_LENGTH || !VALID.matcher(slug).matches()) {
             throw ApiProblem.badRequestField("slug",
                     "Use 3–40 lowercase letters, digits or single hyphens, starting and ending with a letter or digit.");
         }

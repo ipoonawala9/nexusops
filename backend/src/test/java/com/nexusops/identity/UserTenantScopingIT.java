@@ -85,7 +85,7 @@ class UserTenantScopingIT extends IntegrationTestSupport {
         UUID family = Ids.newId();
         Instant now = Instant.now();
         TenantContext.runAs(tenantA, () -> tx.executeWithoutResult(s -> refreshTokens.save(RefreshToken.issue(
-                Ids.newId(), userA, family, "a".repeat(64), now.plus(Duration.ofDays(1)), null, null))));
+                Ids.newId(), userA, family, "a".repeat(64), now.plus(Duration.ofDays(1)), 0, null, null))));
         int fromB = TenantContext.callAs(tenantB,
                 () -> tx.execute(s -> refreshTokens.revokeFamily(family, RevokeReason.LOGOUT, now)));
         assertThat(fromB).isZero();

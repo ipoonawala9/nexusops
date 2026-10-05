@@ -36,6 +36,10 @@ public class RefreshToken extends TenantOwnedEntity {
     @Column(name = "replaced_by")
     private UUID replacedBy;
 
+    /** The user's token_version when this token was issued; a later logout-all invalidates it. */
+    @Column(name = "token_version", nullable = false)
+    private int tokenVersion;
+
     @Column(name = "created_ip")
     private String createdIp;
 
@@ -52,9 +56,10 @@ public class RefreshToken extends TenantOwnedEntity {
     }
 
     public static RefreshToken issue(UUID id, UUID userId, UUID familyId, String tokenHash, Instant expiresAt,
-            String ip, String userAgent) {
+            int tokenVersion, String ip, String userAgent) {
         RefreshToken token = new RefreshToken(id);
         token.userId = userId;
+        token.tokenVersion = tokenVersion;
         token.familyId = familyId;
         token.tokenHash = tokenHash;
         token.expiresAt = expiresAt;
@@ -82,5 +87,6 @@ public class RefreshToken extends TenantOwnedEntity {
     public UUID getUserId() { return userId; }
     public UUID getFamilyId() { return familyId; }
     public Instant getExpiresAt() { return expiresAt; }
+    public int getTokenVersion() { return tokenVersion; }
     public RevokeReason getRevokeReason() { return revokeReason; }
 }

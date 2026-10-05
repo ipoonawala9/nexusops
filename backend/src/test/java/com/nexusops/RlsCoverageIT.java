@@ -36,7 +36,7 @@ class RlsCoverageIT extends IntegrationTestSupport {
         List<String> unprotected = jdbc.queryForList("""
                 select c.relname
                 from pg_class c join pg_namespace n on n.oid = c.relnamespace
-                where n.nspname = 'public' and c.relkind = 'r'
+                where n.nspname = 'public' and c.relkind in ('r', 'p')
                   and not (c.relrowsecurity and c.relforcerowsecurity
                            and exists (select 1 from pg_policies p where p.schemaname = 'public' and p.tablename = c.relname))
                 """, String.class);

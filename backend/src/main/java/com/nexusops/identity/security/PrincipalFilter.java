@@ -20,7 +20,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
 /**
  * Runs after JWT verification: binds TenantContext from the verified claims, then loads the
  * caller's live state (user status, token version, tenant status, permissions). Rejects stale
- * tokens and suspended tenants before any controller runs; grants permissions as authorities.
+ * tokens and any tenant that is not ACTIVE before any controller runs; grants permissions as
+ * authorities.
  */
 @Component
 public class PrincipalFilter extends OncePerRequestFilter {
@@ -60,8 +61,9 @@ public class PrincipalFilter extends OncePerRequestFilter {
                 reject(response, HttpStatus.UNAUTHORIZED, "Unauthorized", "Your session is no longer valid. Please sign in again.");
                 return;
             }
-            if ("SUSPENDED".equals(state.tenantStatus())) {
-                reject(response, HttpStatus.FORBIDDEN, "Forbidden", "Workspace suspended.");
+            if (!"ACTIVE".equals(state.tenantStatus())) { // allow-list: any non-active workspace fails closed
+                reject(response, HttpStatus.FORBIDDEN, "Forbidden",
+                        "SUSPENDED".equals(state.tenantStatus()) ? "Workspace suspended." : "Workspace is not active.");
                 return;
             }
             List<SimpleGrantedAuthority> authorities = state.permissions().stream().map(SimpleGrantedAuthority::new).toList();

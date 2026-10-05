@@ -34,4 +34,22 @@ class SlugTest {
     void acceptsFortyCharacters() {
         assertThat(Slug.normalize("abcdefghijabcdefghijabcdefghijabcdefghij")).hasSize(40);
     }
+
+    @Test
+    void lengthCountsCharactersIncludingHyphens() {
+        assertThat(Slug.normalize("a-b")).isEqualTo("a-b");
+        String hyphenated40 = "ab" + "-b".repeat(19);
+        assertThat(hyphenated40).hasSize(40);
+        assertThat(Slug.normalize(hyphenated40)).isEqualTo(hyphenated40);
+    }
+
+    @Test
+    void rejectsHyphenatedSlugsLongerThanFortyCharacters() {
+        String hyphenated41 = "a" + "-b".repeat(20);
+        String hyphenated79 = "a" + "-b".repeat(39);
+        assertThat(hyphenated41).hasSize(41);
+        assertThat(hyphenated79).hasSize(79);
+        assertThat(Slug.tryNormalize(hyphenated41)).isEmpty();
+        assertThat(Slug.tryNormalize(hyphenated79)).isEmpty();
+    }
 }

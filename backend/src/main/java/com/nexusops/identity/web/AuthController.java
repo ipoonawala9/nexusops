@@ -28,7 +28,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Public authentication routes — each is listed in PublicEndpoints. */
+/**
+ * Authentication routes. All are public (listed in PublicEndpoints) except {@code POST /logout-all},
+ * which requires an authenticated caller.
+ */
 @RestController
 @RequestMapping("/api/v1/auth")
 class AuthController {

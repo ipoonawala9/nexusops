@@ -13,11 +13,19 @@ import com.nexusops.support.TestTenants;
 import com.nexusops.support.TestTenants.Session;
 import com.nexusops.support.TestTenants.Workspace;
 import jakarta.servlet.http.Cookie;
+import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.ResultActions;
 
 @AutoConfigureMockMvc
@@ -71,6 +79,37 @@ class RefreshTokenIT extends IntegrationTestSupport {
         rotate(second); // the family is still alive
     }
 
+    /**
+     * Two refreshes of the same token race for real: the row lock in findForUpdateByTokenHash must
+     * serialize them so exactly one rotates and the other sees a just-rotated token (grace, no revocation).
+     * Several rounds, so a missing lock cannot pass by lucky scheduling.
+     */
+    @Test
+    void trulyConcurrentRefreshesRotateExactlyOnce() throws Exception {
+        var owner = OwnerJdbc.ownerAs(ws.tenantId());
+        try (ExecutorService pool = Executors.newFixedThreadPool(2)) {
+            for (int round = 0; round < 5; round++) {
+                String token = round == 0 ? session.refreshToken() : TestTenants.login(mvc, ws).refreshToken();
+                CountDownLatch start = new CountDownLatch(1);
+                Callable<MvcResult> attempt = () -> {
+                    start.await();
+                    return mvc.perform(post("/api/v1/auth/refresh").cookie(new Cookie("nexus_rt", token))).andReturn();
+                };
+                Future<MvcResult> a = pool.submit(attempt);
+                Future<MvcResult> b = pool.submit(attempt);
+                start.countDown();
+                List<MvcResult> results = List.of(a.get(30, TimeUnit.SECONDS), b.get(30, TimeUnit.SECONDS));
+
+                assertThat(results).extracting(r -> r.getResponse().getStatus()).as("round %d", round)
+                        .containsExactlyInAnyOrder(200, 401);
+                assertThat(owner.queryForObject(
+                        "select count(*) from refresh_tokens where revoke_reason = 'REUSE_DETECTED'", Long.class)).isZero();
+                MvcResult winner = results.stream().filter(r -> r.getResponse().getStatus() == 200).findFirst().orElseThrow();
+                rotate(TestTenants.refreshCookieOf(winner));
+            }
+        }
+    }
+
     @Test
     void reuseAfterGraceRevokesTheWholeFamilyAndIsAudited() throws Exception {
         String second = rotate(session.refreshToken());
@@ -83,6 +122,18 @@ class RefreshTokenIT extends IntegrationTestSupport {
         assertThat(owner.queryForList("select action from audit_events", String.class)).contains("RefreshTokenReuseDetected");
         assertThat(owner.queryForObject("select count(*) from refresh_tokens where revoke_reason = 'REUSE_DETECTED'",
                 Long.class)).isPositive();
+    }
+
+    @Test
+    void refreshTokenFromBeforeATokenVersionBumpIsRejectedAndItsFamilyRevoked() throws Exception {
+        var owner = OwnerJdbc.ownerAs(ws.tenantId());
+        // a logout-all whose revocation UPDATE missed this row (e.g. inserted by a concurrent refresh)
+        owner.update("update users set token_version = token_version + 1");
+
+        refresh(session.refreshToken()).andExpect(status().isUnauthorized());
+
+        assertThat(owner.queryForList("select revoke_reason from refresh_tokens", String.class))
+                .isNotEmpty().allMatch("LOGOUT_ALL"::equals);
     }
 
     @Test

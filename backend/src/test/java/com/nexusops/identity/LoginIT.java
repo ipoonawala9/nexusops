@@ -91,4 +91,15 @@ class LoginIT extends IntegrationTestSupport {
         login(ws.slug(), ws.email(), ws.password()).andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.detail").value("Workspace suspended."));
     }
+
+    @Test
+    void workspaceThatIsNotActiveCannotLogIn() throws Exception {
+        Workspace ws = TestTenants.signupAndVerify(mvc, mail, TestTenants.uniqueSlug("pend"));
+        OwnerJdbc.jdbc().update("update tenants set status = 'PENDING_VERIFICATION' where id = ?", ws.tenantId());
+        login(ws.slug(), ws.email(), ws.password()).andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.detail").value("Workspace is not active."));
+        assertThat(OwnerJdbc.ownerAs(ws.tenantId()).queryForList(
+                "select metadata->>'reason' from audit_events where action = 'LoginFailed'", String.class))
+                .containsExactly("WORKSPACE_PENDING_VERIFICATION");
+    }
 }

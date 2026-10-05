@@ -83,9 +83,11 @@ public class LoginService {
             if (!user.isEmailVerified()) {
                 throw ApiProblem.forbidden("Email address not verified.");
             }
-            if (tenant.get().status() == TenantStatus.SUSPENDED) {
-                fail("WORKSPACE_SUSPENDED", user.getId());
-                throw ApiProblem.forbidden("Workspace suspended.");
+            TenantStatus tenantStatus = tenant.get().status();
+            if (tenantStatus != TenantStatus.ACTIVE) { // allow-list: any non-active workspace fails closed
+                fail("WORKSPACE_" + tenantStatus, user.getId());
+                throw ApiProblem.forbidden(tenantStatus == TenantStatus.SUSPENDED
+                        ? "Workspace suspended." : "Workspace is not active.");
             }
         }
 
@@ -98,7 +100,7 @@ public class LoginService {
                 String refreshToken = OpaqueTokens.generate(tenantId);
                 Instant refreshExpiresAt = now.plus(jwtProperties.refreshTokenTtl());
                 refreshTokens.save(RefreshToken.issue(Ids.newId(), userId, Ids.newId(), OpaqueTokens.hash(refreshToken),
-                        refreshExpiresAt, client.ip(), client.userAgent()));
+                        refreshExpiresAt, managed.getTokenVersion(), client.ip(), client.userAgent()));
                 audit.record(AuditEntry.of("LoginSucceeded", "User", userId));
                 var access = accessTokens.issue(tenantId, userId, managed.getTokenVersion());
                 return new AuthResult(tenantId, userId, access.value(), access.expiresAt(), refreshToken, refreshExpiresAt);

@@ -107,6 +107,11 @@ public class RefreshService {
             return new Outcome(null, false);
         }
         User user = users.findById(current.getUserId()).orElse(null);
+        if (user != null && user.getTokenVersion() != current.getTokenVersion()) {
+            // issued before a logout-all whose bulk revocation missed it (e.g. inserted by a concurrent refresh)
+            refreshTokens.revokeFamily(current.getFamilyId(), RevokeReason.LOGOUT_ALL, now);
+            return new Outcome(null, false);
+        }
         if (user == null || user.getStatus() != UserStatus.ACTIVE || !user.isEmailVerified()
                 || tenants.current().status() != TenantStatus.ACTIVE) {
             return new Outcome(null, false);
@@ -116,7 +121,7 @@ public class RefreshService {
         String nextToken = OpaqueTokens.generate(tenantId);
         UUID nextId = Ids.newId();
         refreshTokens.save(RefreshToken.issue(nextId, user.getId(), current.getFamilyId(), OpaqueTokens.hash(nextToken),
-                current.getExpiresAt(), client.ip(), client.userAgent()));
+                current.getExpiresAt(), user.getTokenVersion(), client.ip(), client.userAgent()));
         current.markRotated(nextId, now);
         var access = accessTokens.issue(tenantId, user.getId(), user.getTokenVersion());
         return new Outcome(new AuthResult(tenantId, user.getId(), access.value(), access.expiresAt(), nextToken,

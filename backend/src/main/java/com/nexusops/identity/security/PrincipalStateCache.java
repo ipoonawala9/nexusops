@@ -69,13 +69,21 @@ public class PrincipalStateCache {
         return state;
     }
 
+    /** Best-effort: a Redis failure is logged, not thrown (entries expire within {@link #TTL} anyway). */
     public void evict(UUID tenantId, UUID userId) {
-        redis.delete(key(tenantId, userId));
+        try {
+            redis.delete(key(tenantId, userId));
+        } catch (RuntimeException e) {
+            log.warn("Principal cache eviction failed; entry expires within TTL", e);
+        }
     }
 
+    /** Best-effort: a Redis failure is logged, not thrown (entries expire within {@link #TTL} anyway). */
     public void evictTenant(UUID tenantId) {
         try (Cursor<String> keys = redis.scan(ScanOptions.scanOptions().match(TenantKeys.tenantPattern(tenantId)).count(500).build())) {
             keys.forEachRemaining(redis::delete);
+        } catch (RuntimeException e) {
+            log.warn("Tenant principal cache eviction failed; entries expire within TTL", e);
         }
     }
 

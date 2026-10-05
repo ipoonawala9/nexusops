@@ -95,6 +95,21 @@ class TenantSettingsIT extends IntegrationTestSupport {
     }
 
     @Test
+    void databaseSlugCheckCountsCharactersNotGroups() {
+        insertTenantWithSlug("a-b"); // 3 characters: valid (rejected by the old group-counting regex)
+        assertThatThrownBy(() -> insertTenantWithSlug("a" + "-b".repeat(20)))
+                .hasMessageContaining("tenants_slug_check");
+        assertThatThrownBy(() -> insertTenantWithSlug("a" + "-b".repeat(39)))
+                .hasMessageContaining("tenants_slug_check");
+    }
+
+    private void insertTenantWithSlug(String candidate) {
+        var now = java.sql.Timestamp.from(java.time.Instant.now());
+        OwnerJdbc.jdbc().update("insert into tenants (id, slug, name, status, plan_code, created_at, updated_at) "
+                + "values (?, ?, 'T', 'ACTIVE', 'FREE', ?, ?) on conflict (slug) do nothing", Ids.newId(), candidate, now, now);
+    }
+
+    @Test
     void currentTenantOperationsRequireATenant() {
         assertThatThrownBy(directory::currentSettings).isInstanceOf(IllegalStateException.class);
     }

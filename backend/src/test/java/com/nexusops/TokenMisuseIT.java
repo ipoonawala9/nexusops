@@ -97,6 +97,14 @@ class TokenMisuseIT extends IntegrationTestSupport {
     }
 
     @Test
+    void workspaceThatIsNotActiveIsForbidden() throws Exception {
+        OwnerJdbc.jdbc().update("update tenants set status = 'PENDING_VERIFICATION' where id = ?", ws.tenantId());
+        principalCache.evictTenant(ws.tenantId());
+        me(session.accessToken()).andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.detail").value("Workspace is not active."));
+    }
+
+    @Test
     void publicAuthRoutesIgnoreStaleBearerTokens() throws Exception {
         mvc.perform(post("/api/v1/auth/refresh").header("Authorization", "Bearer expired.or.garbage")
                         .cookie(new Cookie("nexus_rt", session.refreshToken())))
