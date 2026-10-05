@@ -23,7 +23,10 @@ class OpenApiContractIT extends IntegrationTestSupport {
         String doc = mvc.perform(get("/v3/api-docs")).andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
         assertThat(doc).contains("\"/api/v1/auth/signup\"", "\"/api/v1/auth/login\"", "\"/api/v1/auth/refresh\"",
-                "\"/api/v1/auth/logout-all\"", "\"/api/v1/me\"", "\"/api/v1/tenant\"", "\"bearerAuth\"");
+                "\"/api/v1/auth/logout-all\"", "\"/api/v1/me\"", "\"/api/v1/tenant\"", "\"bearerAuth\"",
+                "\"/api/v1/users\"", "\"/api/v1/users/{id}/roles\"", "\"/api/v1/roles/{id}/permissions\"",
+                "\"/api/v1/permissions\"", "\"/api/v1/invitations\"", "\"/api/v1/invitations/accept\"",
+                "\"/api/v1/invitations/preview\"", "\"/api/v1/tenant/modules/{code}\"", "\"/api/v1/audit-events\"");
         if (Boolean.getBoolean("openapi.export")) {
             Files.writeString(Path.of("../docs/api/openapi.json"), doc);
         }

@@ -19,3 +19,12 @@
 ## Consequences
 - Authorization is fine-grained and auditable, and roles stay flexible.
 - Resolving permissions per request costs a cache lookup; we accept that.
+- **Grantable vs effective (Plan 3):** effective permissions (request authorization) are gated by enabled modules;
+  *grantable* permissions (what an actor may grant via roles/invitations/assignment) are the union of the actor's
+  role permissions regardless of modules, so owners can prepare roles before enabling a module.
+- The owner role is managed only by owners (inviting to, assigning, removing, and re-enabling a disabled owner); the
+  last active owner can't be disabled or demoted; owner-set changes serialize per tenant via `pg_advisory_xact_lock`.
+- Permission-affecting changes (role permissions, role deletion, module toggles, user status/roles) evict the affected
+  principal-cache entries after commit, with generation-guarded cache writes so no stale state can be re-cached.
+  Besides the per-user generations there is a tenant-level generation `tenant:{t}:principal-gen`, which
+  `evictTenant` bumps first, so a tenant-wide eviction also invalidates in-flight cache writes for every user.
