@@ -29,6 +29,8 @@ spring:
       enabled: true
 
 nexusops:
+  app:
+    base-url: ${APP_BASE_URL:http://localhost:5173}
   mail:
     from: "NexusOps <no-reply@nexusops.local>"
   security:
