@@ -164,7 +164,7 @@ public class PrincipalStateCache {
             List<String> modules = tenants.enabledModules();
             Set<String> permissions = authorization.effectivePermissions(user.getRoleIds(), modules);
             return new PrincipalState(user.getStatus().name(), user.getTokenVersion(), tenant.status().name(),
-                    permissions, modules);
+                    permissions, modules, user.getRoleIds(), authorization.grantablePermissions(user.getRoleIds()));
         });
     }
 

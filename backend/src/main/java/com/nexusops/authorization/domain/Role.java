@@ -59,4 +59,24 @@ public class Role extends TenantOwnedEntity {
     public Set<String> getPermissions() {
         return Set.copyOf(permissions);
     }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public boolean isSystem() {
+        return system;
+    }
+
+    public void rename(String newName, String newDescription) {
+        if (newName != null) this.name = newName;
+        if (newDescription != null) this.description = newDescription;
+        this.updatedAt = Instant.now();
+    }
+
+    public void replacePermissions(Set<String> codes) {
+        this.permissions.clear();
+        this.permissions.addAll(codes);
+        this.updatedAt = Instant.now();
+    }
 }

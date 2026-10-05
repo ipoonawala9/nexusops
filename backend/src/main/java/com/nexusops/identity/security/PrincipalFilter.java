@@ -78,7 +78,9 @@ public class PrincipalFilter extends OncePerRequestFilter {
             }
             List<SimpleGrantedAuthority> authorities = state.permissions().stream().map(SimpleGrantedAuthority::new).toList();
             var context = SecurityContextHolder.createEmptyContext();
-            context.setAuthentication(new JwtAuthenticationToken(jwt, authorities, userId.toString()));
+            var authenticated = new JwtAuthenticationToken(jwt, authorities, userId.toString());
+            authenticated.setDetails(new com.nexusops.shared.security.ActorDetails(state.roleIds(), state.grantablePermissions()));
+            context.setAuthentication(authenticated);
             SecurityContextHolder.setContext(context);
             chain.doFilter(request, response);
         }

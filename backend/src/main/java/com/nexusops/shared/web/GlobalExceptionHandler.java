@@ -56,6 +56,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return problem(HttpStatus.CONFLICT, "Conflict", "This record was changed by someone else. Reload and try again.");
     }
 
+    @ExceptionHandler(org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class)
+    ResponseEntity<ProblemDetail> handleTypeMismatch(Exception ex) {
+        return problem(HttpStatus.NOT_FOUND, "Not Found", "Resource not found.");
+    }
+
     @ExceptionHandler(Exception.class)
     ResponseEntity<ProblemDetail> handleUnexpected(Exception ex) {
         log.error("Unhandled exception", ex);

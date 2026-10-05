@@ -30,4 +30,8 @@ public class Permission {
     public String getModuleCode() {
         return moduleCode;
     }
+
+    public String getDescription() {
+        return description;
+    }
 }
