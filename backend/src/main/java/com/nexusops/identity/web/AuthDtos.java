@@ -21,4 +21,11 @@ final class AuthDtos {
     record VerifyEmailRequest(@NotBlank @Size(max = 200) String token) {}
 
     record ResendVerificationRequest(@NotBlank @Size(max = 64) String workspace, @NotBlank @Size(max = 254) String email) {}
+
+    record LoginRequest(
+            @NotBlank @Size(max = 64) String workspace,
+            @NotBlank @Size(max = 254) String email,
+            @NotNull @Size(max = 128) String password) {}
+
+    record TokenResponse(String accessToken, String tokenType, long expiresIn) {}
 }

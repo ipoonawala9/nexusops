@@ -42,6 +42,7 @@ nexusops:
       private-key: ${JWT_PRIVATE_KEY:}
       public-key: ${JWT_PUBLIC_KEY:}
       ephemeral-keys: false
+    allowed-origins: ${ALLOWED_ORIGINS:http://localhost:5173,http://localhost:3000}
 
 server:
   shutdown: graceful

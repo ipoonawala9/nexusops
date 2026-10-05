@@ -21,4 +21,9 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, UUID
     @Query("update RefreshToken t set t.revokedAt = :now, t.revokeReason = :reason "
             + "where t.userId = :userId and t.revokedAt is null")
     int revokeAllForUser(@Param("userId") UUID userId, @Param("reason") RevokeReason reason, @Param("now") Instant now);
+
+    /** Row lock: concurrent refreshes of the same token serialize, so only one can rotate it. */
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("select t from RefreshToken t where t.tokenHash = :hash")
+    Optional<RefreshToken> findForUpdateByTokenHash(@Param("hash") String hash);
 }

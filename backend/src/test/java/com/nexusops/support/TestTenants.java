@@ -37,4 +37,31 @@ public final class TestTenants {
                 .andExpect(status().isNoContent());
         return workspace;
     }
+
+    public record Session(String accessToken, String refreshToken) {}
+
+    private static final java.util.regex.Pattern ACCESS = java.util.regex.Pattern.compile("\"accessToken\":\"([^\"]+)\"");
+    private static final java.util.regex.Pattern COOKIE = java.util.regex.Pattern.compile("nexus_rt=([^;]*)");
+
+    public static Session login(MockMvc mvc, Workspace workspace) throws Exception {
+        var result = mvc.perform(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON).content("""
+                {"workspace":"%s","email":"%s","password":"%s"}""".formatted(workspace.slug(), workspace.email(), workspace.password())))
+                .andExpect(status().isOk())
+                .andReturn();
+        return new Session(accessTokenOf(result), refreshCookieOf(result));
+    }
+
+    public static String accessTokenOf(org.springframework.test.web.servlet.MvcResult result) throws Exception {
+        var matcher = ACCESS.matcher(result.getResponse().getContentAsString());
+        if (!matcher.find()) throw new AssertionError("no accessToken in response");
+        return matcher.group(1);
+    }
+
+    public static String refreshCookieOf(org.springframework.test.web.servlet.MvcResult result) {
+        for (String header : result.getResponse().getHeaders("Set-Cookie")) {
+            var matcher = COOKIE.matcher(header);
+            if (matcher.find()) return matcher.group(1);
+        }
+        throw new AssertionError("no nexus_rt cookie set");
+    }
 }
