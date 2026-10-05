@@ -19,13 +19,14 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RestController;
 
 class GlobalExceptionHandlerTest {
 
     record Payload(@NotBlank String name) {}
 
-    @RestController
+    /** Profile keeps component scanning in @SpringBootTest contexts from registering these test routes. */
+    @org.springframework.context.annotation.Profile("standalone-mockmvc-only")
+    @org.springframework.web.bind.annotation.RestController
     static class ThrowingController {
         @GetMapping("/boom")
         String boom() {

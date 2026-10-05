@@ -35,7 +35,7 @@ public class ProblemDetailSecurityHandlers implements AuthenticationEntryPoint, 
         write(response, HttpStatus.FORBIDDEN, "Forbidden", "You do not have permission to perform this action.");
     }
 
-    private void write(HttpServletResponse response, HttpStatus status, String title, String detail)
+    public void write(HttpServletResponse response, HttpStatus status, String title, String detail)
             throws IOException {
         response.setStatus(status.value());
         response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);

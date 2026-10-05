@@ -9,6 +9,8 @@ import com.nexusops.identity.domain.User;
 import com.nexusops.identity.domain.UserRepository;
 import com.nexusops.identity.domain.UserStatus;
 import com.nexusops.identity.security.AccessTokenService;
+import com.nexusops.identity.security.CurrentUser;
+import com.nexusops.identity.security.PrincipalStateCache;
 import com.nexusops.shared.Ids;
 import com.nexusops.shared.TenantContext;
 import com.nexusops.shared.web.ApiProblem;
@@ -40,15 +42,18 @@ public class RefreshService {
     private final AccessTokenService accessTokens;
     private final AuditService audit;
     private final TransactionTemplate tx;
+    private final PrincipalStateCache principals;
 
     RefreshService(RefreshTokenRepository refreshTokens, UserRepository users, TenantDirectory tenants,
-            AccessTokenService accessTokens, AuditService audit, TransactionTemplate tx) {
+            AccessTokenService accessTokens, AuditService audit, TransactionTemplate tx,
+            PrincipalStateCache principals) {
         this.refreshTokens = refreshTokens;
         this.users = users;
         this.tenants = tenants;
         this.accessTokens = accessTokens;
         this.audit = audit;
         this.tx = tx;
+        this.principals = principals;
     }
 
     public AuthResult refresh(String token, ClientInfo client) {
@@ -72,6 +77,18 @@ public class RefreshService {
                 }));
             }
         });
+    }
+
+    /** Invalidates every session of the current user: bumps token_version and revokes all refresh tokens. */
+    public void logoutAll() {
+        var current = CurrentUser.require();
+        tx.executeWithoutResult(status -> {
+            User user = users.findById(current.userId()).orElseThrow(RefreshService::expired);
+            user.bumpTokenVersion();
+            refreshTokens.revokeAllForUser(user.getId(), RevokeReason.LOGOUT_ALL, Instant.now());
+            audit.record(AuditEntry.of("LogoutAll", "User", user.getId()));
+        });
+        principals.evict(current.tenantId(), current.userId());
     }
 
     private Outcome rotate(OpaqueTokens.Parsed parsed, ClientInfo client) {
