@@ -42,6 +42,11 @@ class GlobalExceptionHandlerTest {
             throw com.nexusops.shared.web.ApiProblem.conflictField("slug", "Workspace URL is already taken.");
         }
 
+        @GetMapping("/stale")
+        String stale() {
+            throw new org.springframework.orm.ObjectOptimisticLockingFailureException("Tenant", "id");
+        }
+
         @PostMapping("/validate")
         String validate(@Valid @RequestBody Payload payload) {
             return payload.name();
@@ -105,5 +110,12 @@ class GlobalExceptionHandlerTest {
                 .andExpect(jsonPath("$.errors[0].field").value("slug"))
                 .andExpect(jsonPath("$.errors[0].message").value("Workspace URL is already taken."))
                 .andExpect(jsonPath("$.requestId").exists());
+    }
+
+    @Test
+    void optimisticLockConflictIs409() throws Exception {
+        mvc.perform(get("/stale"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail").value("This record was changed by someone else. Reload and try again."));
     }
 }

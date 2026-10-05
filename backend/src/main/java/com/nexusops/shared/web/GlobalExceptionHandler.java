@@ -47,6 +47,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return ResponseEntity.status(ex.status()).body(problem);
     }
 
+    @ExceptionHandler(org.springframework.orm.ObjectOptimisticLockingFailureException.class)
+    ResponseEntity<ProblemDetail> handleOptimisticLock(Exception ex) {
+        return problem(HttpStatus.CONFLICT, "Conflict", "This record was changed by someone else. Reload and try again.");
+    }
+
     @ExceptionHandler(Exception.class)
     ResponseEntity<ProblemDetail> handleUnexpected(Exception ex) {
         log.error("Unhandled exception", ex);

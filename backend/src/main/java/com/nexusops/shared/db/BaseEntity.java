@@ -27,6 +27,14 @@ public abstract class BaseEntity implements Persistable<UUID> {
         this.id = id;
     }
 
+    /** For entities built by static factories; may be called once. */
+    protected void initId(UUID newId) {
+        if (this.id != null) {
+            throw new IllegalStateException("id already set");
+        }
+        this.id = newId;
+    }
+
     @Override
     public UUID getId() {
         return id;
