@@ -1,6 +1,7 @@
 package com.nexusops.identity.security;
 
 import com.nexusops.shared.TenantContext;
+import com.nexusops.shared.ratelimit.RateLimits;
 import com.nexusops.shared.security.ProblemDetailSecurityHandlers;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -28,10 +29,12 @@ public class PrincipalFilter extends OncePerRequestFilter {
 
     private final PrincipalStateCache principals;
     private final ProblemDetailSecurityHandlers problems;
+    private final RateLimits rateLimits;
 
-    PrincipalFilter(PrincipalStateCache principals, ProblemDetailSecurityHandlers problems) {
+    PrincipalFilter(PrincipalStateCache principals, ProblemDetailSecurityHandlers problems, RateLimits rateLimits) {
         this.principals = principals;
         this.problems = problems;
+        this.rateLimits = rateLimits;
     }
 
     @Override
@@ -64,6 +67,13 @@ public class PrincipalFilter extends OncePerRequestFilter {
             if (!"ACTIVE".equals(state.tenantStatus())) { // allow-list: any non-active workspace fails closed
                 reject(response, HttpStatus.FORBIDDEN, "Forbidden",
                         "SUSPENDED".equals(state.tenantStatus()) ? "Workspace suspended." : "Workspace is not active.");
+                return;
+            }
+            var retryAfter = rateLimits.apiRetryAfter(tenantId, userId);
+            if (retryAfter.isPresent()) {
+                response.setHeader(org.springframework.http.HttpHeaders.RETRY_AFTER, String.valueOf(retryAfter.getAsLong()));
+                reject(response, HttpStatus.TOO_MANY_REQUESTS, "Too Many Requests",
+                        "Too many requests. Try again in " + retryAfter.getAsLong() + " seconds.");
                 return;
             }
             List<SimpleGrantedAuthority> authorities = state.permissions().stream().map(SimpleGrantedAuthority::new).toList();

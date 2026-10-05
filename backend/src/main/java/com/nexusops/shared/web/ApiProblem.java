@@ -45,6 +45,10 @@ public class ApiProblem extends RuntimeException {
         return new ApiProblem(HttpStatus.NOT_FOUND, detail, List.of());
     }
 
+    public static ApiProblem serviceUnavailable(String detail) {
+        return new ApiProblem(HttpStatus.SERVICE_UNAVAILABLE, detail, List.of());
+    }
+
     public static ApiProblem conflict(String detail) {
         return new ApiProblem(HttpStatus.CONFLICT, detail, List.of());
     }

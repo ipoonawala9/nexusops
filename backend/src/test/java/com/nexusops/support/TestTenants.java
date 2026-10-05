@@ -44,7 +44,12 @@ public final class TestTenants {
     private static final java.util.regex.Pattern COOKIE = java.util.regex.Pattern.compile("nexus_rt=([^;]*)");
 
     public static Session login(MockMvc mvc, Workspace workspace) throws Exception {
-        var result = mvc.perform(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON).content("""
+        return login(mvc, workspace, "127.0.0.1");
+    }
+
+    public static Session login(MockMvc mvc, Workspace workspace, String remoteAddr) throws Exception {
+        var result = mvc.perform(post("/api/v1/auth/login").with(r -> { r.setRemoteAddr(remoteAddr); return r; })
+                .contentType(MediaType.APPLICATION_JSON).content("""
                 {"workspace":"%s","email":"%s","password":"%s"}""".formatted(workspace.slug(), workspace.email(), workspace.password())))
                 .andExpect(status().isOk())
                 .andReturn();

@@ -44,7 +44,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                     .map(e -> Map.of("field", e.field(), "message", e.message()))
                     .toList());
         }
-        return ResponseEntity.status(ex.status()).body(problem);
+        var response = ResponseEntity.status(ex.status());
+        if (ex instanceof com.nexusops.shared.ratelimit.RateLimitExceeded limited) {
+            response.header(HttpHeaders.RETRY_AFTER, String.valueOf(limited.retryAfterSeconds()));
+        }
+        return response.body(problem);
     }
 
     @ExceptionHandler(org.springframework.orm.ObjectOptimisticLockingFailureException.class)
