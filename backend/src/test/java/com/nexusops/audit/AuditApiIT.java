@@ -77,6 +77,22 @@ class AuditApiIT extends IntegrationTestSupport {
     }
 
     @Test
+    void mistypedQueryParametersAre400FieldErrorsNot404() throws Exception {
+        search(owner, "actorId", "not-a-uuid").andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title").value("Bad Request"))
+                .andExpect(jsonPath("$.errors[0].field").value("actorId"))
+                .andExpect(jsonPath("$.errors[0].message").exists());
+        search(owner, "page", "abc").andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[0].field").value("page"));
+        mvc.perform(get("/api/v1/users").param("size", "x").header("Authorization", "Bearer " + owner.accessToken()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[0].field").value("size"));
+        // a malformed UUID in the path is still "no such resource"
+        mvc.perform(get("/api/v1/roles/not-a-uuid").header("Authorization", "Bearer " + owner.accessToken()))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
     void requiresTheAuditPermission() throws Exception {
         var reader = TestRoles.create(mvc, owner, "Readers", "identity.user.read");
         Session member = TestTenants.login(mvc, members.create(ws.tenantId(), Set.of(reader)));
