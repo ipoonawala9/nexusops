@@ -97,6 +97,11 @@ describe('api client', () => {
     expect(error.problem.title).toBe('Bad Gateway')
   })
 
+  it('returns undefined for a bodiless 202', async () => {
+    const { client } = setup([new Response(null, { status: 202 })])
+    await expect(client.post('/auth/resend-verification', {})).resolves.toBeUndefined()
+  })
+
   it('sends JSON bodies with content-type and returns undefined for 204', async () => {
     const { client, calls } = setup([new Response(null, { status: 204 })])
     await expect(client.post('/x', { a: 1 })).resolves.toBeUndefined()
