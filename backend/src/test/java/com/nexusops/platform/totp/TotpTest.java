@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.Locale;
 import org.junit.jupiter.api.Test;
 
 class TotpTest {
@@ -18,6 +19,22 @@ class TotpTest {
         assertThat(Totp.code(RFC_SECRET, Totp.step(Instant.ofEpochSecond(1111111111)))).isEqualTo("050471");
         assertThat(Totp.code(RFC_SECRET, Totp.step(Instant.ofEpochSecond(1234567890)))).isEqualTo("005924");
         assertThat(Totp.code(RFC_SECRET, Totp.step(Instant.ofEpochSecond(2000000000)))).isEqualTo("279037");
+    }
+
+    @Test
+    void codesAreAsciiDigitsWhateverTheDefaultLocale() {
+        Locale original = Locale.getDefault();
+        try {
+            Locale.setDefault(Locale.forLanguageTag("ar-SA"));
+            assertThat(Totp.code(RFC_SECRET, Totp.step(Instant.ofEpochSecond(59)))).isEqualTo("287082");
+            assertThat(Totp.code(RFC_SECRET, Totp.step(Instant.ofEpochSecond(1234567890)))).isEqualTo("005924")
+                    .matches("[0-9]{6}");
+            Instant now = Instant.ofEpochSecond(1_800_000_000L);
+            String code = Totp.code(RFC_SECRET, Totp.step(now));
+            assertThat(Totp.verify(RFC_SECRET, code, now, 0)).hasValue(Totp.step(now));
+        } finally {
+            Locale.setDefault(original);
+        }
     }
 
     @Test
