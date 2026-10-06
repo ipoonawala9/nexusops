@@ -1,6 +1,9 @@
 import type { RouteObject } from 'react-router'
 import { EmptyState } from '@/components/states'
+import { PERMISSIONS, RequirePermission } from '@/features/auth/permissions'
+import { ModulesSettingsPage } from '@/features/settings/ModulesSettingsPage'
 import { SettingsLayout } from '@/features/settings/SettingsLayout'
+import { WorkspaceSettingsPage } from '@/features/settings/WorkspaceSettingsPage'
 import { AppLayout } from './AppLayout'
 import { ComingSoonPage } from './ComingSoonPage'
 import { MODULE_PHASES } from './nav'
@@ -23,6 +26,22 @@ function modulePage(path: string, code: string): RouteObject {
 
 /** /app/settings/* children (Tasks 5–8 add theirs before the catch-all, which must stay last). */
 export const settingsChildren: RouteObject[] = [
+  {
+    path: 'workspace',
+    element: (
+      <RequirePermission anyOf={[PERMISSIONS.settingsRead]}>
+        <WorkspaceSettingsPage />
+      </RequirePermission>
+    ),
+  },
+  {
+    path: 'modules',
+    element: (
+      <RequirePermission anyOf={[PERMISSIONS.settingsRead]}>
+        <ModulesSettingsPage />
+      </RequirePermission>
+    ),
+  },
   {
     path: '*',
     element: <EmptyState title="Settings page not found" description="Pick a section above." />,
