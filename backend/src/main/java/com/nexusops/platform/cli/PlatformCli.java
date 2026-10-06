@@ -102,6 +102,7 @@ public class PlatformCli implements ApplicationRunner, ExitCodeGenerator {
             terminal.println("Error: role must be PLATFORM_ADMIN or PLATFORM_SUPPORT.");
             return USAGE;
         }
+        admin.requireNew(email);
         String password = newPassword();
         if (password == null) {
             return FAILED;
@@ -118,6 +119,7 @@ public class PlatformCli implements ApplicationRunner, ExitCodeGenerator {
     }
 
     private int resetTotp() {
+        admin.requireExisting(email);
         Enrollment enrollment = admin.newEnrollment(email);
         long confirmedStep = enrol(enrollment);
         if (confirmedStep < 0) {

@@ -164,7 +164,8 @@ class PlatformCliIT extends IntegrationTestSupport {
         createExisting();
         var again = new ScriptedTerminal().secrets(STRONG, STRONG);
         assertThat(run(again, "create-platform-admin", "PLATFORM_ADMIN")).isEqualTo(1);
-        assertThat(again.all()).contains("already exists");
+        assertThat(again.all()).contains("already exists")
+                .doesNotContain("New password").doesNotContain("Or enter this secret manually").doesNotContain("otpauth://");
         assertThat(run(new ScriptedTerminal(), "create-platform-admin", "ROOT")).isEqualTo(2);
     }
 
@@ -187,6 +188,15 @@ class PlatformCliIT extends IntegrationTestSupport {
         String enrolmentCode = terminal.correctCode();
         login(STRONG, enrolmentCode).andExpect(status().isUnauthorized());
         login(STRONG, Totp.code(terminal.printedSecret(), Totp.step(terminal.now) + 1)).andExpect(status().isOk());
+    }
+
+    @Test
+    void resetTotpForAnUnknownEmailFailsBeforeShowingASecret() {
+        var terminal = new ScriptedTerminal();
+        assertThat(run(terminal, "reset-platform-totp", null)).isEqualTo(1);
+        assertThat(terminal.all()).contains("No platform user with that email.")
+                .doesNotContain("Or enter this secret manually").doesNotContain("otpauth://");
+        assertThat(count()).isZero();
     }
 
     @Test

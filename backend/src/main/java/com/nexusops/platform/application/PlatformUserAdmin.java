@@ -25,6 +25,7 @@ import org.springframework.stereotype.Service;
 public class PlatformUserAdmin {
 
     static final String NOT_FOUND = "No platform user with that email.";
+    static final String DUPLICATE = "A platform user with this email already exists.";
 
     public record Enrollment(String email, byte[] secret, String otpauthUri) {
         public String secretBase32() {
@@ -58,6 +59,19 @@ public class PlatformUserAdmin {
         return new Enrollment(email, secret, Totp.otpauthUri(properties.totpIssuer(), email, secret));
     }
 
+    /** For the CLI, before it shows a new secret: fails with "No platform user with that email." */
+    public void requireExisting(String rawEmail) {
+        access.read(() -> find(rawEmail));
+    }
+
+    /** For the CLI, before it prompts for a password or shows a secret; create() checks again under its write. */
+    public void requireNew(String rawEmail) {
+        String email = Emails.normalize(rawEmail);
+        if (access.read(() -> users.findByEmail(email).isPresent())) {
+            throw duplicate();
+        }
+    }
+
     public void checkPassword(String password, String rawEmail) {
         passwordPolicy.check(password, Emails.normalize(rawEmail));
     }
@@ -70,7 +84,7 @@ public class PlatformUserAdmin {
         UUID id = Ids.newId();
         return access.write(() -> {
             if (users.findByEmail(email).isPresent()) {
-                throw ApiProblem.conflictField("email", "A platform user with this email already exists.");
+                throw duplicate();
             }
             users.saveAndFlush(PlatformUser.create(id, email, hash, cipher.encrypt(secret, id), role, confirmedStep));
             audit.record(AuditEntry.of("PlatformUserCreated", "PlatformUser", id)
@@ -110,6 +124,10 @@ public class PlatformUserAdmin {
             String action = status == PlatformUserStatus.DISABLED ? "PlatformUserDisabled" : "PlatformUserEnabled";
             audit.record(AuditEntry.of(action, "PlatformUser", user.getId()).asActor(ActorType.SYSTEM));
         });
+    }
+
+    private static ApiProblem duplicate() {
+        return ApiProblem.conflictField("email", DUPLICATE);
     }
 
     private PlatformUser find(String rawEmail) {
