@@ -43,6 +43,12 @@ class GlobalExceptionHandlerTest {
             throw com.nexusops.shared.web.ApiProblem.conflictField("slug", "Workspace URL is already taken.");
         }
 
+        @GetMapping("/duplicate")
+        String duplicate() {
+            throw com.nexusops.shared.web.ApiProblem.conflict("Looks like a duplicate.")
+                    .withProperty("duplicates", java.util.List.of(java.util.Map.of("id", "p-1", "name", "Acme")));
+        }
+
         @GetMapping("/stale")
         String stale() {
             throw new org.springframework.orm.ObjectOptimisticLockingFailureException("Tenant", "id");
@@ -118,5 +124,15 @@ class GlobalExceptionHandlerTest {
         mvc.perform(get("/stale"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.detail").value("This record was changed by someone else. Reload and try again."));
+    }
+
+    @Test
+    void apiProblemPropertiesBecomeProblemMembers() throws Exception {
+        mvc.perform(get("/duplicate"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail").value("Looks like a duplicate."))
+                .andExpect(jsonPath("$.duplicates[0].id").value("p-1"))
+                .andExpect(jsonPath("$.duplicates[0].name").value("Acme"))
+                .andExpect(jsonPath("$.requestId").exists());
     }
 }
