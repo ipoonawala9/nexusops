@@ -89,6 +89,10 @@ To recover, run one of these:
 - `make platform-reset-password EMAIL=…` for a lost password;
 - `make platform-disable EMAIL=…` / `make platform-enable EMAIL=…` to disable or re-enable an account.
 
+Ten consecutive wrong codes after a correct password disable the account (audited as `PlatformUserLockedOut`). To
+recover, run `make platform-enable EMAIL=…` and also `make platform-reset-password EMAIL=…`, because whoever was
+guessing codes knows the password.
+
 In Docker, run `docker compose -f infra/docker/docker-compose.yml --profile app run --rm -it backend --nexusops.cli.command=create-platform-admin --nexusops.cli.email=you@example.com`.
 
 Production must set `PLATFORM_TOTP_KEY`: 32 random bytes, base64, e.g. `openssl rand -base64 32`. Keep it out of the

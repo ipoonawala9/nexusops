@@ -83,6 +83,7 @@ erDiagram
     text role
     text status
     int token_version
+    int failed_totp_attempts
     timestamptz last_login_at
     timestamptz created_at
     timestamptz updated_at

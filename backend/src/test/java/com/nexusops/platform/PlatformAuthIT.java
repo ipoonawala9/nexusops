@@ -181,6 +181,69 @@ class PlatformAuthIT extends IntegrationTestSupport {
         login(op.email(), "a different platform passphrase", op.codeAt(nextStep())).andExpect(status().isOk());
     }
 
+    private int failedTotpAttempts() {
+        return TestPlatformUsers.platformJdbc().queryForObject(
+                "select failed_totp_attempts from platform_users where id = ?", Integer.class, op.id());
+    }
+
+    private String platformStatus() {
+        return TestPlatformUsers.platformJdbc().queryForObject(
+                "select status from platform_users where id = ?", String.class, op.id());
+    }
+
+    private void wrongCodes(int count) throws Exception {
+        long far = Totp.step(Instant.now()) + 5;
+        for (int i = 0; i < count; i++) {
+            login(op.email(), op.password(), op.codeAt(far + i))
+                    .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.detail").value(INVALID));
+        }
+    }
+
+    private long lockoutAudits() {
+        return OwnerJdbc.superuser().queryForObject("""
+                select count(*) from audit_events where action = 'PlatformUserLockedOut' and entity_type = 'PlatformUser'
+                  and entity_id = ? and tenant_id is null and actor_type = 'SYSTEM'""", Long.class, op.id().toString());
+    }
+
+    @Test
+    void nineWrongCodesThenACorrectOneSignsInAndResetsTheCounter() throws Exception {
+        wrongCodes(9);
+        assertThat(failedTotpAttempts()).isEqualTo(9);
+        login(op.email(), op.password(), op.currentCode()).andExpect(status().isOk());
+        assertThat(failedTotpAttempts()).isZero();
+        assertThat(platformStatus()).isEqualTo("ACTIVE");
+        assertThat(lockoutAudits()).isZero();
+    }
+
+    @Test
+    void tenWrongCodesLockTheAccountUntilItIsReEnabled() throws Exception {
+        String cookie = cookieOf(login(op.email(), op.password(), op.currentCode()).andExpect(status().isOk()).andReturn());
+        wrongCodes(10);
+        assertThat(platformStatus()).isEqualTo("DISABLED");
+        assertThat(lockoutAudits()).isOne();
+        assertThat(OwnerJdbc.superuser().queryForList("""
+                select metadata->>'reason' from audit_events where action = 'PlatformLoginFailed' and entity_id = ?""",
+                String.class, op.id().toString())).hasSize(10).containsOnly("BAD_CODE");
+        login(op.email(), op.password(), op.codeAt(nextStep()))
+                .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.detail").value(INVALID));
+        refresh(cookie).andExpect(status().isUnauthorized());
+
+        admin.setStatus(op.email(), PlatformUserStatus.ACTIVE);
+        assertThat(failedTotpAttempts()).isZero();
+        assertThat(platformStatus()).isEqualTo("ACTIVE");
+        login(op.email(), op.password(), op.codeAt(nextStep())).andExpect(status().isOk());
+    }
+
+    @Test
+    void wrongPasswordsDoNotCountTowardsTheLockout() throws Exception {
+        for (int i = 0; i < 12; i++) {
+            login(op.email(), "wrong platform password!", op.currentCode()).andExpect(status().isUnauthorized());
+        }
+        assertThat(failedTotpAttempts()).isZero();
+        assertThat(platformStatus()).isEqualTo("ACTIVE");
+        login(op.email(), op.password(), op.currentCode()).andExpect(status().isOk());
+    }
+
     @Test
     void refreshAndLogoutRejectAForeignOrigin() throws Exception {
         String cookie = cookieOf(login(op.email(), op.password(), op.currentCode()).andExpect(status().isOk()).andReturn());

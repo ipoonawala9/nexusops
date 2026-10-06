@@ -23,6 +23,10 @@
   - Secrets are 20 random bytes, encrypted with AES-256-GCM. The key is `PLATFORM_TOTP_KEY`, required at startup; the
     AAD is the platform user id. The secret is shown once, in the CLI.
   - Failures are uniform ("Invalid email, password or code."), with dummy-hash timing, and every failure is audited.
+  - Lockout: ten consecutive wrong codes after a correct password disable the account in the same transaction
+    (`failed_totp_attempts`, audited as `PlatformUserLockedOut`; the response stays the uniform 401). A correct code
+    resets the count. Recovery is `make platform-enable` plus `make platform-reset-password`, since the password is
+    known to whoever was guessing. Wrong passwords never touch the count, so it adds no pre-auth lockout vector.
 - **Separate tokens.**
   - One RS256 key, two audiences:
     - tenant tokens carry `aud=nexusops-tenant` and `tid`;

@@ -28,7 +28,8 @@ import org.springframework.stereotype.Service;
 
 /**
  * Platform sign-in (spec §6, ADR-0007): password + single-use TOTP, uniform failures with dummy-hash timing,
- * rotating refresh tokens with reuse detection inside a fixed 8-hour family lifetime.
+ * rotating refresh tokens with reuse detection inside a fixed 8-hour family lifetime. Ten consecutive wrong codes
+ * after a correct password disable the account (PlatformUser.MAX_FAILED_TOTP).
  */
 @Service
 public class PlatformAuthService {
@@ -89,7 +90,12 @@ public class PlatformAuthService {
             OptionalLong step = Totp.verify(cipher.decrypt(locked.getTotpSecretEnc(), id), code, now,
                     locked.getTotpLastStep());
             if (step.isEmpty()) {
-                return null;
+                if (locked.recordFailedTotp()) {
+                    audit.record(AuditEntry.of("PlatformUserLockedOut", "PlatformUser", id)
+                            .withMetadata(Map.of("failedTotpAttempts", PlatformUser.MAX_FAILED_TOTP))
+                            .asActor(ActorType.SYSTEM));
+                }
+                return null; // commits the count (and a lockout) before the uniform 401
             }
             locked.recordTotpUse(step.getAsLong());
             locked.recordLogin(now);

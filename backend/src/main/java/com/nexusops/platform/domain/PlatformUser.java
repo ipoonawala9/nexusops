@@ -18,6 +18,9 @@ import java.util.UUID;
 @Table(name = "platform_users")
 public class PlatformUser extends BaseEntity {
 
+    /** Consecutive wrong TOTP codes (after a correct password) that disable the account (I1, ADR-0007). */
+    public static final int MAX_FAILED_TOTP = 10;
+
     @Column(nullable = false)
     private String email;
 
@@ -40,6 +43,9 @@ public class PlatformUser extends BaseEntity {
 
     @Column(name = "token_version", nullable = false)
     private int tokenVersion;
+
+    @Column(name = "failed_totp_attempts", nullable = false)
+    private int failedTotpAttempts;
 
     @Column(name = "last_login_at")
     private Instant lastLoginAt;
@@ -86,7 +92,22 @@ public class PlatformUser extends BaseEntity {
 
     public void enable() {
         status = PlatformUserStatus.ACTIVE;
+        failedTotpAttempts = 0;
         updatedAt = Instant.now();
+    }
+
+    /**
+     * A wrong code after a correct password. Returns true when this attempt reached {@link #MAX_FAILED_TOTP}: the
+     * account is then disabled and its sessions end, until an operator re-enables it from the CLI.
+     */
+    public boolean recordFailedTotp() {
+        failedTotpAttempts++;
+        updatedAt = Instant.now();
+        if (failedTotpAttempts >= MAX_FAILED_TOTP && status == PlatformUserStatus.ACTIVE) {
+            disable();
+            return true;
+        }
+        return false;
     }
 
     /** Single use (RFC 6238 §5.2): callers verified {@code step > totpLastStep} under a row lock. */
@@ -95,6 +116,7 @@ public class PlatformUser extends BaseEntity {
             throw new IllegalStateException("TOTP step already used");
         }
         totpLastStep = step;
+        failedTotpAttempts = 0;
     }
 
     public void recordLogin(Instant now) {
@@ -114,4 +136,5 @@ public class PlatformUser extends BaseEntity {
     public PlatformRole getRole() { return role; }
     public PlatformUserStatus getStatus() { return status; }
     public int getTokenVersion() { return tokenVersion; }
+    public int getFailedTotpAttempts() { return failedTotpAttempts; }
 }

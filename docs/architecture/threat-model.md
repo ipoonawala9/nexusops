@@ -19,7 +19,7 @@
 | T15 | Suspended tenant keeps access | E | Tenant status checked per request (cached briefly), login refused | TenantSuspensionIT, PlatformTenantApiIT |
 | T16 | Platform token used on tenant APIs or vice versa | E | Audience separation; platform decoder rejects any `tid`; separate security chains | PlatformSecurityIT |
 | T17 | User enumeration through signup/login responses | I | Generic login errors; slug-availability endpoint is rate limited | AuthIT |
-| T18 | Stolen platform password | S | Password + single-use TOTP; uniform failures; per-IP and per-account rate limits; audited failures | PlatformAuthIT, PlatformLoginRateLimitIT |
+| T18 | Stolen platform password | S | Password + single-use TOTP; uniform failures; per-IP and per-account rate limits; audited failures; 10 consecutive wrong codes disable the account | PlatformAuthIT, PlatformLoginRateLimitIT |
 | T19 | TOTP code replay (shoulder-surfing, intercepted code) | S | `totp_last_step` advanced under a row lock; a step ≤ last used is rejected | PlatformAuthIT |
 | T20 | Tenant code path reads staff credentials or other tenants' rows | I/E | Platform tables and cross-tenant SELECT policies require `app.platform_access`; only `PlatformAccess` sets it, transaction-locally | PlatformAccessIT, PlatformAccessConfinementTest |
 | T21 | Database dump exposes TOTP secrets | I | AES-256-GCM with `PLATFORM_TOTP_KEY` (not in the DB), AAD = user id | TotpSecretCipherTest |
