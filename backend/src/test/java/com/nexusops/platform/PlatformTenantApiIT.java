@@ -180,7 +180,7 @@ class PlatformTenantApiIT extends IntegrationTestSupport {
             String users = as(ownerToken, get("/api/v1/users")).andExpect(status().isOk())
                     .andExpect(jsonPath("$.total").value(2))
                     .andReturn().getResponse().getContentAsString();
-            assertThat(users).doesNotContain(b.slug());
+            assertThat(users).doesNotContain(b.slug()).doesNotContain(b.email());
         }
     }
 }

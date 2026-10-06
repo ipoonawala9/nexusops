@@ -21,6 +21,6 @@
 | T17 | User enumeration through signup/login responses | I | Generic login errors; slug-availability endpoint is rate limited | AuthIT |
 | T18 | Stolen platform password | S | Password + single-use TOTP; uniform failures; per-IP and per-account rate limits; audited failures; 10 consecutive wrong codes disable the account | PlatformAuthIT, PlatformLoginRateLimitIT |
 | T19 | TOTP code replay (shoulder-surfing, intercepted code) | S | `totp_last_step` advanced under a row lock; a step ≤ last used is rejected | PlatformAuthIT |
-| T20 | Tenant code path reads staff credentials or other tenants' rows | I/E | Platform tables and cross-tenant SELECT policies require `app.platform_access`; only `PlatformAccess` turns it on, transaction-locally; every connection checkout clears it at session level (`TenantAwareDataSource`) | PlatformAccessIT, PlatformAccessConfinementTest |
+| T20 | Tenant code path reads staff credentials or other tenants' rows | I/E | Platform tables and cross-tenant SELECT policies require `app.platform_access`; only `PlatformAccess` turns it on, transaction-locally; every connection checkout clears it at session level (`TenantAwareDataSource`) | PlatformAccessIT, PlatformAccessConfinementTest, TenantAwareDataSourceIT |
 | T21 | Database dump exposes TOTP secrets | I | AES-256-GCM with `PLATFORM_TOTP_KEY` (not in the DB), AAD = user id | TotpSecretCipherTest |
 | T22 | Long-lived stolen platform session | S/E | 15-min access tokens; refresh family capped at 8 h; credential changes bump `token_version` | PlatformAuthIT |

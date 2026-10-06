@@ -175,7 +175,7 @@ A Redis token bucket implemented as an atomic Lua script. The filter runs before
 
 | Route class | Key | Default |
 |---|---|---|
-| login / platform login | per IP `rl:ip:{ip}:login`; per account `rl:acct:{sha256(workspace+email)}:login`; per workspace `rl:ws:{sha256(workspace)}:login-workspace`, failed logins only (see §16 / ADR-0006) | 10/min per IP; 10/min per account; 100/min per workspace |
+| login | per IP `rl:ip:{ip}:login`; per account `rl:acct:{sha256(workspace+email)}:login`; per workspace `rl:ws:{sha256(workspace)}:login-workspace`, failed logins only (see §16 / ADR-0006) | 10/min per IP; 10/min per account; 100/min per workspace |
 | platform login | per IP `rl:ip:{ip}:platform-login`; per account `rl:pacct:{sha256(email)}:platform-login` | 10/min per IP; 5/min per account |
 | signup, invitation accept, verify | `ip:{ip}:rl:{route}` | 5/min |
 | refresh | `ip:{ip}:rl:refresh` | 30/min |
