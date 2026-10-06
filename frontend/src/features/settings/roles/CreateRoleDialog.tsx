@@ -23,7 +23,7 @@ import type { RoleView } from '@/lib/api/types'
 
 const schema = z.object({
   name: requiredText(60),
-  description: z.string().trim().max(300, 'Use at most 300 characters.'),
+  description: z.string().trim().max(255, 'Use at most 255 characters.'), // server: RoleDtos @Size(max = 255), AuthorizationService
 })
 type Values = z.infer<typeof schema>
 

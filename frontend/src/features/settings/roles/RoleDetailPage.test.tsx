@@ -80,6 +80,17 @@ describe('RoleDetailPage', () => {
     })
   })
 
+  it("limits the description to the server's 255 characters", async () => {
+    const { server, user } = setup()
+    const description = await screen.findByLabelText('Description')
+    await user.clear(description)
+    await user.click(description)
+    await user.paste('x'.repeat(256))
+    await user.click(screen.getByRole('button', { name: 'Save details' }))
+    expect(await screen.findByText('Use at most 255 characters.')).toBeInTheDocument()
+    expect(server.callsTo('PATCH /roles/:id')).toHaveLength(0)
+  })
+
   it('deletes a role, or explains why it cannot', async () => {
     const { server, user, router } = setup()
     server.on('DELETE /roles/:id', {

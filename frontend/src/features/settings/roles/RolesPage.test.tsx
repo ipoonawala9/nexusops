@@ -72,6 +72,20 @@ describe('RolesPage', () => {
     ).toBeInTheDocument()
   })
 
+  it("limits the description to the server's 255 characters", async () => {
+    const server = fakeServer()
+    signedIn(server).on('GET /roles', { body: ROLES })
+    const { user } = renderApp({ server, path: '/app/settings/roles' })
+    await user.click(await screen.findByRole('button', { name: 'New role' }))
+    const dialog = await screen.findByRole('dialog')
+    await user.type(within(dialog).getByLabelText('Name'), 'Auditor')
+    await user.click(within(dialog).getByLabelText('Description'))
+    await user.paste('x'.repeat(256))
+    await user.click(within(dialog).getByRole('button', { name: 'Create role' }))
+    expect(await within(dialog).findByText('Use at most 255 characters.')).toBeInTheDocument()
+    expect(server.callsTo('POST /roles')).toHaveLength(0)
+  })
+
   it('hides New role without the manage permission', async () => {
     const server = fakeServer()
     signedIn(server, testProfile({ permissions: ['authorization.role.read'] })).on('GET /roles', {
