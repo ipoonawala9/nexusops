@@ -217,6 +217,37 @@ class PlatformCliIT extends IntegrationTestSupport {
     }
 
     @Test
+    void withoutAnInteractiveTerminalItPrintsTheErrorAndExits1() {
+        List<String> printed = new ArrayList<>();
+        String message = "Run this command in an interactive terminal (for Docker: docker compose run -it ...).";
+        Terminal noConsole = new Terminal() {
+            @Override
+            public String readLine(String prompt) {
+                throw new IllegalStateException(message);
+            }
+
+            @Override
+            public char[] readSecret(String prompt) {
+                throw new IllegalStateException(message);
+            }
+
+            @Override
+            public void println(String line) {
+                printed.add(line);
+            }
+        };
+        for (String command : List.of("create-platform-admin", "reset-platform-password")) {
+            printed.clear();
+            if (command.equals("reset-platform-password")) {
+                createExisting();
+            }
+            int exit = new PlatformCli(admin, noConsole, command, email, null, Clock.fixed(NOW, ZoneOffset.UTC)).execute();
+            assertThat(exit).isEqualTo(1);
+            assertThat(printed).containsExactly("Error: " + message);
+        }
+    }
+
+    @Test
     void unknownCommandOrMissingEmailPrintsUsage() {
         assertThat(run(new ScriptedTerminal(), "make-coffee", null)).isEqualTo(2);
         email = " ";

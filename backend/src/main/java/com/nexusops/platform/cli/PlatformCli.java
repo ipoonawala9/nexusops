@@ -93,6 +93,9 @@ public class PlatformCli implements ApplicationRunner, ExitCodeGenerator {
         } catch (ApiProblem problem) {
             terminal.println("Error: " + describe(problem));
             return FAILED;
+        } catch (IllegalStateException e) { // e.g. ConsoleTerminal without an interactive terminal: no stack trace
+            terminal.println("Error: " + e.getMessage());
+            return FAILED;
         }
     }
 

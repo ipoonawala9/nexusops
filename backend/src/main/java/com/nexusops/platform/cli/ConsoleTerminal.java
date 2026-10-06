@@ -10,7 +10,7 @@ final class ConsoleTerminal implements Terminal {
 
     private Console console() {
         Console console = System.console();
-        if (console == null) {
+        if (console == null || !console.isTerminal()) { // JDK 22+ may return a Console for redirected streams
             throw new IllegalStateException(
                     "Run this command in an interactive terminal (for Docker: docker compose run -it ...).");
         }
