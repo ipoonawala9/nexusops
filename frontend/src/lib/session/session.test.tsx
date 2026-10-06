@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react'
+import { act, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import type { RouteObject } from 'react-router'
 import { useTenantSession } from '@/features/auth/tenantSession'
@@ -77,5 +77,28 @@ describe('tenant session', () => {
     server.on('POST /auth/refresh', { status: 401, body: {} })
     await user.click(screen.getByRole('button', { name: 'call' }))
     await waitFor(() => expect(screen.getByText('status: anonymous')).toBeInTheDocument())
+  })
+
+  it('keeps the session when TenantRoot remounts after navigating away and back', async () => {
+    const server = fakeServer()
+    signedOut(server)
+    server
+      .on('POST /auth/login', { body: { accessToken: 'tok', tokenType: 'Bearer', expiresIn: 900 } })
+      .on('GET /me', { body: testProfile() })
+    const routesWithSibling: RouteObject[] = [
+      ...routes,
+      { path: '/elsewhere', element: <p>elsewhere</p> },
+    ]
+    const { user, router } = renderApp({ server, path: '/', routes: routesWithSibling })
+    await screen.findByText('status: anonymous')
+    await user.click(screen.getByRole('button', { name: 'login' }))
+    await screen.findByText('user: ada@acme.test')
+
+    await act(() => router.navigate('/elsewhere'))
+    expect(await screen.findByText('elsewhere')).toBeInTheDocument()
+    await act(() => router.navigate('/'))
+
+    expect(await screen.findByText('user: ada@acme.test')).toBeInTheDocument()
+    expect(server.callsTo('POST /auth/refresh')).toHaveLength(1)
   })
 })

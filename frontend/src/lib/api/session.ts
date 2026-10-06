@@ -6,7 +6,7 @@ export interface SessionApi {
   client: ApiClient
   tokens: TokenStore
   /**
-   * One cookie-based refresh at boot. Memoized: React StrictMode mounts twice, and two concurrent
+   * One cookie-based refresh at boot. Memoized while in flight: React StrictMode mounts twice, and two concurrent
    * refreshes would race the server's single-use rotation (ADR-0003).
    */
   restore(): Promise<boolean>
@@ -49,12 +49,17 @@ export function createSessionApi({
     client,
     tokens,
     restore() {
+      // Already holding a token (e.g. TenantRoot remounted after a sign-in): nothing to restore.
+      if (tokens.get() !== null) return Promise.resolve(true)
       restoring ??= refresh()
         .then((token) => {
           tokens.set(token)
           return token !== null
         })
         .catch(() => false)
+        .finally(() => {
+          restoring = null
+        })
       return restoring
     },
     onAuthFailure(listener) {
