@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { authTestRoutes } from '@/test/authRoutes'
 import { fakeServer } from '@/test/fakeServer'
@@ -88,5 +88,30 @@ describe('AcceptInvitationPage', () => {
     expect(
       await screen.findByText('This person is already a member of the workspace.'),
     ).toBeInTheDocument()
+  })
+
+  it('keeps the success screen when the consumed token later fails to preview', async () => {
+    const { user, server, queryClient } = setup()
+    server.on('POST /invitations/accept', {
+      status: 201,
+      body: { workspace: 'acme', email: 'grace@acme.test' },
+    })
+    await fillAndSubmit(user)
+    expect(await screen.findByRole('heading', { name: "You're in" })).toBeInTheDocument()
+
+    server.on('GET /invitations/preview', {
+      status: 400,
+      body: { detail: 'This invitation link is invalid or has expired.' },
+    })
+    await queryClient.refetchQueries({ queryKey: ['invitation-preview'] })
+    // the failed refetch has been recorded; let React render it
+    await waitFor(() =>
+      expect(queryClient.getQueryState(['invitation-preview', 't0k.en'])?.status).toBe('error'),
+    )
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(screen.getByRole('heading', { name: "You're in" })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Sign in to Acme Inc' })).toBeInTheDocument()
+    expect(screen.queryByText("This invitation can't be used")).not.toBeInTheDocument()
   })
 })

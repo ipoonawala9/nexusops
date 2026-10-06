@@ -33,7 +33,9 @@ export function AcceptInvitationPage() {
   const [params] = useSearchParams()
   const [token] = useState(() => params.get('token') ?? '')
   const stripped = useRef(false)
-  const [accepted, setAccepted] = useState<AcceptedInvitation | null>(null)
+  const [accepted, setAccepted] = useState<(AcceptedInvitation & { workspaceName: string }) | null>(
+    null,
+  )
   const [formError, setFormError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -45,6 +47,8 @@ export function AcceptInvitationPage() {
   const preview = useQuery({
     queryKey: ['invitation-preview', token],
     enabled: token.length > 0,
+    staleTime: Infinity, // the token is single-use: never refetch it
+    refetchOnWindowFocus: false,
     queryFn: () =>
       api.get<InvitationPreview>(`/invitations/preview?token=${encodeURIComponent(token)}`, {
         skipAuthRefresh: true,
@@ -64,7 +68,8 @@ export function AcceptInvitationPage() {
         { token, firstName, lastName, password },
         { skipAuthRefresh: true },
       )
-      setAccepted(result)
+      // The token is consumed now; keep what the success screen needs so a later preview refetch can't affect it.
+      setAccepted({ ...result, workspaceName: preview.data?.workspaceName ?? result.workspace })
     } catch (error) {
       if (!applyKnownErrors(error)) setFormError(problemMessage(error))
     }
@@ -84,6 +89,20 @@ export function AcceptInvitationPage() {
       }
     }
     return applied
+  }
+
+  if (accepted) {
+    const query = new URLSearchParams({ workspace: accepted.workspace, email: accepted.email })
+    return (
+      <AuthCard
+        title="You're in"
+        description={`Your account in ${accepted.workspaceName} is ready.`}
+      >
+        <Link to={`/login?${query.toString()}`} className={buttonVariants({ className: 'w-full' })}>
+          Sign in to {accepted.workspaceName}
+        </Link>
+      </AuthCard>
+    )
   }
 
   if (!token) {
@@ -114,19 +133,6 @@ export function AcceptInvitationPage() {
   }
 
   const invitation = preview.data
-  if (accepted) {
-    const query = new URLSearchParams({ workspace: accepted.workspace, email: accepted.email })
-    return (
-      <AuthCard
-        title="You're in"
-        description={`Your account in ${invitation.workspaceName} is ready.`}
-      >
-        <Link to={`/login?${query.toString()}`} className={buttonVariants({ className: 'w-full' })}>
-          Sign in to {invitation.workspaceName}
-        </Link>
-      </AuthCard>
-    )
-  }
 
   return (
     <AuthCard
