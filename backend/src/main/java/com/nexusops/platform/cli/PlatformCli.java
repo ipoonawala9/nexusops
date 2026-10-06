@@ -8,6 +8,7 @@ import com.nexusops.platform.totp.Totp;
 import com.nexusops.shared.web.ApiProblem;
 import java.time.Clock;
 import java.util.Arrays;
+import java.util.OptionalLong;
 import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -106,10 +107,11 @@ public class PlatformCli implements ApplicationRunner, ExitCodeGenerator {
             return FAILED;
         }
         Enrollment enrollment = admin.newEnrollment(email);
-        if (!enrol(enrollment)) {
+        long confirmedStep = enrol(enrollment);
+        if (confirmedStep < 0) {
             return FAILED;
         }
-        admin.create(email, platformRole, password, enrollment.secret());
+        admin.create(email, platformRole, password, enrollment.secret(), confirmedStep);
         terminal.println("Created " + platformRole + " " + enrollment.email()
                 + ". Sign in at /platform/login with your password and a code from your app.");
         return OK;
@@ -117,10 +119,11 @@ public class PlatformCli implements ApplicationRunner, ExitCodeGenerator {
 
     private int resetTotp() {
         Enrollment enrollment = admin.newEnrollment(email);
-        if (!enrol(enrollment)) {
+        long confirmedStep = enrol(enrollment);
+        if (confirmedStep < 0) {
             return FAILED;
         }
-        admin.resetTotp(email, enrollment.secret());
+        admin.resetTotp(email, enrollment.secret(), confirmedStep);
         terminal.println("New authenticator enrolled for " + enrollment.email() + "; all their sessions are signed out.");
         return OK;
     }
@@ -152,21 +155,25 @@ public class PlatformCli implements ApplicationRunner, ExitCodeGenerator {
         }
     }
 
-    /** Shows the secret once and requires a correct code before anything is saved. */
-    private boolean enrol(Enrollment enrollment) {
+    /**
+     * Shows the secret once and requires a correct code before anything is saved. Returns the confirmed code's step
+     * (stored as already used, so the code typed here can't sign in), or -1 if enrolment was not confirmed.
+     */
+    private long enrol(Enrollment enrollment) {
         terminal.println("Scan this QR code with your authenticator app (1Password, Google Authenticator, Authy, ...):");
         terminal.println(QrCodes.render(enrollment.otpauthUri()));
         terminal.println("Or enter this secret manually: " + grouped(enrollment.secretBase32()));
         terminal.println("otpauth URI: " + enrollment.otpauthUri());
         for (int attempt = 1; attempt <= CODE_ATTEMPTS; attempt++) {
             String code = terminal.readLine("Enter the 6-digit code your app shows: ");
-            if (Totp.verify(enrollment.secret(), code, clock.instant(), 0).isPresent()) {
-                return true;
+            OptionalLong step = Totp.verify(enrollment.secret(), code, clock.instant(), 0);
+            if (step.isPresent()) {
+                return step.getAsLong();
             }
             terminal.println("That code doesn't match. Check the time on your phone and try again.");
         }
         terminal.println("Error: enrolment not confirmed; nothing was saved.");
-        return false;
+        return -1;
     }
 
     private PlatformRole parseRole() {

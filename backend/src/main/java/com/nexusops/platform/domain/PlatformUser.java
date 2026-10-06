@@ -61,22 +61,25 @@ public class PlatformUser extends BaseEntity {
 
     protected PlatformUser() {}
 
-    public static PlatformUser create(UUID id, String email, String passwordHash, String totpSecretEnc, PlatformRole role) {
+    /** {@code confirmedStep}: the step of the code that confirmed enrolment, consumed so it can't sign in again. */
+    public static PlatformUser create(UUID id, String email, String passwordHash, String totpSecretEnc, PlatformRole role,
+            long confirmedStep) {
         PlatformUser user = new PlatformUser();
         user.initId(id);
         user.email = email;
         user.passwordHash = passwordHash;
         user.totpSecretEnc = totpSecretEnc;
         user.role = role;
+        user.totpLastStep = confirmedStep;
         user.status = PlatformUserStatus.ACTIVE;
         user.createdAt = Instant.now();
         user.updatedAt = user.createdAt;
         return user;
     }
 
-    public void replaceTotp(String encryptedSecret) {
+    public void replaceTotp(String encryptedSecret, long confirmedStep) {
         totpSecretEnc = encryptedSecret;
-        totpLastStep = 0;
+        totpLastStep = confirmedStep;
         endSessions();
     }
 

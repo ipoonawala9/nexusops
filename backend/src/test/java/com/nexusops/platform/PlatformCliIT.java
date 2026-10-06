@@ -1,6 +1,8 @@
 package com.nexusops.platform;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.nexusops.platform.application.PlatformUserAdmin;
 import com.nexusops.platform.cli.PlatformCli;
@@ -24,8 +26,13 @@ import java.util.regex.Pattern;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
 
+@AutoConfigureMockMvc
 class PlatformCliIT extends IntegrationTestSupport {
 
     static final Instant NOW = Instant.parse("2026-10-06T10:00:00Z");
@@ -35,6 +42,7 @@ class PlatformCliIT extends IntegrationTestSupport {
     @Autowired PlatformUserAdmin admin;
     @Autowired TotpSecretCipher cipher;
     @Autowired PasswordEncoder passwordEncoder;
+    @Autowired MockMvc mvc;
 
     String email;
 
@@ -48,6 +56,7 @@ class PlatformCliIT extends IntegrationTestSupport {
         final Deque<String> secrets = new ArrayDeque<>();
         final List<String> output = new ArrayList<>();
         boolean answerCorrectly = true;
+        Instant now = NOW;
 
         ScriptedTerminal secrets(String... values) {
             secrets.addAll(List.of(values));
@@ -85,7 +94,7 @@ class PlatformCliIT extends IntegrationTestSupport {
         }
 
         String correctCode() {
-            return Totp.code(printedSecret(), Totp.step(NOW));
+            return Totp.code(printedSecret(), Totp.step(now));
         }
 
         String all() {
@@ -94,7 +103,12 @@ class PlatformCliIT extends IntegrationTestSupport {
     }
 
     private int run(ScriptedTerminal terminal, String command, String role) {
-        return new PlatformCli(admin, terminal, command, email, role, Clock.fixed(NOW, ZoneOffset.UTC)).execute();
+        return new PlatformCli(admin, terminal, command, email, role, Clock.fixed(terminal.now, ZoneOffset.UTC)).execute();
+    }
+
+    private ResultActions login(String password, String code) throws Exception {
+        return mvc.perform(post("/api/v1/platform/auth/login").contentType(MediaType.APPLICATION_JSON).content("""
+                {"email":"%s","password":"%s","code":"%s"}""".formatted(email, password, code)));
     }
 
     private Map<String, Object> row() {
@@ -117,6 +131,7 @@ class PlatformCliIT extends IntegrationTestSupport {
         assertThat(row.get("status")).isEqualTo("ACTIVE");
         assertThat(cipher.decrypt((String) row.get("totp_secret_enc"), id)).isEqualTo(terminal.printedSecret());
         assertThat(passwordEncoder.matches(STRONG, (String) row.get("password_hash"))).isTrue();
+        assertThat(row.get("totp_last_step")).isEqualTo(Totp.step(NOW)); // the confirmation code is consumed
         assertThat(terminal.all()).contains("otpauth://totp/NexusOps:").doesNotContain(STRONG);
         assertThat(OwnerJdbc.superuser().queryForObject("""
                 select count(*) from audit_events where action = 'PlatformUserCreated' and entity_id = ?
@@ -161,7 +176,17 @@ class PlatformCliIT extends IntegrationTestSupport {
         Map<String, Object> row = row();
         assertThat(cipher.decrypt((String) row.get("totp_secret_enc"), (UUID) row.get("id"))).isEqualTo(terminal.printedSecret());
         assertThat(row.get("token_version")).isEqualTo(1);
-        assertThat(row.get("totp_last_step")).isEqualTo(0L);
+        assertThat(row.get("totp_last_step")).isEqualTo(Totp.step(NOW)); // the confirmation code is consumed
+    }
+
+    @Test
+    void theEnrolmentCodeCannotBeUsedAgainToSignIn() throws Exception {
+        var terminal = new ScriptedTerminal().secrets(STRONG, STRONG);
+        terminal.now = Instant.now();
+        assertThat(run(terminal, "create-platform-admin", "PLATFORM_ADMIN")).isZero();
+        String enrolmentCode = terminal.correctCode();
+        login(STRONG, enrolmentCode).andExpect(status().isUnauthorized());
+        login(STRONG, Totp.code(terminal.printedSecret(), Totp.step(terminal.now) + 1)).andExpect(status().isOk());
     }
 
     @Test
@@ -191,6 +216,6 @@ class PlatformCliIT extends IntegrationTestSupport {
     }
 
     private void createExisting() {
-        admin.create(email, PlatformRole.PLATFORM_ADMIN, TestPlatformUsers.PASSWORD, Totp.newSecret());
+        admin.create(email, PlatformRole.PLATFORM_ADMIN, TestPlatformUsers.PASSWORD, Totp.newSecret(), 0);
     }
 }

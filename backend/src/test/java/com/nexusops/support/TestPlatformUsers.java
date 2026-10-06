@@ -32,7 +32,7 @@ public final class TestPlatformUsers {
     public static Operator create(PlatformUserAdmin admin, PlatformRole role) {
         String email = "ops-" + UUID.randomUUID().toString().substring(0, 8) + "@nexusops.test";
         byte[] secret = Totp.newSecret();
-        UUID id = admin.create(email, role, PASSWORD, secret);
+        UUID id = admin.create(email, role, PASSWORD, secret, 0);
         return new Operator(id, email, PASSWORD, secret);
     }
 

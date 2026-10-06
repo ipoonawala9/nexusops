@@ -62,7 +62,8 @@ public class PlatformUserAdmin {
         passwordPolicy.check(password, Emails.normalize(rawEmail));
     }
 
-    public UUID create(String rawEmail, PlatformRole role, String password, byte[] secret) {
+    /** {@code confirmedStep} is the TOTP step the operator confirmed at enrolment; it is stored as already used. */
+    public UUID create(String rawEmail, PlatformRole role, String password, byte[] secret, long confirmedStep) {
         String email = Emails.normalize(rawEmail);
         passwordPolicy.check(password, email);
         String hash = passwordEncoder.encode(password);
@@ -71,7 +72,7 @@ public class PlatformUserAdmin {
             if (users.findByEmail(email).isPresent()) {
                 throw ApiProblem.conflictField("email", "A platform user with this email already exists.");
             }
-            users.saveAndFlush(PlatformUser.create(id, email, hash, cipher.encrypt(secret, id), role));
+            users.saveAndFlush(PlatformUser.create(id, email, hash, cipher.encrypt(secret, id), role, confirmedStep));
             audit.record(AuditEntry.of("PlatformUserCreated", "PlatformUser", id)
                     .withMetadata(Map.of("email", email, "role", role.name()))
                     .asActor(ActorType.SYSTEM));
@@ -79,10 +80,10 @@ public class PlatformUserAdmin {
         });
     }
 
-    public void resetTotp(String rawEmail, byte[] secret) {
+    public void resetTotp(String rawEmail, byte[] secret, long confirmedStep) {
         access.writeWithoutResult(() -> {
             PlatformUser user = find(rawEmail);
-            user.replaceTotp(cipher.encrypt(secret, user.getId()));
+            user.replaceTotp(cipher.encrypt(secret, user.getId()), confirmedStep);
             audit.record(AuditEntry.of("PlatformTotpReset", "PlatformUser", user.getId()).asActor(ActorType.SYSTEM));
         });
     }
