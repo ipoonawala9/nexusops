@@ -1,6 +1,7 @@
 import { Navigate, type RouteObject } from 'react-router'
 import { RedirectIfTenantSignedIn, RequireTenantSession } from '@/features/auth/guards'
 import { linkRoutes, signInRoutes } from '@/features/auth/routes'
+import { platformRoutes } from '@/features/platform/routes'
 import { appRoutes } from '@/features/shell/routes'
 import { NotFoundPage } from '@/pages/NotFoundPage'
 import { TenantRoot } from './TenantRoot'
@@ -21,5 +22,6 @@ export const routes: RouteObject[] = [
       },
     ],
   },
+  ...platformRoutes,
   { path: '*', element: <NotFoundPage /> },
 ]
