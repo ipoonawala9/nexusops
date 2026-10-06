@@ -8,7 +8,10 @@ const OPERATOR = {
   secret: 'JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP',
 }
 
-test('a platform admin suspends and reactivates a workspace', async ({ page, browser }) => {
+test('a platform admin suspends and reactivates a workspace', async ({
+  page,
+  browser,
+}, testInfo) => {
   const ws = newWorkspace('susp')
   await signUpAndVerify(page, ws)
   await signIn(page, ws, ws.email)
@@ -19,7 +22,10 @@ test('a platform admin suspends and reactivates a workspace', async ({ page, bro
   await ops.goto('/platform/login')
   await ops.getByLabel('Email').fill(OPERATOR.email)
   await ops.getByLabel('Password').fill(OPERATOR.password)
-  await ops.getByLabel('Authenticator code').fill(totp(OPERATOR.secret))
+  // The server rejects a code whose step isn't after the last one used (replay). A CI retry may sign in again within
+  // the same 30 s step, so a retry uses the next step's code (still inside the server's ±1 step window).
+  const at = Date.now() + (testInfo.retry > 0 ? 30_000 : 0)
+  await ops.getByLabel('Authenticator code').fill(totp(OPERATOR.secret, at))
   await ops.getByRole('button', { name: 'Sign in' }).click()
   await expect(ops.getByRole('heading', { name: 'Workspaces' })).toBeVisible()
 
@@ -30,7 +36,19 @@ test('a platform admin suspends and reactivates a workspace', async ({ page, bro
   await ops.getByRole('button', { name: 'Suspend workspace' }).click()
   await expect(ops.getByText(`${ws.name} suspended.`)).toBeVisible()
 
-  // The owner is out: a reload can't restore the session, and signing in names the reason.
+  // The owner's next action that reaches the API names the reason (lists refetch whenever their page mounts)...
+  await page
+    .getByRole('navigation', { name: 'Workspace' })
+    .getByRole('link', { name: 'Settings' })
+    .click()
+  await page
+    .getByRole('navigation', { name: 'Settings' })
+    .getByRole('link', { name: 'Roles' })
+    .click()
+  await expect(page).toHaveURL(/\/app\/settings\/roles$/)
+  await expect(page.getByRole('alert').filter({ hasText: 'Workspace suspended.' })).toBeVisible()
+
+  // ...and they are out: a reload can't restore the session, and signing in names the reason.
   await page.reload()
   await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible()
   await signIn(page, ws, ws.email)

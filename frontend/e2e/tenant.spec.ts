@@ -61,14 +61,19 @@ test('an owner builds a team, and the audit log shows every step', async ({ page
   await page.getByRole('dialog').getByLabel('Name').fill('Auditor')
   await page.getByRole('button', { name: 'Create role' }).click()
   await page.getByRole('checkbox', { name: /View the audit log/ }).check()
+  // The first save's 'Permissions saved.' toast may still be up, so check the saved state instead of the toast text.
+  const saved = page.waitForResponse(
+    (r) => r.request().method() === 'PUT' && r.url().includes('/permissions') && r.ok(),
+  )
   await page.getByRole('button', { name: 'Save permissions' }).click()
-  await expect(page.getByText('Permissions saved.')).toBeVisible()
+  await saved
+  await page.reload()
+  await expect(page.getByRole('checkbox', { name: /View the audit log/ })).toBeChecked()
   await page
     .getByRole('navigation', { name: 'Settings' })
     .getByRole('link', { name: 'Users' })
     .click()
-  // Grace joined in another browser; the list is cached for 30 s, so reload to see her.
-  await page.reload()
+  // Grace joined in another browser; the list refetches on mount, so she is there without a reload.
   await page.getByRole('button', { name: 'Manage Grace Hopper' }).click()
   await page.getByRole('dialog').getByRole('checkbox', { name: 'Auditor' }).check()
   await page.getByRole('dialog').getByRole('button', { name: 'Save roles' }).click()
