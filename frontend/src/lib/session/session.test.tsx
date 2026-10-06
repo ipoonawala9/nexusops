@@ -93,12 +93,15 @@ describe('tenant session', () => {
     await screen.findByText('status: anonymous')
     await user.click(screen.getByRole('button', { name: 'login' }))
     await screen.findByText('user: ada@acme.test')
+    // The boot restore found no cookie: one refresh plus its single cross-tab-race retry.
+    expect(server.callsTo('POST /auth/refresh')).toHaveLength(2)
 
     await act(() => router.navigate('/elsewhere'))
     expect(await screen.findByText('elsewhere')).toBeInTheDocument()
     await act(() => router.navigate('/'))
 
     expect(await screen.findByText('user: ada@acme.test')).toBeInTheDocument()
-    expect(server.callsTo('POST /auth/refresh')).toHaveLength(1)
+    // No further refresh on remount.
+    expect(server.callsTo('POST /auth/refresh')).toHaveLength(2)
   })
 })

@@ -22,10 +22,15 @@ export function renderApp({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   })
   const handles: ApiHandles = {
-    tenant: createSessionApi({ refreshPath: '/auth/refresh', fetchImpl: server.fetchImpl }),
+    tenant: createSessionApi({
+      refreshPath: '/auth/refresh',
+      fetchImpl: server.fetchImpl,
+      refreshRetryDelayMs: 0,
+    }),
     platform: createSessionApi({
       refreshPath: '/platform/auth/refresh',
       fetchImpl: server.fetchImpl,
+      refreshRetryDelayMs: 0,
     }),
   }
   const router = createMemoryRouter(routes, { initialEntries: [path] })

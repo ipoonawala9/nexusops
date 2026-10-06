@@ -18,9 +18,85 @@ describe('createSessionApi', () => {
     const server = fakeServer({
       'POST /auth/refresh': { status: 401, body: { detail: 'expired' } },
     })
-    const api = createSessionApi({ refreshPath: '/auth/refresh', fetchImpl: server.fetchImpl })
+    const api = createSessionApi({
+      refreshPath: '/auth/refresh',
+      fetchImpl: server.fetchImpl,
+      refreshRetryDelayMs: 0,
+    })
     await expect(api.restore()).resolves.toBe(false)
     expect(api.tokens.get()).toBeNull()
+  })
+
+  it('retries a refresh once when another tab won the rotation (401 then 200)', async () => {
+    let calls = 0
+    const server = fakeServer({
+      'POST /auth/refresh': () =>
+        ++calls === 1
+          ? { status: 401, body: { detail: 'Your session has expired. Please sign in again.' } }
+          : { body: { accessToken: 'rotated', tokenType: 'Bearer', expiresIn: 900 } },
+    })
+    const api = createSessionApi({
+      refreshPath: '/auth/refresh',
+      fetchImpl: server.fetchImpl,
+      refreshRetryDelayMs: 0,
+    })
+    await expect(api.restore()).resolves.toBe(true)
+    expect(api.tokens.get()).toBe('rotated')
+    expect(server.callsTo('POST /auth/refresh')).toHaveLength(2)
+  })
+
+  it('gives up after a second refresh 401', async () => {
+    const server = fakeServer({
+      'POST /auth/refresh': { status: 401, body: { detail: 'expired' } },
+    })
+    const api = createSessionApi({
+      refreshPath: '/auth/refresh',
+      fetchImpl: server.fetchImpl,
+      refreshRetryDelayMs: 0,
+    })
+    await expect(api.restore()).resolves.toBe(false)
+    expect(api.tokens.get()).toBeNull()
+    expect(server.callsTo('POST /auth/refresh')).toHaveLength(2)
+  })
+
+  it('does not retry a refresh that failed for another reason', async () => {
+    const server = fakeServer({
+      'POST /auth/refresh': { status: 500, body: { detail: 'boom' } },
+    })
+    const api = createSessionApi({
+      refreshPath: '/auth/refresh',
+      fetchImpl: server.fetchImpl,
+      refreshRetryDelayMs: 0,
+    })
+    await expect(api.restore()).resolves.toBe(false)
+    expect(server.callsTo('POST /auth/refresh')).toHaveLength(1)
+  })
+
+  it('recovers a rejected request when the second refresh attempt succeeds', async () => {
+    let refreshes = 0
+    let meCalls = 0
+    const server = fakeServer({
+      'POST /auth/refresh': () =>
+        ++refreshes === 1
+          ? { status: 401, body: { detail: 'expired' } }
+          : { body: { accessToken: 'rotated', tokenType: 'Bearer', expiresIn: 900 } },
+      'GET /me': (req) =>
+        ++meCalls === 1
+          ? { status: 401, body: {} }
+          : { body: { auth: req.headers.get('Authorization') } },
+    })
+    const api = createSessionApi({
+      refreshPath: '/auth/refresh',
+      fetchImpl: server.fetchImpl,
+      refreshRetryDelayMs: 0,
+    })
+    let failures = 0
+    api.onAuthFailure(() => failures++)
+    api.tokens.set('stale')
+    await expect(api.client.get('/me')).resolves.toEqual({ auth: 'Bearer rotated' })
+    expect(failures).toBe(0)
+    expect(api.tokens.get()).toBe('rotated')
+    expect(server.callsTo('POST /auth/refresh')).toHaveLength(2)
   })
 
   it('refreshes silently when a sent token is rejected', async () => {
