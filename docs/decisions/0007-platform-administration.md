@@ -73,3 +73,10 @@
   needs someone with server access to run the reset.
 - Platform events with no workspace (logins, account changes) are recorded with `tenant_id` NULL. Viewing them needs a
   future platform audit view.
+- Residual risk, accepted: login timing. A correct password runs an extra locked TOTP transaction, so response
+  timing can reveal that a stolen password is right. The 10-code lockout limits what an attacker gains from knowing
+  this.
+- Residual risk, accepted: pre-auth flag scope. `app.platform_access` is also on during unauthenticated platform
+  login, refresh and logout, and in the principal filter. So the `platform_read` SELECT policies on `users`, `roles`
+  and `user_roles` are open before a principal is verified. Those paths issue no such queries today. Future defence in
+  depth: a separate tenant-read flag set only for the workspace listing.
