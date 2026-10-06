@@ -1,5 +1,6 @@
 import type { RouteObject } from 'react-router'
 import { EmptyState } from '@/components/states'
+import { AuditPage } from '@/features/audit/AuditPage'
 import { PERMISSIONS, RequirePermission } from '@/features/auth/permissions'
 import { ModulesSettingsPage } from '@/features/settings/ModulesSettingsPage'
 import { RoleDetailPage } from '@/features/settings/roles/RoleDetailPage'
@@ -75,7 +76,7 @@ export const settingsChildren: RouteObject[] = [
   },
 ]
 
-/** /app/* children (Task 9 appends the audit route). */
+/** /app/* children. */
 export const appChildren: RouteObject[] = [
   { index: true, element: <OverviewPage /> },
   modulePage('crm', 'CRM'),
@@ -110,6 +111,14 @@ export const appChildren: RouteObject[] = [
         phase={12}
         description="Permission-aware answers about your workspace."
       />
+    ),
+  },
+  {
+    path: 'audit',
+    element: (
+      <RequirePermission anyOf={[PERMISSIONS.auditRead]}>
+        <AuditPage />
+      </RequirePermission>
     ),
   },
   { path: 'settings', element: <SettingsLayout />, children: settingsChildren },
