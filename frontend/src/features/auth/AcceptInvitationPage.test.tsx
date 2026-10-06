@@ -69,6 +69,20 @@ describe('AcceptInvitationPage', () => {
     expect(screen.getByText(/ask the person who invited you/i)).toBeInTheDocument()
   })
 
+  it('focuses the field a server error names', async () => {
+    const { user, server } = setup()
+    server.on('POST /invitations/accept', {
+      status: 400,
+      body: {
+        detail: 'Request validation failed.',
+        errors: [{ field: 'lastName', message: 'Enter a last name.' }],
+      },
+    })
+    await fillAndSubmit(user)
+    expect(await screen.findByText('Enter a last name.')).toBeInTheDocument()
+    expect(screen.getByLabelText('Last name')).toHaveFocus()
+  })
+
   it('checks the repeated password and shows server errors', async () => {
     const { user, server } = setup()
     await fillAndSubmit(user, 'something else entirely')

@@ -43,6 +43,7 @@ describe('SignupPage', () => {
     await user.click(screen.getByRole('button', { name: 'Create workspace' }))
     expect(await screen.findByText('This workspace URL is already taken.')).toBeInTheDocument()
     expect(screen.getByLabelText('Workspace URL')).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.getByLabelText('Workspace URL')).toHaveFocus()
     expect(screen.getByLabelText('Work email')).toHaveValue('ada@acme.test')
   })
 

@@ -78,10 +78,12 @@ export function AcceptInvitationPage() {
   function applyKnownErrors(error: unknown): boolean {
     if (!(error instanceof ApiError) || !error.problem.errors?.length) return false
     let applied = false
+    let focused = false
     for (const { field, message } of error.problem.errors) {
       const known = FIELDS.find((f) => f === field)
       if (known) {
-        form.setError(known, { type: 'server', message })
+        form.setError(known, { type: 'server', message }, { shouldFocus: !focused })
+        focused = true
         applied = true
       } else {
         setFormError(message) // e.g. email conflict: the invitee can't change the email here
