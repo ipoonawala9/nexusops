@@ -17,6 +17,7 @@ export function ModulesSettingsPage() {
   const plan = session.state.status === 'authenticated' ? session.state.profile.tenant.planCode : ''
   const modules = useQuery({
     queryKey: ['tenant-modules'],
+    refetchOnMount: 'always',
     queryFn: () => api.get<ModuleState[]>('/tenant/modules'),
   })
   const toggle = useMutation({

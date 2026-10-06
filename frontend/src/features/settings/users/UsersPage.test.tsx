@@ -1,5 +1,5 @@
-import { screen, within } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { act, screen, within } from '@testing-library/react'
+import { describe, expect, it, vi } from 'vitest'
 import { fakeServer } from '@/test/fakeServer'
 import { signedIn, testProfile, user as aUser } from '@/test/fixtures'
 import { renderApp } from '@/test/renderApp'
@@ -33,13 +33,13 @@ function page(items = [aUser(), GRACE], total = items.length) {
   return { items, page: 0, size: 20, total }
 }
 
-function setup(profile = testProfile()) {
+function setup(profile = testProfile(), path = '/app/settings/users') {
   const server = fakeServer()
   signedIn(server, profile)
     .on('GET /users', { body: page() })
     .on('GET /roles', { body: ROLES })
     .on('GET /invitations', { body: [] })
-  return renderApp({ server, path: '/app/settings/users' })
+  return renderApp({ server, path })
 }
 
 describe('UsersPage', () => {
@@ -75,6 +75,46 @@ describe('UsersPage', () => {
     const { server } = setup()
     server.on('GET /users', { body: page([], 0) })
     expect(await screen.findByText('No people match these filters.')).toBeInTheDocument()
+  })
+
+  it('offers the first page when a later page is empty', async () => {
+    const { server, user, router } = setup(
+      testProfile(),
+      '/app/settings/users?status=ACTIVE&page=3',
+    )
+    server.on('GET /users', (req) =>
+      req.query.get('page') === '0'
+        ? { body: page() }
+        : { body: { items: [], page: 3, size: 20, total: 2 } },
+    )
+    expect(await screen.findByText('No people match these filters.')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Back to first page' }))
+    expect(await screen.findByText('grace@acme.test')).toBeInTheDocument()
+    expect(router.state.location.search).toBe('?status=ACTIVE')
+    expect(server.callsTo('GET /users').at(-1)?.query.get('page')).toBe('0')
+  })
+
+  it('shows a suspension that happens while signed in', async () => {
+    const { server } = setup()
+    server.on('GET /users', { status: 403, body: { detail: 'Workspace suspended.' } })
+    expect(await screen.findByRole('alert')).toHaveTextContent('Workspace suspended.')
+  })
+
+  it('refetches the lists each time the page mounts, even while cached data is fresh', async () => {
+    const { server, router, queryClient } = setup()
+    queryClient.setDefaultOptions({ queries: { retry: false, staleTime: 30_000 } })
+    await screen.findByText('grace@acme.test')
+    await act(() => router.navigate('/app/settings/roles'))
+    await screen.findByRole('link', { name: 'Support' })
+    await act(() => router.navigate('/app/settings/users'))
+    await screen.findByText('grace@acme.test')
+    await act(() => router.navigate('/app/settings/roles'))
+    await screen.findByRole('link', { name: 'Support' })
+    await vi.waitFor(() => {
+      expect(server.callsTo('GET /users')).toHaveLength(2)
+      expect(server.callsTo('GET /invitations')).toHaveLength(2)
+      expect(server.callsTo('GET /roles')).toHaveLength(2)
+    })
   })
 
   it('renames a person', async () => {

@@ -17,6 +17,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { describedBy, Field } from '@/components/form/Field'
 import { FormError } from '@/components/form/FormError'
 import { useApi } from '@/lib/api/ApiContext'
+import { ApiError } from '@/lib/api/client'
 import { applyFieldErrors, problemMessage } from '@/lib/api/problems'
 import type { PlatformTenant } from '@/lib/api/types'
 
@@ -49,6 +50,9 @@ export function StatusChangeDialog({
       onClose()
     } catch (e) {
       if (!applyFieldErrors(e, form.setError, ['reason'] as const)) setError(problemMessage(e))
+      // A conflict means the row behind the dialog is stale (changed elsewhere): refresh it.
+      if (e instanceof ApiError && e.status === 409)
+        void queryClient.invalidateQueries({ queryKey: ['platform-tenants'] })
     }
   })
 

@@ -1,5 +1,6 @@
-import { screen } from '@testing-library/react'
+import { act, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
+import { GENERIC_ERROR } from '@/lib/api/problems'
 import type { RoleView } from '@/lib/api/types'
 import { fakeServer } from '@/test/fakeServer'
 import { signedIn } from '@/test/fixtures'
@@ -52,6 +53,33 @@ describe('RoleDetailPage', () => {
     expect(server.callsTo('PUT /roles/:id/permissions')[0].body).toEqual({
       permissions: ['audit.event.read', 'identity.user.read'],
     })
+  })
+
+  it('reports a save as saved even when the follow-up profile reload fails', async () => {
+    const { server, user } = setup()
+    server.on('PUT /roles/:id/permissions', (req) => ({
+      body: { ...SUPPORT, ...(req.body as object) },
+    }))
+    await user.click(await screen.findByRole('checkbox', { name: /View the audit log/ }))
+    server.on('GET /me', { status: 500, body: { detail: 'Profile service hiccup.' } })
+    await user.click(screen.getByRole('button', { name: 'Save permissions' }))
+    expect(await screen.findByText('Permissions saved.')).toBeInTheDocument()
+    await waitFor(() => expect(server.callsTo('GET /me').length).toBeGreaterThan(1))
+    expect(screen.queryByText('Profile service hiccup.')).not.toBeInTheDocument()
+    expect(screen.queryByText(GENERIC_ERROR)).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Save permissions' })).toBeEnabled()
+  })
+
+  it('re-seeds the checkboxes when a refetch brings newer permissions', async () => {
+    const { server, queryClient } = setup()
+    expect(await screen.findByRole('checkbox', { name: /View the audit log/ })).not.toBeChecked()
+    server.on('GET /roles/:id', {
+      body: { ...SUPPORT, permissions: ['audit.event.read', 'identity.user.read'] },
+    })
+    await act(() => queryClient.invalidateQueries({ queryKey: ['role', 'r-support'] }))
+    await waitFor(() =>
+      expect(screen.getByRole('checkbox', { name: /View the audit log/ })).toBeChecked(),
+    )
   })
 
   it("shows the server's hierarchy refusal", async () => {

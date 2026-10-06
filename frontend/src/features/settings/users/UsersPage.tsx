@@ -41,6 +41,7 @@ export function UsersPage() {
     queryKey: ['users', { q, status, page }],
     queryFn: () => api.get<Page<UserView>>(`/users?${toQuery({ q, status, page, size: SIZE })}`),
     placeholderData: keepPreviousData,
+    refetchOnMount: 'always',
   })
 
   function update(next: Record<string, string>) {
@@ -94,6 +95,13 @@ export function UsersPage() {
         <EmptyState
           title="No people match these filters."
           description="Try a different search or status."
+          action={
+            page > 0 && (
+              <Button variant="outline" onClick={() => update({ page: '' })}>
+                Back to first page
+              </Button>
+            )
+          }
         />
       ) : (
         <>

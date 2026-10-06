@@ -26,6 +26,17 @@ describe('AppLayout', () => {
     expect(screen.getAllByText('Acme Inc').length).toBeGreaterThan(0)
   })
 
+  it('marks Settings active on every settings page', async () => {
+    const server = fakeServer()
+    signedIn(server).on('GET /roles', { body: [] })
+    renderApp({ server, path: '/app/settings/roles' })
+    await screen.findByRole('navigation', { name: 'Settings' })
+    const settings = nav().getByRole('link', { name: 'Settings' })
+    expect(settings).toHaveAttribute('href', '/app/settings/workspace')
+    expect(settings).toHaveAttribute('aria-current', 'page')
+    expect(nav().getByRole('link', { name: 'Overview' })).not.toHaveAttribute('aria-current')
+  })
+
   it('hides Settings entirely without any settings permission', async () => {
     const server = fakeServer()
     signedIn(server, testProfile({ permissions: [] }))

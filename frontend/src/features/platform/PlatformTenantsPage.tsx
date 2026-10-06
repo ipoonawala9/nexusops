@@ -47,7 +47,15 @@ export function PlatformTenantsPage() {
         `/platform/tenants?${toQuery({ q, status, page, size: SIZE })}`,
       ),
     placeholderData: keepPreviousData,
+    refetchOnMount: 'always',
   })
+
+  function goToPage(p: number) {
+    const next = new URLSearchParams(params)
+    if (p > 0) next.set('page', String(p))
+    else next.delete('page')
+    setParams(next, { replace: true })
+  }
 
   function onSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -87,7 +95,17 @@ export function PlatformTenantsPage() {
       ) : tenants.isError ? (
         <ErrorState error={tenants.error} onRetry={() => void tenants.refetch()} />
       ) : tenants.data.items.length === 0 ? (
-        <EmptyState title="No workspaces match." description="Try a different search or status." />
+        <EmptyState
+          title="No workspaces match."
+          description="Try a different search or status."
+          action={
+            page > 0 && (
+              <Button variant="outline" onClick={() => goToPage(0)}>
+                Back to first page
+              </Button>
+            )
+          }
+        />
       ) : (
         <>
           <div className="overflow-x-auto rounded-lg border">
@@ -160,11 +178,7 @@ export function PlatformTenantsPage() {
             page={tenants.data.page}
             size={tenants.data.size}
             total={tenants.data.total}
-            onPage={(p) => {
-              const next = new URLSearchParams(params)
-              next.set('page', String(p))
-              setParams(next, { replace: true })
-            }}
+            onPage={goToPage}
           />
         </>
       )}

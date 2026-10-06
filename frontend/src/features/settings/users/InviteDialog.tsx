@@ -33,6 +33,7 @@ export function InviteDialog({ onClose }: { onClose: () => void }) {
   const queryClient = useQueryClient()
   const roles = useQuery({
     queryKey: ['roles'],
+    refetchOnMount: 'always',
     queryFn: () => api.get<RoleView[]>('/roles'),
     enabled: canReadRoles,
   })

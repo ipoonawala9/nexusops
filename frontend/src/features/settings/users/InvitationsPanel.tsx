@@ -30,6 +30,7 @@ export function InvitationsPanel() {
   const [revokeError, setRevokeError] = useState<string | null>(null)
   const invitations = useQuery({
     queryKey: ['invitations'],
+    refetchOnMount: 'always',
     queryFn: () => api.get<InvitationView[]>('/invitations'),
   })
 

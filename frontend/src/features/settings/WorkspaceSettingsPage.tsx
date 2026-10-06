@@ -16,6 +16,7 @@ import { useTenantSession } from '@/features/auth/tenantSession'
 import { useApi } from '@/lib/api/ApiContext'
 import { applyFieldErrors, problemMessage } from '@/lib/api/problems'
 import type { TenantSettings } from '@/lib/api/types'
+import { quietly } from '@/lib/quietly'
 
 const schema = z.object({
   name: requiredText(120),
@@ -86,10 +87,11 @@ function WorkspaceForm({ settings }: { settings: TenantSettings }) {
         currency: updated.currency,
       })
       toast.success('Workspace settings saved.')
-      await session.reloadProfile()
     } catch (error) {
       if (!applyFieldErrors(error, form.setError, FIELDS)) setFormError(problemMessage(error))
+      return
     }
+    await quietly(() => session.reloadProfile())
   })
 
   const timezoneError = form.formState.errors.timezone?.message

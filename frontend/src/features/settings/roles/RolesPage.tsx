@@ -21,7 +21,11 @@ export function RolesPage() {
   const api = useApi()
   const canManage = useCan()(PERMISSIONS.roleManage)
   const [creating, setCreating] = useState(false)
-  const roles = useQuery({ queryKey: ['roles'], queryFn: () => api.get<RoleView[]>('/roles') })
+  const roles = useQuery({
+    queryKey: ['roles'],
+    queryFn: () => api.get<RoleView[]>('/roles'),
+    refetchOnMount: 'always',
+  })
 
   return (
     <>

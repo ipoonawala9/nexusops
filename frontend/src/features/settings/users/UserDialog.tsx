@@ -25,6 +25,7 @@ import { useApi } from '@/lib/api/ApiContext'
 import { applyFieldErrors, problemMessage } from '@/lib/api/problems'
 import type { RoleView, UserView } from '@/lib/api/types'
 import { fullName } from '@/lib/format'
+import { quietly } from '@/lib/quietly'
 
 /** Manage one person. Each section is shown only with its permission; the server re-checks every call. */
 export function UserDialog({ person, onClose }: { person: UserView; onClose: () => void }) {
@@ -38,8 +39,9 @@ export function UserDialog({ person, onClose }: { person: UserView; onClose: () 
   async function changed(updated: UserView, message: string) {
     setCurrent(updated)
     toast.success(message)
-    await queryClient.invalidateQueries({ queryKey: ['users'] })
-    if (isSelf) await session.reloadProfile()
+    // The change succeeded: a failing refresh must not show up as a failed change.
+    await quietly(() => queryClient.invalidateQueries({ queryKey: ['users'] }))
+    if (isSelf) await quietly(() => session.reloadProfile())
   }
 
   return (
@@ -171,6 +173,7 @@ function RolesSection({ person, onChanged }: { person: UserView; onChanged: Chan
   const canReadRoles = can(PERMISSIONS.roleRead)
   const roles = useQuery({
     queryKey: ['roles'],
+    refetchOnMount: 'always',
     queryFn: () => api.get<RoleView[]>('/roles'),
     enabled: canReadRoles,
   })

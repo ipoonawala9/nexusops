@@ -66,6 +66,34 @@ describe('AuditPage', () => {
     expect(await screen.findByText("'from' must not be after 'to'.")).toBeInTheDocument()
   })
 
+  it('ignores dates in the URL that are not dates', async () => {
+    const server = fakeServer()
+    signedIn(server).on('GET /audit-events', {
+      body: { items: [EVENT], page: 0, size: 25, total: 1 },
+    })
+    renderApp({ server, path: '/app/audit?from=garbage&to=2026-13-45&action=RoleCreated' })
+    expect(await screen.findByRole('cell', { name: 'RoleCreated' })).toBeInTheDocument()
+    const query = server.callsTo('GET /audit-events')[0].query
+    expect(query.has('from')).toBe(false)
+    expect(query.has('to')).toBe(false)
+    expect(query.get('action')).toBe('RoleCreated')
+  })
+
+  it('offers the first page when a later page is empty', async () => {
+    const server = fakeServer()
+    signedIn(server).on('GET /audit-events', (req) => ({
+      body:
+        req.query.get('page') === '0'
+          ? { items: [EVENT], page: 0, size: 25, total: 1 }
+          : { items: [], page: 4, size: 25, total: 1 },
+    }))
+    const { user, router } = renderApp({ server, path: '/app/audit?action=RoleCreated&page=4' })
+    expect(await screen.findByText('No events match these filters.')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Back to first page' }))
+    expect(await screen.findByRole('cell', { name: 'RoleCreated' })).toBeInTheDocument()
+    expect(router.state.location.search).toBe('?action=RoleCreated')
+  })
+
   it('needs the audit permission', async () => {
     const server = fakeServer()
     signedIn(server, testProfile({ permissions: [] }))

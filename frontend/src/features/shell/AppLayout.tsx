@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { NavLink, Outlet } from 'react-router'
+import { Link, NavLink, Outlet, useLocation } from 'react-router'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { useCan } from '@/features/auth/permissions'
@@ -20,6 +20,7 @@ export function AppLayout() {
   const session = useTenantSession()
   const api = useApi()
   const can = useCan()
+  const location = useLocation()
   const [menuOpen, setMenuOpen] = useState(false)
   if (session.state.status !== 'authenticated') return null // RequireTenantSession guarantees this
   const { profile } = session.state
@@ -75,9 +76,12 @@ export function AppLayout() {
             </NavLink>
           ))}
           {settingsPath && (
-            <NavLink to={settingsPath} className={linkClass} onClick={() => setMenuOpen(false)}>
-              Settings
-            </NavLink>
+            // Active on every /app/settings/* page, not only the tab it links to.
+            <SettingsLink
+              to={settingsPath}
+              active={/^\/app\/settings(\/|$)/.test(location.pathname)}
+              onClick={() => setMenuOpen(false)}
+            />
           )}
         </nav>
         <div className="mt-8 space-y-2 border-t pt-4 text-sm">
@@ -97,5 +101,26 @@ export function AppLayout() {
         <Outlet />
       </main>
     </div>
+  )
+}
+
+function SettingsLink({
+  to,
+  active,
+  onClick,
+}: {
+  to: string
+  active: boolean
+  onClick: () => void
+}) {
+  return (
+    <Link
+      to={to}
+      aria-current={active ? 'page' : undefined}
+      className={linkClass({ isActive: active })}
+      onClick={onClick}
+    >
+      Settings
+    </Link>
   )
 }

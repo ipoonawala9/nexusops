@@ -17,6 +17,7 @@ import { useTenantSession } from '@/features/auth/tenantSession'
 import { useApi } from '@/lib/api/ApiContext'
 import { applyFieldErrors, problemMessage } from '@/lib/api/problems'
 import type { PermissionView, RoleView } from '@/lib/api/types'
+import { quietly } from '@/lib/quietly'
 import { PermissionMatrix } from './PermissionMatrix'
 
 export function RoleDetailPage() {
@@ -57,7 +58,15 @@ export function RoleDetailPage() {
         <ErrorState error={catalog.error} onRetry={() => void catalog.refetch()} />
       </>
     )
-  return <RoleEditor key={role.data.id} role={role.data} catalog={catalog.data} back={back} />
+  // Keyed on the permission set too, so a refetch with newer permissions re-seeds the checkboxes.
+  return (
+    <RoleEditor
+      key={`${role.data.id}:${role.data.permissions.join(',')}`}
+      role={role.data}
+      catalog={catalog.data}
+      back={back}
+    />
+  )
 }
 
 const detailsSchema = z.object({
@@ -118,12 +127,13 @@ function RoleEditor({
         }),
       )
       toast.success('Permissions saved.')
-      await session.reloadProfile() // the signed-in user may hold this role
     } catch (error) {
       setPermissionsError(problemMessage(error))
+      return
     } finally {
       setSaving(false)
     }
+    await quietly(() => session.reloadProfile()) // the signed-in user may hold this role
   }
 
   async function remove() {

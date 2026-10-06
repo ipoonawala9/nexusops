@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react'
+import { act, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import type { PlatformTenant } from '@/lib/api/types'
 import { fakeServer } from '@/test/fakeServer'
@@ -81,6 +81,23 @@ describe('PlatformTenantsPage', () => {
     expect(
       await within(dialog).findByText('Only a suspended workspace can be reactivated.'),
     ).toBeInTheDocument()
+    // The row was stale: the conflict refreshes the list behind the dialog.
+    await waitFor(() => expect(server.callsTo('GET /platform/tenants')).toHaveLength(2))
+  })
+
+  it('offers the first page when a later page is empty', async () => {
+    const { server, user, router } = setup()
+    server.on('GET /platform/tenants', (req) => ({
+      body:
+        req.query.get('page') === '0'
+          ? { items: [ACME], page: 0, size: 20, total: 1 }
+          : { items: [], page: 2, size: 20, total: 1 },
+    }))
+    await act(() => router.navigate('/platform/tenants?q=acme&page=2'))
+    expect(await screen.findByText('No workspaces match.')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Back to first page' }))
+    expect(await screen.findByText('Acme Inc')).toBeInTheDocument()
+    expect(router.state.location.search).toBe('?q=acme')
   })
 
   it('gives support staff no suspend actions', async () => {

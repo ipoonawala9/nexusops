@@ -23,13 +23,17 @@ import { toQuery } from '@/lib/query'
 const SIZE = 25
 const FILTERS = ['action', 'entityType', 'from', 'to'] as const
 
-/** Local calendar days → ISO instants (the API expects ISO-8601 instants). */
-function dayStart(day: string): string | undefined {
-  return day ? new Date(`${day}T00:00:00`).toISOString() : undefined
+/**
+ * Local calendar days → ISO instants (the API expects ISO-8601 instants). A value that isn't a real day (e.g. a
+ * hand-edited `?from=garbage`) is treated as absent instead of throwing a RangeError.
+ */
+function instant(day: string, time: string): string | undefined {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return undefined
+  const date = new Date(`${day}T${time}`)
+  return Number.isNaN(date.getTime()) ? undefined : date.toISOString()
 }
-function dayEnd(day: string): string | undefined {
-  return day ? new Date(`${day}T23:59:59.999`).toISOString() : undefined
-}
+const dayStart = (day: string) => instant(day, '00:00:00')
+const dayEnd = (day: string) => instant(day, '23:59:59.999')
 function shortId(id: string | null): string {
   return id ? id.slice(0, 8) : '—'
 }
@@ -58,6 +62,7 @@ export function AuditPage() {
         })}`,
       ),
     placeholderData: keepPreviousData,
+    refetchOnMount: 'always',
   })
 
   function onFilter(event: FormEvent<HTMLFormElement>) {
@@ -68,6 +73,13 @@ export function AuditPage() {
       const value = data.get(key)
       if (typeof value === 'string' && value.trim()) next.set(key, value.trim())
     }
+    setParams(next, { replace: true })
+  }
+
+  function goToPage(p: number) {
+    const next = new URLSearchParams(params)
+    if (p > 0) next.set('page', String(p))
+    else next.delete('page')
     setParams(next, { replace: true })
   }
 
@@ -127,6 +139,13 @@ export function AuditPage() {
         <EmptyState
           title="No events match these filters."
           description="Try a wider date range or clear the filters."
+          action={
+            page > 0 && (
+              <Button variant="outline" onClick={() => goToPage(0)}>
+                Back to first page
+              </Button>
+            )
+          }
         />
       ) : (
         <>
@@ -201,11 +220,7 @@ export function AuditPage() {
             page={events.data.page}
             size={events.data.size}
             total={events.data.total}
-            onPage={(p) => {
-              const next = new URLSearchParams(params)
-              next.set('page', String(p))
-              setParams(next, { replace: true })
-            }}
+            onPage={goToPage}
           />
         </>
       )}
