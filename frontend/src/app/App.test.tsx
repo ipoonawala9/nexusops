@@ -1,16 +1,14 @@
-import { render, screen } from '@testing-library/react'
-import { createMemoryRouter, RouterProvider } from 'react-router'
+import { screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import { routes } from './router'
+import { fakeServer } from '@/test/fakeServer'
+import { signedOut } from '@/test/fixtures'
+import { renderApp } from '@/test/renderApp'
 
 describe('App routes', () => {
-  it('renders the home page', () => {
-    render(<RouterProvider router={createMemoryRouter(routes, { initialEntries: ['/'] })} />)
-    expect(screen.getByRole('heading', { name: /nexusops/i })).toBeInTheDocument()
-  })
-
-  it('renders a not-found page for unknown routes', () => {
-    render(<RouterProvider router={createMemoryRouter(routes, { initialEntries: ['/nope'] })} />)
-    expect(screen.getByRole('heading', { name: /page not found/i })).toBeInTheDocument()
+  it('renders a not-found page for unknown routes', async () => {
+    const server = fakeServer()
+    signedOut(server)
+    renderApp({ server, path: '/nope' })
+    expect(await screen.findByRole('heading', { name: /page not found/i })).toBeInTheDocument()
   })
 })
