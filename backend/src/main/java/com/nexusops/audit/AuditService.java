@@ -53,7 +53,7 @@ public class AuditService {
         UUID actorId = entry.actorId() != null ? entry.actorId() : TenantContext.userId().orElse(null);
         ActorType actorType = entry.actorType() != null ? entry.actorType()
                 : actorId != null ? ActorType.USER : ActorType.ANONYMOUS;
-        HttpServletRequest request = currentRequest();
+        HttpServletRequest request = entry.clientDetailsSuppressed() ? null : currentRequest();
         String requestId = RequestIds.current();
 
         jdbc.update("""

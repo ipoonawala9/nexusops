@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.nexusops.shared.TenantContext;
+import com.nexusops.shared.web.RequestIdFilter;
 import com.nexusops.support.IntegrationTestSupport;
 import com.nexusops.support.OwnerJdbc;
 import java.sql.Timestamp;
@@ -12,9 +13,13 @@ import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.transaction.IllegalTransactionStateException;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 class AuditServiceIT extends IntegrationTestSupport {
 
@@ -111,5 +116,39 @@ class AuditServiceIT extends IntegrationTestSupport {
         assertThat(scoped.get("tenant_id")).isEqualTo(tenant);
         assertThat(scoped.get("actor_type")).isEqualTo("PLATFORM");
         assertThat(scoped.get("actor_id")).isEqualTo(operator); // the operator, not whoever TenantContext names
+    }
+
+    @Test
+    void withoutClientDetailsDropsIpAndUserAgentButKeepsRequestIds() {
+        var request = new MockHttpServletRequest();
+        request.setRemoteAddr("203.0.113.9");
+        request.addHeader("User-Agent", "OperatorBrowser/1.0");
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+        MDC.put(RequestIdFilter.MDC_REQUEST_ID, "req-redaction-test");
+        MDC.put(RequestIdFilter.MDC_CORRELATION_ID, "corr-redaction-test");
+        UUID operator = UUID.randomUUID();
+        try (var scope = TenantContext.open(tenant, null)) {
+            tx.executeWithoutResult(s -> {
+                audit.record(AuditEntry.of("RedactedThing", "Tenant", tenant).asPlatformActor(operator)
+                        .withoutClientDetails());
+                audit.record(AuditEntry.of("UnredactedThing", "Tenant", tenant).asPlatformActor(operator));
+            });
+        } finally {
+            RequestContextHolder.resetRequestAttributes();
+            MDC.remove(RequestIdFilter.MDC_REQUEST_ID);
+            MDC.remove(RequestIdFilter.MDC_CORRELATION_ID);
+        }
+        Map<String, Object> redacted = onlyRow("RedactedThing");
+        assertThat(redacted.get("ip")).isNull();
+        assertThat(redacted.get("user_agent")).isNull();
+        assertThat(redacted.get("request_id")).isEqualTo("req-redaction-test");
+        assertThat(redacted.get("correlation_id")).isEqualTo("corr-redaction-test");
+        assertThat(redacted.get("actor_type")).isEqualTo("PLATFORM");
+        assertThat(redacted.get("actor_id")).isEqualTo(operator);
+
+        Map<String, Object> full = onlyRow("UnredactedThing");
+        assertThat(full.get("ip")).isEqualTo("203.0.113.9");
+        assertThat(full.get("user_agent")).isEqualTo("OperatorBrowser/1.0");
+        assertThat(full.get("request_id")).isEqualTo("req-redaction-test");
     }
 }

@@ -187,7 +187,8 @@ public class TenantDirectory {
         tenants.flush();
         audit.record(AuditEntry.of(action, "Tenant", tenant.getId())
                 .withMetadata(Map.of("reason", reason))
-                .asPlatformActor(platformUserId));
+                .asPlatformActor(platformUserId)
+                .withoutClientDetails()); // the workspace sees the reason, not the operator's IP/UA (ADR-0007)
         events.publishEvent(new TenantStatusChanged(tenant.getId()));
         return tenant.toSummary();
     }

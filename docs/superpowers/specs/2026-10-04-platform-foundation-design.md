@@ -333,7 +333,10 @@ The built system deviates from the decisions above as follows:
 6. **TOTP:** RFC 6238 SHA-1/6/30 s, ±1 step of skew, single-use codes. Secrets are AES-256-GCM encrypted with
    `PLATFORM_TOTP_KEY` (a required secret), bound to the user id.
 7. **Suspension:** only ACTIVE ⇄ SUSPENDED, with a reason of 1–500 characters.
-   - It is audited in the workspace's own log with `actor_type=PLATFORM`.
+   - It is audited in the workspace's own log with `actor_type=PLATFORM`. The workspace sees the reason and that a
+     platform operator acted, but the row stores no IP address or user agent. The operator's IP and user agent are
+     kept only in a companion platform row (`PlatformTenantSuspended`/`PlatformTenantReactivated`, `tenant_id`
+     NULL).
    - It takes effect on members' next request via after-commit cache eviction.
    - Sessions resume on reactivation.
 8. **`Emails`, `PasswordPolicy` and `OriginGuard` moved to `shared`**, so `platform` doesn't depend on `identity`.

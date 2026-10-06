@@ -110,6 +110,47 @@ class PlatformTenantApiIT extends IntegrationTestSupport {
     }
 
     @Test
+    void tenantVisibleRowsCarryNoOperatorNetworkDetailsButThePlatformRowDoes() throws Exception {
+        String ip = "198.51.100.23";
+        String agent = "OperatorBrowser/9.9 (StaffOS 4.2)";
+        for (String action : new String[] {"suspend", "reactivate"}) {
+            as(adminToken, post("/api/v1/platform/tenants/" + a.tenantId() + "/" + action)
+                    .with(r -> { r.setRemoteAddr(ip); return r; }).header("User-Agent", agent)
+                    .contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"Abuse report 7\"}"))
+                    .andExpect(status().isOk());
+        }
+
+        for (String action : new String[] {"TenantSuspended", "TenantReactivated"}) {
+            Map<String, Object> tenantRow = OwnerJdbc.ownerAs(a.tenantId()).queryForMap(
+                    "select ip, user_agent, actor_type, actor_id, metadata->>'reason' as reason from audit_events where action = ?",
+                    action);
+            assertThat(tenantRow.get("ip")).isNull();
+            assertThat(tenantRow.get("user_agent")).isNull();
+            assertThat(tenantRow).containsEntry("actor_type", "PLATFORM").containsEntry("actor_id", adminOp.id())
+                    .containsEntry("reason", "Abuse report 7");
+
+            String visible = mvc.perform(get("/api/v1/audit-events").param("action", action)
+                            .header("Authorization", "Bearer " + TestTenants.login(mvc, a).accessToken()))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.total").value(1))
+                    .andExpect(jsonPath("$.items[0].metadata.reason").value("Abuse report 7"))
+                    .andReturn().getResponse().getContentAsString();
+            assertThat(visible).doesNotContain(ip).doesNotContain("OperatorBrowser");
+        }
+
+        for (String action : new String[] {"PlatformTenantSuspended", "PlatformTenantReactivated"}) {
+            Map<String, Object> platformRow = OwnerJdbc.superuser().queryForMap("""
+                    select tenant_id, ip, user_agent, actor_type, actor_id, entity_type,
+                           metadata->>'tenantId' as tenant, metadata->>'reason' as reason
+                      from audit_events where action = ? and entity_id = ?""", action, a.tenantId().toString());
+            assertThat(platformRow.get("tenant_id")).isNull();
+            assertThat(platformRow).containsEntry("ip", ip).containsEntry("user_agent", agent)
+                    .containsEntry("actor_type", "PLATFORM").containsEntry("actor_id", adminOp.id())
+                    .containsEntry("entity_type", "Tenant").containsEntry("tenant", a.tenantId().toString())
+                    .containsEntry("reason", "Abuse report 7");
+        }
+    }
+
+    @Test
     void supportCannotSuspendAndTenantTokensCannotReachThePlatform() throws Exception {
         change(supportToken, a.tenantId(), "suspend", "nope").andExpect(status().isForbidden());
         String tenantToken = TestTenants.login(mvc, a).accessToken();

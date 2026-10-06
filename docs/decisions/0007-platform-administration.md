@@ -46,6 +46,10 @@
 - **Suspension lives in tenancy.**
   - `TenantDirectory.suspendCurrent/reactivateCurrent` allow only ACTIVE ⇄ SUSPENDED, require a reason, and are audited
     in the workspace's own log as `actor_type=PLATFORM` with the operator's id.
+  - What the workspace may see: the reason and that a platform operator acted. Those tenant rows are written without
+    the operator's IP address and user agent (`AuditEntry.withoutClientDetails`). The platform module writes a
+    companion row with `tenant_id` NULL (`PlatformTenantSuspended`/`PlatformTenantReactivated`, metadata `tenantId`
+    and `reason`) that keeps the operator's IP and user agent for staff forensics.
   - The platform module opens a TenantContext scope from the path id only around the tenancy call, for an
     authenticated operator holding `platform.tenant.suspend`. This is a server-side lookup (TenantDirectory 404s
     unknown ids), and it is the only place tenant scope comes from a URL.
