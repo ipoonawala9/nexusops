@@ -19,6 +19,12 @@ make frontend  # UI  http://localhost:5173 (proxies /api to :8081)
 ```
 Or run everything in containers with `make up-all` (UI http://localhost:3000, API http://localhost:8081).
 
+## Using the app
+- Run `make up && make backend` in one terminal and `make frontend` in another, then open http://localhost:5173/signup
+  to create a workspace. The verification email arrives in Mailpit (http://localhost:8025).
+- The staff console is at http://localhost:5173/platform/login. Create an operator first with
+  `make platform-admin EMAIL=you@example.com`.
+
 One-time ai-service setup: `cd ai-service && python3 -m venv .venv && .venv/bin/pip install -e '.[dev]'`.
 
 | Service | Host port |
@@ -100,7 +106,9 @@ database backups. Losing it means every operator must re-enrol.
 
 ## Tests
 - `make test` runs the backend (including Testcontainers integration tests, so Docker must be running), the frontend and the ai-service.
-- `make e2e` runs Playwright.
+- `make e2e` starts the full Docker stack (UI http://localhost:3000, Mailpit http://localhost:8025) and runs the
+  Playwright journeys: sign up → verify → sign in → custom role → invite → accept → assign → audit trail, and a
+  platform admin suspending and reactivating a workspace. The stack stays up afterwards; `make down` stops it.
 
 ## Database roles
 - The app connects as `nexusops_app` (not a superuser, no BYPASSRLS) and refuses to start as anything more privileged.
