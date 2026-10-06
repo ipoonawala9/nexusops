@@ -356,8 +356,11 @@ The built system deviates from the decisions above as follows:
    Module placeholders name their blueprint phase: CRM 5, Inventory 6, HelpDesk 7, HRMS 8, Workflows 9, Insights 11,
    AI Assistant 12.
 4. **Permission gating mirrors the server's `@PreAuthorize` exactly.** The UI hides; the server enforces.
-5. **Emailed tokens leave the address bar immediately,** and the referrer policy is `no-referrer`. This closes the
-   Plan 3 deferred item.
+5. **Emailed tokens leave the address bar immediately,** and the referrer policy is `no-referrer` (meta tag and nginx
+   header), so they don't linger in the address bar or history or leak through `Referer`. The UI's nginx access log
+   records request paths without query strings, so `?token=` values (the emailed page links and
+   `GET /api/v1/invitations/preview`) don't reach its logs. This closes the Plan 3 deferred item for the bundled UI
+   container; a proxy or load balancer put in front of it must also log without query strings.
 6. **E2E runs against Docker Compose:**
    - `make e2e` runs Playwright against :3000 and reads emails from Mailpit :8025;
    - a seeded, local-key-bound platform operator covers the staff journey;

@@ -19,12 +19,6 @@ make frontend  # UI  http://localhost:5173 (proxies /api to :8081)
 ```
 Or run everything in containers with `make up-all` (UI http://localhost:3000, API http://localhost:8081).
 
-## Using the app
-- Run `make up && make backend` in one terminal and `make frontend` in another, then open http://localhost:5173/signup
-  to create a workspace. The verification email arrives in Mailpit (http://localhost:8025).
-- The staff console is at http://localhost:5173/platform/login. Create an operator first with
-  `make platform-admin EMAIL=you@example.com`.
-
 One-time ai-service setup: `cd ai-service && python3 -m venv .venv && .venv/bin/pip install -e '.[dev]'`.
 
 | Service | Host port |
@@ -37,6 +31,12 @@ One-time ai-service setup: `cd ai-service && python3 -m venv .venv && .venv/bin/
 | ai-service | 8000 |
 
 Host ports can be overridden through `infra/docker/.env` (see `.env.example`).
+
+## Using the app
+- Run `make up && make backend` in one terminal and `make frontend` in another, then open http://localhost:5173/signup
+  to create a workspace. The verification email arrives in Mailpit (http://localhost:8025).
+- The staff console is at http://localhost:5173/platform/login. Create an operator first with
+  `make platform-admin EMAIL=you@example.com`.
 
 ## Try the API (local)
 ```bash
@@ -109,6 +109,8 @@ database backups. Losing it means every operator must re-enrol.
 - `make e2e` starts the full Docker stack (UI http://localhost:3000, Mailpit http://localhost:8025) and runs the
   Playwright journeys: sign up → verify → sign in → custom role → invite → accept → assign → audit trail, and a
   platform admin suspending and reactivating a workspace. The stack stays up afterwards; `make down` stops it.
+- `make e2e` seeds a local-only platform operator (`e2e-ops@nexusops.test`); `make reset-db` removes it, and the next
+  `make e2e` seeds it again.
 
 ## Database roles
 - The app connects as `nexusops_app` (not a superuser, no BYPASSRLS) and refuses to start as anything more privileged.
