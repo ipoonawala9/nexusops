@@ -9,6 +9,7 @@ import javax.sql.DataSource;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.SingleConnectionDataSource;
 
 class TenantAwareDataSourceIT extends IntegrationTestSupport {
 
@@ -37,6 +38,24 @@ class TenantAwareDataSourceIT extends IntegrationTestSupport {
         // The pool hands back a previously used connection; it must not still carry the old tenant.
         for (int i = 0; i < 20; i++) {
             assertThat(currentSetting()).isEmpty();
+        }
+    }
+
+    @Test
+    void everyCheckoutClearsASessionLevelPlatformFlag() throws Exception {
+        var single = new SingleConnectionDataSource(IntegrationTestSupport.POSTGRES.getJdbcUrl(), "nexusops_app",
+                IntegrationTestSupport.APP_PASSWORD, true);
+        try {
+            // A leaked session-level setting on a pooled connection (what PlatformAccess never does)...
+            new JdbcTemplate(single).queryForObject("select set_config('app.platform_access', 'on', false)", String.class);
+            assertThat(new JdbcTemplate(single).queryForObject(
+                    "select current_setting('app.platform_access', true)", String.class)).isEqualTo("on");
+            // ...is gone the next time the same connection is checked out through TenantAwareDataSource.
+            var tenantAware = new JdbcTemplate(new TenantAwareDataSource(single));
+            assertThat(tenantAware.queryForObject("select current_setting('app.platform_access', true)", String.class))
+                    .isEmpty();
+        } finally {
+            single.destroy();
         }
     }
 }

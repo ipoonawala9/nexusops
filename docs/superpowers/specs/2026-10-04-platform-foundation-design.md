@@ -329,7 +329,9 @@ The built system deviates from the decisions above as follows:
 4. **The workspace list shows active-user counts and owner emails** (your decision), via `FOR SELECT` policies
    `platform_read` on `users`, `roles` and `user_roles`, gated by `app.platform_access`.
 5. **Platform tables are RLS-protected** behind the same flag, not plain global tables. `PlatformAccess` is the only
-   setter, and the flag is transaction-local. A source-scan test confines the flag to the platform module.
+   setter, and the flag is transaction-local. Every connection checkout also clears it at session level
+   (`TenantAwareDataSource`). A source-scan test confines the flag to `PlatformAccess`, which alone turns it on, and
+   the datasource, which only clears it.
 6. **TOTP:** RFC 6238 SHA-1/6/30 s, ±1 step of skew, single-use codes. Secrets are AES-256-GCM encrypted with
    `PLATFORM_TOTP_KEY` (a required secret), bound to the user id.
 7. **Suspension:** only ACTIVE ⇄ SUSPENDED, with a reason of 1–500 characters.

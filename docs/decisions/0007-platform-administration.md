@@ -40,9 +40,15 @@
   - `platform_users` and `platform_refresh_tokens` have FORCE RLS, visible only while `app.platform_access = 'on'`.
   - The same flag enables `FOR SELECT` policies `platform_read` on `users`, `roles` and `user_roles`, so the workspace
     list can show active-user counts and owner emails. Write policies are untouched.
-  - `PlatformAccess` is the only setter. It uses `set_config(..., true)`, refuses tenant scopes and refuses
-    already-open transactions.
-  - `PlatformAccessConfinementTest` fails the build if any other main source mentions the flag.
+  - `PlatformAccess` is the only code that turns it on. It uses `set_config(..., true)`, refuses tenant scopes and
+    refuses already-open transactions.
+  - `TenantAwareDataSource` also clears the flag at session level on every connection checkout (in the same round
+    trip as `app.tenant_id`). A session-level leak therefore can't outlive one checkout. Checkout happens before a
+    transaction begins, so the transaction-local setting is unaffected.
+  - `PlatformAccessConfinementTest` fails the build unless:
+    - exactly these two main sources mention the flag;
+    - only `PlatformAccess` sets it to `'on'`;
+    - among resources, only `V7__platform.sql` mentions it.
 - **Suspension lives in tenancy.**
   - `TenantDirectory.suspendCurrent/reactivateCurrent` allow only ACTIVE ⇄ SUSPENDED, require a reason, and are audited
     in the workspace's own log as `actor_type=PLATFORM` with the operator's id.
