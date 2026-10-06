@@ -42,6 +42,18 @@ describe('AppLayout', () => {
     expect(server.callsTo('POST /auth/logout-all')).toHaveLength(1)
     await screen.findByRole('heading', { name: 'Sign in' })
     expect(router.state.location.pathname).toBe('/login')
+    expect(router.state.location.search).toBe('')
+  })
+
+  it('signs out to a plain sign-in page (no next)', async () => {
+    const server = fakeServer()
+    signedIn(server).on('POST /auth/logout', { status: 204 })
+    const { user, router } = renderApp({ server, path: '/app/settings/roles' })
+    await user.click(await screen.findByRole('button', { name: 'Sign out' }))
+    await screen.findByRole('heading', { name: 'Sign in' })
+    expect(server.callsTo('POST /auth/logout')).toHaveLength(1)
+    expect(router.state.location.pathname).toBe('/login')
+    expect(router.state.location.search).toBe('')
   })
 
   it('toggles the navigation on small screens', async () => {

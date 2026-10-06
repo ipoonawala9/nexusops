@@ -96,4 +96,13 @@ describe('PlatformTenantsPage', () => {
     expect(await screen.findByRole('heading', { name: 'Staff sign-in' })).toBeInTheDocument()
     expect(router.state.location.search).toBe(`?next=${encodeURIComponent('/platform/tenants')}`)
   })
+
+  it('signs staff out to a plain platform sign-in page (no next)', async () => {
+    const { server, user, router } = setup()
+    server.on('POST /platform/auth/logout', { status: 204 })
+    await user.click(await screen.findByRole('button', { name: 'Sign out' }))
+    expect(await screen.findByRole('heading', { name: 'Staff sign-in' })).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/platform/login')
+    expect(router.state.location.search).toBe('')
+  })
 })

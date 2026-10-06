@@ -11,15 +11,23 @@ import {
 import type { SessionApi } from '@/lib/api/session'
 import type { TokenResponse } from '@/lib/api/types'
 
+/**
+ * Why a session is anonymous: 'signed-out' after a deliberate sign-out (guards then send a plain sign-in page),
+ * 'expired' when a 401 could not be recovered. Absent at boot (no session to restore).
+ */
+export type AnonymousReason = 'signed-out' | 'expired'
+
 export type SessionState<P> =
-  { status: 'loading' } | { status: 'anonymous' } | { status: 'authenticated'; profile: P }
+  | { status: 'loading' }
+  | { status: 'anonymous'; reason?: AnonymousReason }
+  | { status: 'authenticated'; profile: P }
 
 export interface Session<P, L> {
   state: SessionState<P>
   login(input: L): Promise<void>
   logout(): Promise<void>
   reloadProfile(): Promise<void>
-  /** Forget the session locally, e.g. after a server-side "sign out everywhere". */
+  /** Forget the session locally after a deliberate sign-out, e.g. a server-side "sign out everywhere". */
   clear(): void
 }
 
@@ -37,18 +45,22 @@ export function createSession<P, L>(paths: SessionPaths, name: string) {
     const queryClient = useQueryClient()
     const [state, setState] = useState<SessionState<P>>({ status: 'loading' })
 
-    const clear = useCallback(() => {
-      api.tokens.set(null)
-      queryClient.clear()
-      setState({ status: 'anonymous' })
-    }, [api, queryClient])
+    const forget = useCallback(
+      (reason: AnonymousReason) => {
+        api.tokens.set(null)
+        queryClient.clear()
+        setState({ status: 'anonymous', reason })
+      },
+      [api, queryClient],
+    )
+    const clear = useCallback(() => forget('signed-out'), [forget])
 
     const reloadProfile = useCallback(async () => {
       const profile = await api.client.get<P>(paths.profile)
       setState({ status: 'authenticated', profile })
     }, [api])
 
-    useEffect(() => api.onAuthFailure(clear), [api, clear])
+    useEffect(() => api.onAuthFailure(() => forget('expired')), [api, forget])
 
     useEffect(() => {
       let cancelled = false
@@ -62,6 +74,8 @@ export function createSession<P, L>(paths: SessionPaths, name: string) {
           const profile = await api.client.get<P>(paths.profile)
           if (!cancelled) setState({ status: 'authenticated', profile })
         } catch {
+          // A token without a profile is no session: don't keep it around for later requests.
+          api.tokens.set(null)
           if (!cancelled) setState({ status: 'anonymous' })
         }
       })
@@ -77,7 +91,12 @@ export function createSession<P, L>(paths: SessionPaths, name: string) {
         })
         api.tokens.set(response.accessToken)
         queryClient.clear()
-        await reloadProfile()
+        try {
+          await reloadProfile()
+        } catch (error) {
+          api.tokens.set(null)
+          throw error
+        }
       },
       [api, queryClient, reloadProfile],
     )

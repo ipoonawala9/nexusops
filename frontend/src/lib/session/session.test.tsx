@@ -8,9 +8,12 @@ import { signedIn, signedOut, testProfile } from '@/test/fixtures'
 import { renderApp } from '@/test/renderApp'
 import { useApi } from '@/lib/api/ApiContext'
 
+const sessionRef: { current: ReturnType<typeof useTenantSession> | null } = { current: null }
+
 function Probe() {
   const session = useTenantSession()
   const api = useApi()
+  sessionRef.current = session
   return (
     <div>
       <p>status: {session.state.status}</p>
@@ -66,6 +69,22 @@ describe('tenant session', () => {
     await user.click(screen.getByRole('button', { name: 'logout' }))
     expect(await screen.findByText('status: anonymous')).toBeInTheDocument()
     expect(server.callsTo('POST /auth/logout')).toHaveLength(1)
+  })
+
+  it('rejects a sign-in whose profile cannot be loaded and keeps no token', async () => {
+    const server = fakeServer()
+    signedOut(server)
+    server
+      .on('POST /auth/login', { body: { accessToken: 'tok', tokenType: 'Bearer', expiresIn: 900 } })
+      .on('GET /me', { status: 500, body: { detail: 'boom' } })
+    const { handles } = renderApp({ server, path: '/', routes })
+    await screen.findByText('status: anonymous')
+    const { login } = sessionRef.current!
+    await expect(
+      login({ workspace: 'acme', email: 'ada@acme.test', password: 'pw' }),
+    ).rejects.toThrow('boom')
+    expect(handles.tenant.tokens.get()).toBeNull()
+    expect(screen.getByText('status: anonymous')).toBeInTheDocument()
   })
 
   it('signs out on an unrecoverable 401', async () => {
