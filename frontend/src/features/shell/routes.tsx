@@ -3,6 +3,7 @@ import { EmptyState } from '@/components/states'
 import { PERMISSIONS, RequirePermission } from '@/features/auth/permissions'
 import { ModulesSettingsPage } from '@/features/settings/ModulesSettingsPage'
 import { SettingsLayout } from '@/features/settings/SettingsLayout'
+import { UsersPage } from '@/features/settings/users/UsersPage'
 import { WorkspaceSettingsPage } from '@/features/settings/WorkspaceSettingsPage'
 import { AppLayout } from './AppLayout'
 import { ComingSoonPage } from './ComingSoonPage'
@@ -39,6 +40,14 @@ export const settingsChildren: RouteObject[] = [
     element: (
       <RequirePermission anyOf={[PERMISSIONS.settingsRead]}>
         <ModulesSettingsPage />
+      </RequirePermission>
+    ),
+  },
+  {
+    path: 'users',
+    element: (
+      <RequirePermission anyOf={[PERMISSIONS.userRead]}>
+        <UsersPage />
       </RequirePermission>
     ),
   },
