@@ -1,4 +1,5 @@
 import { act, screen, waitFor } from '@testing-library/react'
+import { useState } from 'react'
 import { describe, expect, it } from 'vitest'
 import type { RouteObject } from 'react-router'
 import { useTenantSession } from '@/features/auth/tenantSession'
@@ -8,12 +9,10 @@ import { signedIn, signedOut, testProfile } from '@/test/fixtures'
 import { renderApp } from '@/test/renderApp'
 import { useApi } from '@/lib/api/ApiContext'
 
-const sessionRef: { current: ReturnType<typeof useTenantSession> | null } = { current: null }
-
 function Probe() {
   const session = useTenantSession()
   const api = useApi()
-  sessionRef.current = session
+  const [loginError, setLoginError] = useState<string | null>(null)
   return (
     <div>
       <p>status: {session.state.status}</p>
@@ -25,6 +24,16 @@ function Probe() {
       >
         login
       </button>
+      <button
+        onClick={() =>
+          void session
+            .login({ workspace: 'acme', email: 'ada@acme.test', password: 'pw' })
+            .catch((e: unknown) => setLoginError(e instanceof Error ? e.message : String(e)))
+        }
+      >
+        try login
+      </button>
+      {loginError && <p>login error: {loginError}</p>}
       <button onClick={() => void session.logout()}>logout</button>
       <button onClick={() => void api.get('/users').catch(() => undefined)}>call</button>
     </div>
@@ -77,12 +86,10 @@ describe('tenant session', () => {
     server
       .on('POST /auth/login', { body: { accessToken: 'tok', tokenType: 'Bearer', expiresIn: 900 } })
       .on('GET /me', { status: 500, body: { detail: 'boom' } })
-    const { handles } = renderApp({ server, path: '/', routes })
+    const { handles, user } = renderApp({ server, path: '/', routes })
     await screen.findByText('status: anonymous')
-    const { login } = sessionRef.current!
-    await expect(
-      login({ workspace: 'acme', email: 'ada@acme.test', password: 'pw' }),
-    ).rejects.toThrow('boom')
+    await user.click(screen.getByRole('button', { name: 'try login' }))
+    expect(await screen.findByText('login error: boom')).toBeInTheDocument()
     expect(handles.tenant.tokens.get()).toBeNull()
     expect(screen.getByText('status: anonymous')).toBeInTheDocument()
   })

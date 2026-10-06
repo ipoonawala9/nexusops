@@ -1,6 +1,6 @@
 import { Navigate, Outlet, useLocation, useSearchParams } from 'react-router'
 import { FullPageLoading } from '@/components/states'
-import { safeNext, signInPath } from '@/features/auth/guards'
+import { safeNext, signInPath } from '@/features/auth/redirects'
 import { usePlatformSession } from './platformSession'
 
 export function RequirePlatformSession() {

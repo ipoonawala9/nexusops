@@ -6,7 +6,8 @@ import { fakeServer } from '@/test/fakeServer'
 import { signedIn, signedOut, testProfile } from '@/test/fixtures'
 import { renderApp } from '@/test/renderApp'
 import { useApi } from '@/lib/api/ApiContext'
-import { RedirectIfTenantSignedIn, RequireTenantSession, safeNext } from './guards'
+import { RedirectIfTenantSignedIn, RequireTenantSession } from './guards'
+import { safeNext } from './redirects'
 import { PERMISSIONS, RequirePermission } from './permissions'
 
 function UsersProbe() {
