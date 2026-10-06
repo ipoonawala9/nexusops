@@ -32,6 +32,12 @@ One-time ai-service setup: `cd ai-service && python3 -m venv .venv && .venv/bin/
 
 Host ports can be overridden through `infra/docker/.env` (see `.env.example`).
 
+## Using the app
+- Run `make up && make backend` in one terminal and `make frontend` in another, then open http://localhost:5173/signup
+  to create a workspace. The verification email arrives in Mailpit (http://localhost:8025).
+- The staff console is at http://localhost:5173/platform/login. Create an operator first with
+  `make platform-admin EMAIL=you@example.com`.
+
 ## Try the API (local)
 ```bash
 curl -s -X POST localhost:8081/api/v1/auth/signup -H 'Content-Type: application/json' \
@@ -100,7 +106,11 @@ database backups. Losing it means every operator must re-enrol.
 
 ## Tests
 - `make test` runs the backend (including Testcontainers integration tests, so Docker must be running), the frontend and the ai-service.
-- `make e2e` runs Playwright.
+- `make e2e` starts the full Docker stack (UI http://localhost:3000, Mailpit http://localhost:8025) and runs the
+  Playwright journeys: sign up → verify → sign in → custom role → invite → accept → assign → audit trail, and a
+  platform admin suspending and reactivating a workspace. The stack stays up afterwards; `make down` stops it.
+- `make e2e` seeds a local-only platform operator (`e2e-ops@nexusops.test`); `make reset-db` removes it, and the next
+  `make e2e` seeds it again.
 
 ## Database roles
 - The app connects as `nexusops_app` (not a superuser, no BYPASSRLS) and refuses to start as anything more privileged.

@@ -28,8 +28,9 @@ test-frontend:
 	cd frontend && npm run format:check && npm run lint && npm run typecheck && npm test && npm run build
 test-ai:
 	cd ai-service && .venv/bin/ruff check . && .venv/bin/ruff format --check . && .venv/bin/pytest -q
-e2e:
-	cd frontend && npm run e2e
+e2e:           ## Playwright journeys against the full Docker stack (UI :3000, Mailpit :8025); leaves it running
+	$(COMPOSE) --profile app up -d --build --wait postgres redis mailpit backend frontend
+	cd frontend && E2E_BASE_URL=http://localhost:3000 npm run e2e
 
 PLATFORM_CLI = cd backend && ./gradlew -q bootJar && SPRING_PROFILES_ACTIVE=$${SPRING_PROFILES_ACTIVE:-local} \
 	java -jar $$(ls build/libs/backend-*-SNAPSHOT.jar) --nexusops.cli.email=$(EMAIL)

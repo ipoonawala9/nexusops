@@ -95,7 +95,9 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
     }
     if (!response.ok) throw new ApiError(await toProblem(response))
     if (response.status === 204) return undefined as T
-    return (await response.json()) as T
+    // Bodiless successes other than 204 exist too (e.g. 202 Accepted from resend-verification).
+    const text = await response.text()
+    return (text ? JSON.parse(text) : undefined) as T
   }
 
   const withBody =
