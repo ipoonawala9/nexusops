@@ -1,4 +1,5 @@
 import type { RouteObject } from 'react-router'
+import { AcceptInvitationPage } from './AcceptInvitationPage'
 import { LoginPage } from './LoginPage'
 import { SignupPage } from './SignupPage'
 import { VerifyEmailPage } from './VerifyEmailPage'
@@ -10,4 +11,7 @@ export const signInRoutes: RouteObject[] = [
 ]
 
 /** Pages opened from emailed links: always reachable, signed in or not. */
-export const linkRoutes: RouteObject[] = [{ path: '/verify-email', element: <VerifyEmailPage /> }]
+export const linkRoutes: RouteObject[] = [
+  { path: '/verify-email', element: <VerifyEmailPage /> },
+  { path: '/invite/accept', element: <AcceptInvitationPage /> },
+]
