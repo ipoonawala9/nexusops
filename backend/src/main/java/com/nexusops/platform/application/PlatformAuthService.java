@@ -104,7 +104,7 @@ public class PlatformAuthService {
             refreshTokens.save(PlatformRefreshToken.issue(Ids.newId(), id, Ids.newId(),
                     PlatformSessionTokens.hash(refreshToken), cap, locked.getTokenVersion(), client.ip(), client.userAgent()));
             audit.record(AuditEntry.of("PlatformLoginSucceeded", "PlatformUser", id).asPlatformActor(id));
-            var accessToken = tokens.issue(id, locked.getTokenVersion());
+            var accessToken = tokens.issue(id, locked.getTokenVersion(), cap);
             return new PlatformSession(accessToken.value(), accessToken.expiresAt(), refreshToken, cap);
         });
         if (session == null) {
@@ -164,7 +164,7 @@ public class PlatformAuthService {
                 PlatformSessionTokens.hash(next), current.getExpiresAt(), user.getTokenVersion(), client.ip(),
                 client.userAgent()));
         current.markRotated(nextId, now);
-        var accessToken = tokens.issue(user.getId(), user.getTokenVersion());
+        var accessToken = tokens.issue(user.getId(), user.getTokenVersion(), current.getExpiresAt());
         return new PlatformSession(accessToken.value(), accessToken.expiresAt(), next, current.getExpiresAt());
     }
 

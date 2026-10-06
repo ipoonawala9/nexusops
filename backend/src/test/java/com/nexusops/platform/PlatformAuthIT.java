@@ -6,6 +6,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.jayway.jsonpath.JsonPath;
 import com.nexusops.platform.application.PlatformUserAdmin;
 import com.nexusops.platform.domain.PlatformRole;
 import com.nexusops.platform.domain.PlatformUserStatus;
@@ -16,9 +17,11 @@ import com.nexusops.support.OwnerJdbc;
 import com.nexusops.support.TestPlatformUsers;
 import com.nexusops.support.TestPlatformUsers.Operator;
 import jakarta.servlet.http.Cookie;
+import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Base64;
 import java.util.List;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.BeforeEach;
@@ -157,6 +160,23 @@ class PlatformAuthIT extends IntegrationTestSupport {
                 op.id());
         refresh(second).andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.detail").value("Your session has expired. Please sign in again."));
+    }
+
+    @Test
+    void aRefreshedAccessTokenNeverOutlivesTheFamilyCap() throws Exception {
+        String first = cookieOf(login(op.email(), op.password(), op.currentCode()).andExpect(status().isOk()).andReturn());
+        TestPlatformUsers.platformJdbc().update(
+                "update platform_refresh_tokens set expires_at = now() + interval '5 minutes' where token_hash = ?",
+                PlatformSessionTokens.hash(first));
+        Instant cap = expiresAt(first).toInstant();
+
+        MvcResult refreshed = refresh(first).andExpect(status().isOk()).andReturn();
+        String payload = new String(Base64.getUrlDecoder().decode(accessOf(refreshed).split("\\.")[1]),
+                StandardCharsets.UTF_8);
+        var exp = Pattern.compile("\"exp\":(\\d+)").matcher(payload);
+        assertThat(exp.find()).isTrue();
+        assertThat(Instant.ofEpochSecond(Long.parseLong(exp.group(1)))).isBeforeOrEqualTo(cap);
+        assertThat(JsonPath.<Integer>read(refreshed.getResponse().getContentAsString(), "$.expiresIn")).isLessThanOrEqualTo(300);
     }
 
     @Test

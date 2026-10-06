@@ -48,9 +48,16 @@ public class PlatformTokenService {
         this.clock = clock;
     }
 
+    /** Test convenience: a token limited only by the access-token TTL. Sign-in and refresh use the capped form. */
     public IssuedToken issue(UUID platformUserId, int tokenVersion) {
+        return issue(platformUserId, tokenVersion, Instant.MAX);
+    }
+
+    /** {@code exp = min(now + access-token TTL, cap)}: a token never outlives its session's 8-hour family cap. */
+    public IssuedToken issue(UUID platformUserId, int tokenVersion, Instant cap) {
         Instant now = clock.instant();
-        Instant expiresAt = now.plus(properties.accessTokenTtl());
+        Instant ttlExpiry = now.plus(properties.accessTokenTtl());
+        Instant expiresAt = ttlExpiry.isAfter(cap) ? cap : ttlExpiry;
         JwtClaimsSet claims = JwtClaimsSet.builder()
                 .issuer(issuer)
                 .audience(List.of(properties.audience()))
