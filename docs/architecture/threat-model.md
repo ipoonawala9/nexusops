@@ -1,4 +1,4 @@
-# Threat Model (STRIDE) — Tenancy and Identity, Phases 1–3
+# Threat Model (STRIDE) — Tenancy and Identity, Phases 1–4
 
 | # | Threat | STRIDE | Mitigation | Verified by |
 |---|---|---|---|---|
@@ -16,6 +16,11 @@
 | T12 | Audit tampering | R/T | INSERT/SELECT-only grant + trigger; no API | AuditImmutabilityIT |
 | T13 | Cache key collision leaks permissions | I | `TenantKeys` builder with a mandatory tenant prefix | Unit tests |
 | T14 | Secrets or tokens leaked in logs | I | Never log credentials; `@Sensitive` redaction; structured logging | Log assertion tests |
-| T15 | Suspended tenant keeps access | E | Tenant status checked per request (cached briefly), login refused | TenantSuspensionIT |
-| T16 | Platform token used on tenant APIs or vice versa | E | Audience separation | TokenMisuseIT |
+| T15 | Suspended tenant keeps access | E | Tenant status checked per request (cached briefly), login refused | TenantSuspensionIT, PlatformTenantApiIT |
+| T16 | Platform token used on tenant APIs or vice versa | E | Audience separation; platform decoder rejects any `tid`; separate security chains | PlatformSecurityIT |
 | T17 | User enumeration through signup/login responses | I | Generic login errors; slug-availability endpoint is rate limited | AuthIT |
+| T18 | Stolen platform password | S | Password + single-use TOTP; uniform failures; per-IP and per-account rate limits; audited failures; 10 consecutive wrong codes disable the account | PlatformAuthIT, PlatformLoginRateLimitIT |
+| T19 | TOTP code replay (shoulder-surfing, intercepted code) | S | `totp_last_step` advanced under a row lock; a step ≤ last used is rejected | PlatformAuthIT |
+| T20 | Tenant code path reads staff credentials or other tenants' rows | I/E | Platform tables and cross-tenant SELECT policies require `app.platform_access`; only `PlatformAccess` turns it on, transaction-locally; every connection checkout clears it at session level (`TenantAwareDataSource`) | PlatformAccessIT, PlatformAccessConfinementTest, TenantAwareDataSourceIT |
+| T21 | Database dump exposes TOTP secrets | I | AES-256-GCM with `PLATFORM_TOTP_KEY` (not in the DB), AAD = user id | TotpSecretCipherTest |
+| T22 | Long-lived stolen platform session | S/E | 15-min access tokens; refresh family capped at 8 h; credential changes bump `token_version` | PlatformAuthIT |

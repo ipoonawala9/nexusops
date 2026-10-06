@@ -30,3 +30,18 @@ test-ai:
 	cd ai-service && .venv/bin/ruff check . && .venv/bin/ruff format --check . && .venv/bin/pytest -q
 e2e:
 	cd frontend && npm run e2e
+
+PLATFORM_CLI = cd backend && ./gradlew -q bootJar && SPRING_PROFILES_ACTIVE=$${SPRING_PROFILES_ACTIVE:-local} \
+	java -jar $$(ls build/libs/backend-*-SNAPSHOT.jar) --nexusops.cli.email=$(EMAIL)
+
+.PHONY: platform-admin platform-reset-totp platform-reset-password platform-disable platform-enable
+platform-admin:          ## create a platform user: make platform-admin EMAIL=you@example.com [ROLE=PLATFORM_SUPPORT]
+	$(PLATFORM_CLI) --nexusops.cli.command=create-platform-admin --nexusops.cli.role=$(or $(ROLE),PLATFORM_ADMIN)
+platform-reset-totp:     ## enrol a new authenticator: make platform-reset-totp EMAIL=you@example.com
+	$(PLATFORM_CLI) --nexusops.cli.command=reset-platform-totp
+platform-reset-password: ## set a new password: make platform-reset-password EMAIL=you@example.com
+	$(PLATFORM_CLI) --nexusops.cli.command=reset-platform-password
+platform-disable:        ## disable a platform user: make platform-disable EMAIL=you@example.com
+	$(PLATFORM_CLI) --nexusops.cli.command=disable-platform-user
+platform-enable:         ## re-enable a platform user: make platform-enable EMAIL=you@example.com
+	$(PLATFORM_CLI) --nexusops.cli.command=enable-platform-user

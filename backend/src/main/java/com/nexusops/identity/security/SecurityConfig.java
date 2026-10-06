@@ -14,6 +14,7 @@ import org.springframework.security.web.SecurityFilterChain;
 
 /** Stateless, deny-by-default; JWT bearer auth; principal state checked on every request. */
 @Configuration(proxyBeanMethods = false)
+@org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication(type = org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication.Type.SERVLET)
 @EnableMethodSecurity
 public class SecurityConfig {
 
@@ -24,6 +25,7 @@ public class SecurityConfig {
     };
 
     @Bean
+    @org.springframework.core.annotation.Order(2)
     SecurityFilterChain apiSecurity(HttpSecurity http, ProblemDetailSecurityHandlers handlers,
             PrincipalFilter principalFilter) throws Exception {
         http.csrf(AbstractHttpConfigurer::disable)

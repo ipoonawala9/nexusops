@@ -175,7 +175,8 @@ A Redis token bucket implemented as an atomic Lua script. The filter runs before
 
 | Route class | Key | Default |
 |---|---|---|
-| login / platform login | per IP `rl:ip:{ip}:login`; per account `rl:acct:{sha256(workspace+email)}:login`; per workspace `rl:ws:{sha256(workspace)}:login-workspace`, failed logins only (see §16 / ADR-0006) | 10/min per IP; 10/min per account; 100/min per workspace |
+| login | per IP `rl:ip:{ip}:login`; per account `rl:acct:{sha256(workspace+email)}:login`; per workspace `rl:ws:{sha256(workspace)}:login-workspace`, failed logins only (see §16 / ADR-0006) | 10/min per IP; 10/min per account; 100/min per workspace |
+| platform login | per IP `rl:ip:{ip}:platform-login`; per account `rl:pacct:{sha256(email)}:platform-login` | 10/min per IP; 5/min per account |
 | signup, invitation accept, verify | `ip:{ip}:rl:{route}` | 5/min |
 | refresh | `ip:{ip}:rl:refresh` | 30/min |
 | authenticated API | `tenant:{tid}:user:{uid}:rl:api` | 300/min |
@@ -188,7 +189,7 @@ Exceeding a limit returns 429 ProblemDetail + `Retry-After`. Limits are configur
   - `POST auth/signup`, `auth/verify-email`, `auth/login`, `auth/refresh`, `auth/logout`;
   - `POST invitations/accept`;
   - `GET invitations/preview?token=`;
-  - `POST platform/auth/login`.
+  - `POST platform/auth/login` (public), `POST platform/auth/refresh` and `POST platform/auth/logout` (public, cookie).
 - **Tenant (authenticated):**
   - `POST auth/logout-all`;
   - `GET me`;
@@ -200,8 +201,9 @@ Exceeding a limit returns 429 ProblemDetail + `Retry-After`. Limits are configur
   - `GET|POST roles`, `GET|PATCH|DELETE roles/{id}`, `PUT roles/{id}/permissions`;
   - `GET audit-events`.
 - **Platform (authenticated, `aud=platform`):**
-  - `GET platform/tenants`;
-  - `POST platform/tenants/{id}/suspend|reactivate`.
+  - `GET platform/me`;
+  - `GET platform/tenants?status=&q=&page=&size=`;
+  - `POST platform/tenants/{id}/suspend|reactivate` with `{reason}`.
 
 **Errors:** RFC 9457 ProblemDetail with `type`, `title`, `status`, `detail`, `instance`, `requestId` and field `errors[]`. No stack traces. **Pagination:** `?page=&size=` (max 100) returns `{items, page, size, total}`.
 
@@ -312,3 +314,31 @@ The built system deviates from the decisions above as follows:
   targets keep the owners-only 403 first. Peers with identical permissions may manage each other. See ADR-0004.
 - **Mistyped parameters:** a malformed path id (e.g. not a UUID) is 404; any other mistyped parameter
   (`?page=abc`, `?actorId=not-a-uuid`) is 400 with a field error.
+
+## 17. Deltas adopted in Plan 4
+
+1. **Platform users are created only from a CLI** (your decision, 2026-10-06). It shows the TOTP QR code once and
+   requires a confirming code before saving. There is no HTTP enrolment or account management.
+2. **Platform sessions:** a 15-minute `aud=nexusops-platform` access token plus a rotating `nexus_prt` refresh cookie
+   (path `/api/v1/platform/auth`) with a fixed 8-hour family lifetime (your decision).
+3. **Roles:**
+   - `PLATFORM_SUPPORT` reads workspaces;
+   - `PLATFORM_ADMIN` also suspends and reactivates (your decision).
+
+   Authorities are read from the database on every request.
+4. **The workspace list shows active-user counts and owner emails** (your decision), via `FOR SELECT` policies
+   `platform_read` on `users`, `roles` and `user_roles`, gated by `app.platform_access`.
+5. **Platform tables are RLS-protected** behind the same flag, not plain global tables. `PlatformAccess` is the only
+   setter, and the flag is transaction-local. Every connection checkout also clears it at session level
+   (`TenantAwareDataSource`). A source-scan test confines the flag to `PlatformAccess`, which alone turns it on, and
+   the datasource, which only clears it.
+6. **TOTP:** RFC 6238 SHA-1/6/30 s, ±1 step of skew, single-use codes. Secrets are AES-256-GCM encrypted with
+   `PLATFORM_TOTP_KEY` (a required secret), bound to the user id.
+7. **Suspension:** only ACTIVE ⇄ SUSPENDED, with a reason of 1–500 characters.
+   - It is audited in the workspace's own log with `actor_type=PLATFORM`. The workspace sees the reason and that a
+     platform operator acted, but the row stores no IP address or user agent. The operator's IP and user agent are
+     kept only in a companion platform row (`PlatformTenantSuspended`/`PlatformTenantReactivated`, `tenant_id`
+     NULL).
+   - It takes effect on members' next request via after-commit cache eviction.
+   - Sessions resume on reactivation.
+8. **`Emails`, `PasswordPolicy` and `OriginGuard` moved to `shared`**, so `platform` doesn't depend on `identity`.

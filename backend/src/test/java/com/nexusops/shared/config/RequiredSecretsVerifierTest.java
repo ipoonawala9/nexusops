@@ -13,7 +13,8 @@ class RequiredSecretsVerifierTest {
         var env = new MockEnvironment()
                 .withProperty("spring.datasource.password", "a")
                 .withProperty("spring.flyway.password", "b")
-                .withProperty("nexusops.security.allowed-origins", "https://app.example.com");
+                .withProperty("nexusops.security.allowed-origins", "https://app.example.com")
+                .withProperty("nexusops.platform.totp-key", "k");
         assertThatCode(() -> RequiredSecretsVerifier.verify(env)).doesNotThrowAnyException();
     }
 
@@ -22,7 +23,8 @@ class RequiredSecretsVerifierTest {
         var env = new MockEnvironment()
                 .withProperty("spring.datasource.password", "a")
                 .withProperty("spring.flyway.password", " ")
-                .withProperty("nexusops.security.allowed-origins", "https://app.example.com");
+                .withProperty("nexusops.security.allowed-origins", "https://app.example.com")
+                .withProperty("nexusops.platform.totp-key", "k");
         assertThatThrownBy(() -> RequiredSecretsVerifier.verify(env))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("DB_OWNER_PASSWORD");
@@ -33,9 +35,22 @@ class RequiredSecretsVerifierTest {
         var env = new MockEnvironment()
                 .withProperty("spring.datasource.password", "${DB_APP_PASSWORD}")
                 .withProperty("spring.flyway.password", "b")
-                .withProperty("nexusops.security.allowed-origins", "https://app.example.com");
+                .withProperty("nexusops.security.allowed-origins", "https://app.example.com")
+                .withProperty("nexusops.platform.totp-key", "k");
         assertThatThrownBy(() -> RequiredSecretsVerifier.verify(env))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("DB_APP_PASSWORD");
+    }
+
+    @Test
+    void failsWithoutThePlatformTotpKey() {
+        var env = new MockEnvironment()
+                .withProperty("spring.datasource.password", "a")
+                .withProperty("spring.flyway.password", "b")
+                .withProperty("nexusops.security.allowed-origins", "https://app.example.com")
+                .withProperty("nexusops.platform.totp-key", "");
+        assertThatThrownBy(() -> RequiredSecretsVerifier.verify(env))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("PLATFORM_TOTP_KEY");
     }
 }

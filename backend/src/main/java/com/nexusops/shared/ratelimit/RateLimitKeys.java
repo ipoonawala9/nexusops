@@ -60,6 +60,11 @@ public final class RateLimitKeys {
         return "rl:acct:" + sha256(normalize(rawWorkspace) + "\n" + normalize(rawEmail)) + ":login";
     }
 
+    /** Per-account platform login bucket, keyed by the canonical email (the platform has no workspace). */
+    public static String platformAccount(String canonicalEmail) {
+        return "rl:pacct:" + sha256(normalize(canonicalEmail)) + ":platform-login";
+    }
+
     public static String api(UUID tenantId, UUID userId) {
         return TenantKeys.key(tenantId, "user", userId.toString(), "rl", "api");
     }

@@ -12,3 +12,6 @@ nexusops:
   security:
     jwt:
       ephemeral-keys: true
+  platform:
+    # Local only — NOT a secret. Production must set PLATFORM_TOTP_KEY (32 random bytes, base64).
+    totp-key: ${PLATFORM_TOTP_KEY:bG9jYWwtb25seS10b3RwLWtleS0zMi1ieXRlcyEhISE=}

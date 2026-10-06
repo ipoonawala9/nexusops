@@ -73,6 +73,24 @@ public class Tenant extends BaseEntity {
         }
     }
 
+    /** ACTIVE → SUSPENDED. TenantDirectory checks the current status first and answers 409 otherwise. */
+    public void suspend() {
+        if (status != TenantStatus.ACTIVE) {
+            throw new IllegalStateException("Only an active tenant can be suspended");
+        }
+        status = TenantStatus.SUSPENDED;
+        updatedAt = Instant.now();
+    }
+
+    /** SUSPENDED → ACTIVE (never PENDING_VERIFICATION → ACTIVE: that requires email verification). */
+    public void reactivate() {
+        if (status != TenantStatus.SUSPENDED) {
+            throw new IllegalStateException("Only a suspended tenant can be reactivated");
+        }
+        status = TenantStatus.ACTIVE;
+        updatedAt = Instant.now();
+    }
+
     public void applySettings(String newName, String newTimezone, String newLocale, String newCurrency) {
         if (newName != null) name = newName;
         if (newTimezone != null) timezone = newTimezone;

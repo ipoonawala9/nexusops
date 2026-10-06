@@ -1,4 +1,4 @@
-# ERD — Phases 1–3
+# ERD — Phases 1–4
 
 ```mermaid
 erDiagram
@@ -11,6 +11,7 @@ erDiagram
   roles ||--o{ role_permissions : grants
   permissions ||--o{ role_permissions : in
   users ||--o{ user_roles : has
+  platform_users ||--o{ platform_refresh_tokens : has
   roles ||--o{ user_roles : assigned
   users ||--o{ refresh_tokens : holds
   users ||--o{ email_verifications : verifies
@@ -77,8 +78,32 @@ erDiagram
   platform_users { uuid id PK
     text email UK
     text password_hash
-    bytea totp_secret_enc
-    text role }
+    text totp_secret_enc
+    bigint totp_last_step
+    text role
+    text status
+    int token_version
+    int failed_totp_attempts
+    timestamptz last_login_at
+    timestamptz created_at
+    timestamptz updated_at
+    bigint version }
+  platform_refresh_tokens { uuid id PK
+    uuid platform_user_id FK
+    uuid family_id
+    char token_hash UK
+    timestamptz expires_at
+    timestamptz revoked_at
+    text revoke_reason
+    uuid replaced_by
+    int token_version
+    text created_ip
+    text user_agent
+    timestamptz created_at }
 ```
 
 Tables with RLS: every table that has `tenant_id`, except `tenants` itself, which is global and accessed only through services.
+
+`platform_users` and `platform_refresh_tokens` are not tenant tables. They have FORCE RLS and are visible only while the
+platform module has set `app.platform_access = 'on'` for the transaction (ADR-0007). The same flag also enables
+`FOR SELECT` `platform_read` policies on `users`, `roles` and `user_roles`.

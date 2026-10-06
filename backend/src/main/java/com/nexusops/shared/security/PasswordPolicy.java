@@ -1,4 +1,4 @@
-package com.nexusops.identity.application;
+package com.nexusops.shared.security;
 
 import com.nexusops.shared.web.ApiProblem;
 import java.io.BufferedReader;

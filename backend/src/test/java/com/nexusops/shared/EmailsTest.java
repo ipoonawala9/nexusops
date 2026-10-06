@@ -1,9 +1,8 @@
-package com.nexusops.identity;
+package com.nexusops.shared;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.nexusops.identity.application.Emails;
 import com.nexusops.shared.web.ApiProblem;
 import org.junit.jupiter.api.Test;
 

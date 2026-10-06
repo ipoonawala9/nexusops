@@ -2,6 +2,7 @@ package com.nexusops.identity.security;
 
 import com.nexusops.authorization.RolesChanged;
 import com.nexusops.tenancy.ModulesChanged;
+import com.nexusops.tenancy.TenantStatusChanged;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
@@ -23,6 +24,11 @@ class PrincipalCacheInvalidator {
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     void on(ModulesChanged event) {
+        cache.evictTenant(event.tenantId());
+    }
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
+    void on(TenantStatusChanged event) {
         cache.evictTenant(event.tenantId());
     }
 }

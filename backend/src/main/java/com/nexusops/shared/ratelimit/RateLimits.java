@@ -57,6 +57,17 @@ public class RateLimits {
         }
     }
 
+    /**
+     * Platform login, before authenticating: per IP, then per account. Both count every attempt and fail closed.
+     * {@code canonicalEmail} null means the input can't be a platform account, so only the IP bucket is charged.
+     */
+    public void checkPlatformLogin(String clientIp, String canonicalEmail) {
+        enforce(RateLimitKeys.ip("platform-login", clientIp), rule("platform-login"));
+        if (canonicalEmail != null) {
+            enforce(RateLimitKeys.platformAccount(canonicalEmail), rule("platform-login-account"));
+        }
+    }
+
     public OptionalLong apiRetryAfter(UUID tenantId, UUID userId) {
         try {
             var decision = limiter.tryConsume(RateLimitKeys.api(tenantId, userId), rule("api"));

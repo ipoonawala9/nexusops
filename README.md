@@ -66,6 +66,38 @@ minute per user); exceeding a limit returns `429` with a `Retry-After` header. C
 
 The API contract is in `docs/api/openapi.json`; Swagger UI at http://localhost:8081/swagger-ui.html.
 
+### Platform administration (NexusOps staff)
+Platform users are created from the CLI only. It needs an interactive terminal and the database running (`make up`):
+
+```bash
+make platform-admin EMAIL=you@example.com                    # PLATFORM_ADMIN; add ROLE=PLATFORM_SUPPORT for read-only
+```
+
+Type a password (12+ characters) twice, scan the QR code with an authenticator app, and enter the code it shows.
+Then sign in:
+
+```bash
+curl -i -X POST localhost:8081/api/v1/platform/auth/login -H 'Content-Type: application/json' \
+  -d '{"email":"you@example.com","password":"…","code":"123456"}'
+curl localhost:8081/api/v1/platform/tenants -H "Authorization: Bearer $PLATFORM_TOKEN"
+curl -X POST localhost:8081/api/v1/platform/tenants/$TENANT_ID/suspend -H "Authorization: Bearer $PLATFORM_TOKEN" \
+  -H 'Content-Type: application/json' -d '{"reason":"Abuse report 42"}'
+```
+
+To recover, run one of these:
+- `make platform-reset-totp EMAIL=…` for a lost phone;
+- `make platform-reset-password EMAIL=…` for a lost password;
+- `make platform-disable EMAIL=…` / `make platform-enable EMAIL=…` to disable or re-enable an account.
+
+Ten consecutive wrong codes after a correct password disable the account (audited as `PlatformUserLockedOut`). To
+recover, run `make platform-enable EMAIL=…` and also `make platform-reset-password EMAIL=…`, because whoever was
+guessing codes knows the password.
+
+In Docker, run `docker compose -f infra/docker/docker-compose.yml --profile app run --rm -it backend --nexusops.cli.command=create-platform-admin --nexusops.cli.email=you@example.com`.
+
+Production must set `PLATFORM_TOTP_KEY`: 32 random bytes, base64, e.g. `openssl rand -base64 32`. Keep it out of the
+database backups. Losing it means every operator must re-enrol.
+
 ## Tests
 - `make test` runs the backend (including Testcontainers integration tests, so Docker must be running), the frontend and the ai-service.
 - `make e2e` runs Playwright.

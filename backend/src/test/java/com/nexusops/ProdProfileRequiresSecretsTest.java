@@ -26,4 +26,14 @@ class ProdProfileRequiresSecretsTest {
                 .hasStackTraceContaining("Missing required secret")
                 .hasStackTraceContaining("ALLOWED_ORIGINS");
     }
+
+    @Test
+    void prodProfileFailsFastWithoutThePlatformTotpKey() {
+        assertThatThrownBy(() -> new SpringApplicationBuilder(NexusOpsApplication.class)
+                        .profiles("prod")
+                        .run("--spring.main.web-application-type=none", "--spring.datasource.password=x",
+                                "--spring.flyway.password=y", "--nexusops.security.allowed-origins=https://app.example.com"))
+                .hasStackTraceContaining("Missing required secret")
+                .hasStackTraceContaining("PLATFORM_TOTP_KEY");
+    }
 }

@@ -2,7 +2,6 @@ package com.nexusops.identity.web;
 
 import com.nexusops.identity.application.AuthResult;
 import com.nexusops.identity.application.ClientInfo;
-import com.nexusops.identity.application.Emails;
 import com.nexusops.identity.application.LoginService;
 import com.nexusops.identity.application.RefreshService;
 import com.nexusops.identity.application.SignupCommand;
@@ -13,8 +12,10 @@ import com.nexusops.identity.web.AuthDtos.SignupRequest;
 import com.nexusops.identity.web.AuthDtos.SignupResponse;
 import com.nexusops.identity.web.AuthDtos.TokenResponse;
 import com.nexusops.identity.web.AuthDtos.VerifyEmailRequest;
+import com.nexusops.shared.Emails;
 import com.nexusops.shared.ratelimit.RateLimits;
 import com.nexusops.shared.web.ApiProblem;
+import com.nexusops.shared.web.OriginGuard;
 import com.nexusops.tenancy.Slug;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
