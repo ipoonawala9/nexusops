@@ -2,6 +2,8 @@ import type { RouteObject } from 'react-router'
 import { EmptyState } from '@/components/states'
 import { PERMISSIONS, RequirePermission } from '@/features/auth/permissions'
 import { ModulesSettingsPage } from '@/features/settings/ModulesSettingsPage'
+import { RoleDetailPage } from '@/features/settings/roles/RoleDetailPage'
+import { RolesPage } from '@/features/settings/roles/RolesPage'
 import { SettingsLayout } from '@/features/settings/SettingsLayout'
 import { UsersPage } from '@/features/settings/users/UsersPage'
 import { WorkspaceSettingsPage } from '@/features/settings/WorkspaceSettingsPage'
@@ -48,6 +50,22 @@ export const settingsChildren: RouteObject[] = [
     element: (
       <RequirePermission anyOf={[PERMISSIONS.userRead]}>
         <UsersPage />
+      </RequirePermission>
+    ),
+  },
+  {
+    path: 'roles',
+    element: (
+      <RequirePermission anyOf={[PERMISSIONS.roleRead]}>
+        <RolesPage />
+      </RequirePermission>
+    ),
+  },
+  {
+    path: 'roles/:roleId',
+    element: (
+      <RequirePermission anyOf={[PERMISSIONS.roleRead]}>
+        <RoleDetailPage />
       </RequirePermission>
     ),
   },
