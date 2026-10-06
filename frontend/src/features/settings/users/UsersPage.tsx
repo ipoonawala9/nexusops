@@ -22,6 +22,7 @@ import { useApi } from '@/lib/api/ApiContext'
 import type { Page, UserView } from '@/lib/api/types'
 import { formatDateTime, fullName } from '@/lib/format'
 import { toQuery } from '@/lib/query'
+import { InvitationsPanel } from './InvitationsPanel'
 import { UserDialog } from './UserDialog'
 
 const SIZE = 20
@@ -157,7 +158,7 @@ export function UsersPage() {
         </>
       )}
 
-      {/* invitations: Task 7 */}
+      <InvitationsPanel />
 
       {selected && (
         <UserDialog key={selected.id} person={selected} onClose={() => setSelected(null)} />
