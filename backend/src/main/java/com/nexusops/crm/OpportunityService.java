@@ -186,7 +186,7 @@ public class OpportunityService {
     @Transactional(readOnly = true)
     public BoardView board(String owner) {
         UUID tenant = TenantContext.requireTenantId();
-        UUID ownerId = boardOwner(owner);
+        UUID ownerId = meOrAll(owner);
         Instant since = Instant.now().minus(RECENTLY_CLOSED);
         Map<UUID, List<Object[]>> sums = stageSums(tenant, ownerId, since);
         List<BoardColumn> columns = new ArrayList<>();
@@ -326,7 +326,7 @@ public class OpportunityService {
         return (root, cq, cb) -> cb.conjunction();
     }
 
-    private static UUID boardOwner(String raw) {
+    static UUID meOrAll(String raw) {
         String owner = raw == null ? "" : raw.strip();
         if (owner.isEmpty() || owner.equals("all")) {
             return null;
