@@ -8,6 +8,7 @@ import { PERMISSIONS, useCan } from '@/features/auth/permissions'
 import { ActivityPanel } from '@/features/records/ActivityPanel'
 import { ArchiveControls } from '@/features/records/ArchiveControls'
 import { DocumentsPanel } from '@/features/records/DocumentsPanel'
+import { SubjectTasksPanel } from '@/features/records/SubjectTasksPanel'
 import { useApi } from '@/lib/api/ApiContext'
 import type { Page, PartySummary, PartyView } from '@/lib/api/types'
 import { toQuery } from '@/lib/query'
@@ -91,6 +92,7 @@ export function PartyDetailPage() {
       </div>
       {p.kind === 'ORGANIZATION' && <OrganizationPeople organizationId={p.id} />}
       {/* record panels */}
+      <SubjectTasksPanel subjectType="PARTY" subjectId={p.id} label={p.name} archived={archived} />
       <ActivityPanel subjectType="PARTY" subjectId={p.id} archived={archived} />
       <DocumentsPanel subjectType="PARTY" subjectId={p.id} archived={archived} />
       {editing &&

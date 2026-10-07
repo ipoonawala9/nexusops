@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { PageHeader } from '@/components/states'
 import { PERMISSIONS, useCan } from '@/features/auth/permissions'
 import { useTenantSession } from '@/features/auth/tenantSession'
+import { MyTasksCard } from '@/features/tasks/MyTasksCard'
 import { MODULE_PHASES } from './nav'
 
 /** A placeholder dashboard (blueprint §23): real widgets arrive with the modules and Insights (Phase 11). */
@@ -20,6 +21,7 @@ export function OverviewPage() {
         description={`${profile.tenant.name} · ${profile.tenant.planCode} plan`}
       />
       <div className="grid gap-4 md:grid-cols-2">
+        {can(PERMISSIONS.taskRead) && <MyTasksCard />}
         <Card>
           <CardHeader>
             <CardTitle>Modules</CardTitle>
@@ -38,6 +40,13 @@ export function OverviewPage() {
             <CardTitle>Get started</CardTitle>
           </CardHeader>
           <CardContent className="space-y-1 text-sm">
+            {can(PERMISSIONS.partyRead) && (
+              <p>
+                <Link to="/app/directory" className="underline">
+                  Add customers and suppliers
+                </Link>
+              </p>
+            )}
             {can(PERMISSIONS.userRead) && (
               <p>
                 <Link to="/app/settings/users" className="underline">

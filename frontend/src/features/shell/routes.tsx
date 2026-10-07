@@ -4,6 +4,7 @@ import { AuditPage } from '@/features/audit/AuditPage'
 import { PERMISSIONS, RequirePermission } from '@/features/auth/permissions'
 import { DirectoryPage } from '@/features/directory/DirectoryPage'
 import { PartyDetailPage } from '@/features/directory/PartyDetailPage'
+import { TasksPage } from '@/features/tasks/TasksPage'
 import { ModulesSettingsPage } from '@/features/settings/ModulesSettingsPage'
 import { RoleDetailPage } from '@/features/settings/roles/RoleDetailPage'
 import { RolesPage } from '@/features/settings/roles/RolesPage'
@@ -94,6 +95,14 @@ export const appChildren: RouteObject[] = [
     element: (
       <RequirePermission anyOf={[PERMISSIONS.partyRead]}>
         <PartyDetailPage />
+      </RequirePermission>
+    ),
+  },
+  {
+    path: 'tasks',
+    element: (
+      <RequirePermission anyOf={[PERMISSIONS.taskRead]}>
+        <TasksPage />
       </RequirePermission>
     ),
   },
