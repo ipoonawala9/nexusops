@@ -27,7 +27,7 @@ test('one record per customer, with its activity, tasks and files', async ({ pag
   dialog = page.getByRole('dialog')
   await dialog.getByLabel('First name').fill('Grace')
   await dialog.getByLabel('Last name').fill('Hopper')
-  await dialog.getByLabel('Organization').selectOption({ label: 'Acme Robotics' })
+  await dialog.getByLabel('Organization', { exact: true }).selectOption({ label: 'Acme Robotics' })
   await dialog.getByLabel('Email').fill('grace@acme-robotics.test')
   await dialog.getByRole('button', { name: 'Create person' }).click()
   await expect(page.getByRole('heading', { name: 'Grace Hopper' })).toBeVisible()
@@ -59,7 +59,7 @@ test('one record per customer, with its activity, tasks and files', async ({ pag
   dialog = page.getByRole('dialog')
   await dialog.getByLabel('Title').fill('Send the proposal')
   await dialog.getByLabel('Due date').fill('2030-01-15')
-  await dialog.getByLabel('Assignee').selectOption({ label: 'Ada Owner' })
+  await dialog.getByLabel('Assignee', { exact: true }).selectOption({ label: 'Ada Owner' })
   await dialog.getByRole('button', { name: 'Create task' }).click()
   await expect(tasks.getByText('Send the proposal')).toBeVisible()
 

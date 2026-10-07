@@ -23,6 +23,7 @@ import { requiredText } from '@/features/auth/schemas'
 import { useApi } from '@/lib/api/ApiContext'
 import { applyFieldErrors, problemMessage } from '@/lib/api/problems'
 import type { AssigneeView, TaskView } from '@/lib/api/types'
+import { toQuery } from '@/lib/query'
 import { PRIORITY_LABELS } from './labels'
 
 const schema = z.object({
@@ -48,9 +49,11 @@ export function TaskDialog({
   const api = useApi()
   const queryClient = useQueryClient()
   const [formError, setFormError] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
+  const [picked, setPicked] = useState<{ id: string; name: string } | null>(null)
   const assignees = useQuery({
-    queryKey: ['task-assignees'],
-    queryFn: () => api.get<AssigneeView[]>('/tasks/assignees'),
+    queryKey: ['task-assignees', search.trim()],
+    queryFn: () => api.get<AssigneeView[]>(`/tasks/assignees?${toQuery({ q: search.trim() })}`),
   })
   const form = useForm<Values>({
     resolver: zodResolver(schema),
@@ -67,8 +70,13 @@ export function TaskDialog({
     (task?.subject ? { ...task.subject, label: task.subject.label ?? 'a record' } : undefined)
   const dueError = form.formState.errors.dueOn?.message
   const assigneeError = form.formState.errors.assigneeId?.message
-  const current = task?.assignee
+  const assigneeId = form.watch('assigneeId')
   const options = assignees.data ?? []
+  // The current and the picked assignee stay listed whatever the search returns, so the select never loses its value.
+  const pinned = [task?.assignee, picked].filter(
+    (member, index, all): member is { id: string; name: string } =>
+      !!member && all.findIndex((other) => other?.id === member.id) === index,
+  )
 
   const submit = form.handleSubmit(async (values) => {
     setFormError(null)
@@ -130,17 +138,38 @@ export function TaskDialog({
               />
             </Field>
           </div>
+          <Field id="field-assigneeSearch" label="Find a teammate">
+            <Input
+              id="field-assigneeSearch"
+              type="search"
+              autoComplete="off"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+          </Field>
           <Field id="field-assigneeId" label="Assignee" error={assigneeError}>
             <NativeSelect
               id="field-assigneeId"
+              value={assigneeId}
               aria-invalid={assigneeError ? true : undefined}
               aria-describedby={describedBy('field-assigneeId', assigneeError)}
-              {...form.register('assigneeId')}
+              {...form.register('assigneeId', {
+                onChange: (event: { target: { value: string } }) =>
+                  setPicked(
+                    options.find((member) => member.id === event.target.value) ??
+                      pinned.find((member) => member.id === event.target.value) ??
+                      null,
+                  ),
+              })}
             >
               <option value="">Unassigned</option>
-              {current && <option value={current.id}>{current.name}</option>}
+              {pinned.map((member) => (
+                <option key={member.id} value={member.id}>
+                  {member.name}
+                </option>
+              ))}
               {options
-                .filter((member) => member.id !== current?.id)
+                .filter((member) => !pinned.some((other) => other.id === member.id))
                 .map((member) => (
                   <option key={member.id} value={member.id}>
                     {member.name}

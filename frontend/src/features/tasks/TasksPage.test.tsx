@@ -109,6 +109,41 @@ describe('TasksPage', () => {
     expect(server.callsTo('PUT /tasks/:id')[0].body).toMatchObject({ assigneeId: 'u-ada' })
   })
 
+  it('searches teammates beyond the first page and keeps the chosen assignee selectable', async () => {
+    const { server, user } = setup()
+    const team = [
+      { id: 'u-ada', name: 'Ada Lovelace', email: 'ada@acme.test' },
+      { id: 'u-grace', name: 'Grace Hopper', email: 'grace@acme.test' },
+      { id: 'u-zed', name: 'Zed Zimmer', email: 'zed@acme.test' },
+    ]
+    server
+      .on('GET /tasks/assignees', (request) => {
+        const q = request.query.get('q')?.toLowerCase()
+        return {
+          body: q
+            ? team.filter((member) => member.name.toLowerCase().includes(q))
+            : team.slice(0, 2),
+        }
+      })
+      .on('PUT /tasks/:id', { body: aTask({ version: 1 }) })
+    await user.click(await screen.findByRole('button', { name: 'Edit Send quote' }))
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).queryByRole('option', { name: 'Zed Zimmer' })).not.toBeInTheDocument()
+    await user.type(within(dialog).getByLabelText('Find a teammate'), 'zed')
+    await within(dialog).findByRole('option', { name: 'Zed Zimmer' })
+    expect(server.callsTo('GET /tasks/assignees').at(-1)?.query.get('q')).toBe('zed')
+    // the current assignee stays selected while the search excludes them
+    expect(within(dialog).getByLabelText('Assignee')).toHaveValue('u-ada')
+    await user.selectOptions(within(dialog).getByLabelText('Assignee'), 'u-zed')
+    // and so does a teammate picked from an earlier search
+    await user.clear(within(dialog).getByLabelText('Find a teammate'))
+    await user.type(within(dialog).getByLabelText('Find a teammate'), 'grace')
+    await within(dialog).findByRole('option', { name: 'Grace Hopper' })
+    expect(within(dialog).getByLabelText('Assignee')).toHaveValue('u-zed')
+    await user.click(within(dialog).getByRole('button', { name: 'Save changes' }))
+    expect(server.callsTo('PUT /tasks/:id')[0].body).toMatchObject({ assigneeId: 'u-zed' })
+  })
+
   it('changes status from the list; readers can only move their own tasks', async () => {
     const { server, user } = setup(['collaboration.task.read'])
     server.on('POST /tasks/:id/status', { body: aTask({ status: 'DONE' }) })

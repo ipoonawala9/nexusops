@@ -105,6 +105,75 @@ describe('DirectoryPage', () => {
     expect(router.state.location.pathname).toBe('/app/directory/p-new')
   })
 
+  it('searches organizations for a person and submits the one found', async () => {
+    const { server, user } = setup()
+    const beta = aSummary({ id: 'p-beta', name: 'Beta Works', domain: 'beta.test' })
+    server
+      .on('GET /parties', (request) => {
+        const q = request.query.get('q')
+        if (request.query.get('kind') === 'ORGANIZATION' && q) {
+          return { body: pageOf(q === 'beta' ? [beta] : []) }
+        }
+        return { body: pageOf([ACME, GRACE]) }
+      })
+      .on('POST /persons', { status: 201, body: aPerson({ id: 'p-new', name: 'Ada Byron' }) })
+    await user.click(await screen.findByRole('button', { name: 'New person' }))
+    const dialog = await screen.findByRole('dialog')
+    await user.type(within(dialog).getByLabelText('First name'), 'Ada')
+    await user.type(within(dialog).getByLabelText('Find an organization'), 'beta')
+    await within(dialog).findByRole('option', { name: 'Beta Works' })
+    const search = server
+      .callsTo('GET /parties')
+      .filter((call) => call.query.get('q'))
+      .at(-1)?.query
+    expect(search?.get('kind')).toBe('ORGANIZATION')
+    expect(search?.get('q')).toBe('beta')
+    expect(search?.get('size')).toBe('20')
+    await user.selectOptions(within(dialog).getByLabelText('Organization'), 'p-beta')
+    // a later search that no longer lists it keeps the chosen organization
+    await user.clear(within(dialog).getByLabelText('Find an organization'))
+    await user.type(within(dialog).getByLabelText('Find an organization'), 'nomatch')
+    expect(within(dialog).getByLabelText('Organization')).toHaveValue('p-beta')
+    await user.click(within(dialog).getByRole('button', { name: 'Create person' }))
+    expect(server.callsTo('POST /persons')[0].body).toMatchObject({ organizationId: 'p-beta' })
+  })
+
+  it('drops the duplicate notice and its reason when the identity changes', async () => {
+    const { server, user } = setup()
+    server.on('POST /organizations', {
+      status: 409,
+      body: {
+        detail: 'This looks like a record that already exists.',
+        duplicates: [
+          {
+            id: 'p-acme',
+            kind: 'ORGANIZATION',
+            name: 'Acme',
+            email: null,
+            domain: 'acme.test',
+            archived: false,
+          },
+        ],
+      },
+    })
+    await user.click(await screen.findByRole('button', { name: 'New organization' }))
+    const dialog = await screen.findByRole('dialog')
+    await user.type(within(dialog).getByLabelText('Name'), 'ACME Inc')
+    await user.click(within(dialog).getByRole('button', { name: 'Create organization' }))
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+      'This looks like a record that already exists.',
+    )
+    await user.type(within(dialog).getByLabelText('Why keep a separate record?'), 'Separate entity')
+    await user.type(within(dialog).getByLabelText('Name'), ' Two')
+    expect(within(dialog).queryByRole('alert')).not.toBeInTheDocument()
+    expect(within(dialog).queryByLabelText('Why keep a separate record?')).not.toBeInTheDocument()
+    await user.click(within(dialog).getByRole('button', { name: 'Create organization' }))
+    expect(server.callsTo('POST /organizations')[1].body).toMatchObject({
+      name: 'ACME Inc Two',
+      duplicateReason: null,
+    })
+  })
+
   it('shows probable duplicates and needs a reason to create anyway', async () => {
     const { server, user } = setup()
     server.on('POST /organizations', (req) =>

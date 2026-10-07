@@ -22,6 +22,7 @@ import type { PartyView } from '@/lib/api/types'
 import { blankToNull, organizationSchema, type OrganizationValues } from './schemas'
 
 const FIELDS = ['name', 'domain', 'website', 'email', 'phone'] as const
+const IDENTITY = ['name', 'domain'] as const
 
 /** Creates an organization, or edits {@code organization} (sending the version it was loaded with). */
 export function OrganizationFormDialog({
@@ -35,7 +36,6 @@ export function OrganizationFormDialog({
 }) {
   const api = useApi()
   const queryClient = useQueryClient()
-  const guard = useDuplicateGuard()
   const [formError, setFormError] = useState<string | null>(null)
   const form = useForm<OrganizationValues>({
     resolver: zodResolver(organizationSchema),
@@ -47,6 +47,8 @@ export function OrganizationFormDialog({
       phone: organization?.phone ?? '',
     },
   })
+
+  const guard = useDuplicateGuard(form.watch, IDENTITY)
 
   const submit = form.handleSubmit(async (values) => {
     setFormError(null)

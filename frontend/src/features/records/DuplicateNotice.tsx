@@ -19,7 +19,10 @@ export function DuplicateNotice({
 }) {
   const id = 'field-duplicateReason'
   return (
-    <div className="space-y-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm dark:border-amber-800 dark:bg-amber-950/30">
+    <div
+      role="alert"
+      className="space-y-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm dark:border-amber-800 dark:bg-amber-950/30"
+    >
       <div>
         <p className="font-medium">This looks like a record that already exists.</p>
         <ul className="mt-1 space-y-1">

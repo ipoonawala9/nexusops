@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import {
   Dialog,
   DialogContent,
@@ -25,6 +26,7 @@ import { toQuery } from '@/lib/query'
 import { blankToNull, personSchema, type PersonValues } from './schemas'
 
 const FIELDS = ['firstName', 'lastName', 'jobTitle', 'organizationId', 'email', 'phone'] as const
+const IDENTITY = ['firstName', 'lastName', 'email', 'organizationId'] as const
 
 /** Creates a person, or edits {@code person} (sending the version it was loaded with). */
 export function PersonFormDialog({
@@ -38,12 +40,15 @@ export function PersonFormDialog({
 }) {
   const api = useApi()
   const queryClient = useQueryClient()
-  const guard = useDuplicateGuard()
   const [formError, setFormError] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
+  const [picked, setPicked] = useState<{ id: string; name: string } | null>(null)
   const organizations = useQuery({
-    queryKey: ['parties', 'organization-options'],
+    queryKey: ['parties', 'organization-options', search.trim()],
     queryFn: () =>
-      api.get<Page<PartySummary>>(`/parties?${toQuery({ kind: 'ORGANIZATION', size: 100 })}`),
+      api.get<Page<PartySummary>>(
+        `/parties?${toQuery({ kind: 'ORGANIZATION', q: search.trim(), size: 20 })}`,
+      ),
   })
   const form = useForm<PersonValues>({
     resolver: zodResolver(personSchema),
@@ -56,8 +61,14 @@ export function PersonFormDialog({
       phone: person?.phone ?? '',
     },
   })
+  const guard = useDuplicateGuard(form.watch, IDENTITY)
+  const organizationId = form.watch('organizationId')
   const options = organizations.data?.items ?? []
-  const current = person?.organization
+  // The current and the picked organization stay listed whatever the search returns, so the select never loses its value.
+  const pinned = [person?.organization, picked].filter(
+    (organization, index, all): organization is { id: string; name: string } =>
+      !!organization && all.findIndex((other) => other?.id === organization.id) === index,
+  )
   const organizationError = form.formState.errors.organizationId?.message
 
   const submit = form.handleSubmit(async (values) => {
@@ -103,17 +114,38 @@ export function PersonFormDialog({
             <TextField form={form} name="lastName" label="Last name" maxLength={80} />
           </div>
           <TextField form={form} name="jobTitle" label="Job title" maxLength={100} />
+          <Field id="field-organizationSearch" label="Find an organization">
+            <Input
+              id="field-organizationSearch"
+              type="search"
+              autoComplete="off"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+          </Field>
           <Field id="field-organizationId" label="Organization" error={organizationError}>
             <NativeSelect
               id="field-organizationId"
+              value={organizationId}
               aria-invalid={organizationError ? true : undefined}
               aria-describedby={describedBy('field-organizationId', organizationError)}
-              {...form.register('organizationId')}
+              {...form.register('organizationId', {
+                onChange: (event: { target: { value: string } }) =>
+                  setPicked(
+                    options.find((organization) => organization.id === event.target.value) ??
+                      pinned.find((organization) => organization.id === event.target.value) ??
+                      null,
+                  ),
+              })}
             >
               <option value="">No organization</option>
-              {current && <option value={current.id}>{current.name}</option>}
+              {pinned.map((organization) => (
+                <option key={organization.id} value={organization.id}>
+                  {organization.name}
+                </option>
+              ))}
               {options
-                .filter((organization) => organization.id !== current?.id)
+                .filter((organization) => !pinned.some((other) => other.id === organization.id))
                 .map((organization) => (
                   <option key={organization.id} value={organization.id}>
                     {organization.name}
