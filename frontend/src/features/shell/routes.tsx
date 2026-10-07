@@ -2,6 +2,11 @@ import type { RouteObject } from 'react-router'
 import { EmptyState } from '@/components/states'
 import { AuditPage } from '@/features/audit/AuditPage'
 import { PERMISSIONS, RequirePermission } from '@/features/auth/permissions'
+import { DirectoryPage } from '@/features/directory/DirectoryPage'
+import { PartyDetailPage } from '@/features/directory/PartyDetailPage'
+import { ProductDetailPage } from '@/features/products/ProductDetailPage'
+import { ProductsPage } from '@/features/products/ProductsPage'
+import { TasksPage } from '@/features/tasks/TasksPage'
 import { ModulesSettingsPage } from '@/features/settings/ModulesSettingsPage'
 import { RoleDetailPage } from '@/features/settings/roles/RoleDetailPage'
 import { RolesPage } from '@/features/settings/roles/RolesPage'
@@ -79,6 +84,46 @@ export const settingsChildren: RouteObject[] = [
 /** /app/* children. */
 export const appChildren: RouteObject[] = [
   { index: true, element: <OverviewPage /> },
+  {
+    path: 'directory',
+    element: (
+      <RequirePermission anyOf={[PERMISSIONS.partyRead]}>
+        <DirectoryPage />
+      </RequirePermission>
+    ),
+  },
+  {
+    path: 'directory/:partyId',
+    element: (
+      <RequirePermission anyOf={[PERMISSIONS.partyRead]}>
+        <PartyDetailPage />
+      </RequirePermission>
+    ),
+  },
+  {
+    path: 'products',
+    element: (
+      <RequirePermission anyOf={[PERMISSIONS.productRead]}>
+        <ProductsPage />
+      </RequirePermission>
+    ),
+  },
+  {
+    path: 'products/:productId',
+    element: (
+      <RequirePermission anyOf={[PERMISSIONS.productRead]}>
+        <ProductDetailPage />
+      </RequirePermission>
+    ),
+  },
+  {
+    path: 'tasks',
+    element: (
+      <RequirePermission anyOf={[PERMISSIONS.taskRead]}>
+        <TasksPage />
+      </RequirePermission>
+    ),
+  },
   modulePage('crm', 'CRM'),
   modulePage('inventory', 'INVENTORY'),
   modulePage('helpdesk', 'HELPDESK'),

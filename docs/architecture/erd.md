@@ -107,3 +107,73 @@ Tables with RLS: every table that has `tenant_id`, except `tenants` itself, whic
 `platform_users` and `platform_refresh_tokens` are not tenant tables. They have FORCE RLS and are visible only while the
 platform module has set `app.platform_access = 'on'` for the transaction (ADR-0007). The same flag also enables
 `FOR SELECT` `platform_read` policies on `users`, `roles` and `user_roles`.
+
+## Phase 4 — canonical data model
+
+```mermaid
+erDiagram
+    TENANTS ||--o{ PARTIES : owns
+    PARTIES ||--o{ PARTIES : "employs (organization_id)"
+    PARTIES ||--o{ PARTY_ROLES : plays
+    TENANTS ||--o{ PRODUCTS : owns
+    TENANTS ||--o{ ACTIVITIES : owns
+    TENANTS ||--o{ TASKS : owns
+    TENANTS ||--o{ DOCUMENTS : owns
+    DOCUMENTS ||--|| DOCUMENT_CONTENTS : stores
+    USERS ||--o{ TASKS : "assigned (assignee_id)"
+    USERS ||--o{ ACTIVITIES : authored
+    PARTIES {
+        uuid id PK
+        uuid tenant_id FK
+        text kind "PERSON | ORGANIZATION"
+        text name
+        text name_key "duplicate match key"
+        uuid organization_id "FK (tenant_id, organization_id)"
+        text email
+        text domain
+        text duplicate_reason
+        timestamptz archived_at
+    }
+    PARTY_ROLES {
+        uuid id PK
+        uuid party_id "FK (tenant_id, party_id)"
+        text role "CUSTOMER | SUPPLIER | EMPLOYEE"
+        text status "ACTIVE | INACTIVE"
+        text employee_number
+    }
+    PRODUCTS {
+        uuid id PK
+        text sku "unique per tenant, ci"
+        text kind "GOODS | SERVICE"
+        numeric list_price
+        text currency
+        timestamptz archived_at
+    }
+    ACTIVITIES {
+        uuid id PK
+        text subject_type "PARTY | PRODUCT | ..."
+        uuid subject_id
+        text type "NOTE | CALL | EMAIL | MEETING"
+        text summary
+    }
+    TASKS {
+        uuid id PK
+        text title
+        text status
+        text priority
+        date due_on
+        uuid assignee_id FK
+        text subject_type
+        uuid subject_id
+    }
+    DOCUMENTS {
+        uuid id PK
+        text subject_type
+        uuid subject_id
+        text file_name
+        bigint size_bytes
+        text sha256
+    }
+```
+Activities, tasks and documents reference their subject without a foreign key (ADR-0008). Every table carries
+`tenant_id` with FORCE RLS.

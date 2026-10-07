@@ -33,6 +33,7 @@ export function signedIn(server: FakeServer, profile: Profile = testProfile()): 
       body: { accessToken: 'test-token', tokenType: 'Bearer', expiresIn: 900 },
     })
     .on('GET /me', { body: profile })
+    .on('GET /tasks', { body: { items: [], page: 0, size: 5, total: 0 } })
 }
 
 export function signedOut(server: FakeServer): FakeServer {

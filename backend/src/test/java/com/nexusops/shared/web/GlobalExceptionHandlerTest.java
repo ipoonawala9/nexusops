@@ -33,6 +33,11 @@ class GlobalExceptionHandlerTest {
             throw new IllegalStateException("secret-db-detail password=hunter2");
         }
 
+        @GetMapping("/too-large")
+        String tooLarge() {
+            throw new org.springframework.web.multipart.MaxUploadSizeExceededException(10);
+        }
+
         @GetMapping("/denied")
         String denied() {
             throw new AccessDeniedException("nope");
@@ -41,6 +46,12 @@ class GlobalExceptionHandlerTest {
         @GetMapping("/conflict")
         String conflict() {
             throw com.nexusops.shared.web.ApiProblem.conflictField("slug", "Workspace URL is already taken.");
+        }
+
+        @GetMapping("/duplicate")
+        String duplicate() {
+            throw com.nexusops.shared.web.ApiProblem.conflict("Looks like a duplicate.")
+                    .withProperty("duplicates", java.util.List.of(java.util.Map.of("id", "p-1", "name", "Acme")));
         }
 
         @GetMapping("/stale")
@@ -62,6 +73,14 @@ class GlobalExceptionHandlerTest {
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .addFilters(new RequestIdFilter())
                 .build();
+    }
+
+    @Test
+    void oversizedUploadsAre413WithAPlainMessage() throws Exception {
+        mvc.perform(get("/too-large"))
+                .andExpect(status().isPayloadTooLarge())
+                .andExpect(jsonPath("$.detail").value("The file is larger than 10 MB."))
+                .andExpect(jsonPath("$.requestId").exists());
     }
 
     @Test
@@ -118,5 +137,15 @@ class GlobalExceptionHandlerTest {
         mvc.perform(get("/stale"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.detail").value("This record was changed by someone else. Reload and try again."));
+    }
+
+    @Test
+    void apiProblemPropertiesBecomeProblemMembers() throws Exception {
+        mvc.perform(get("/duplicate"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail").value("Looks like a duplicate."))
+                .andExpect(jsonPath("$.duplicates[0].id").value("p-1"))
+                .andExpect(jsonPath("$.duplicates[0].name").value("Acme"))
+                .andExpect(jsonPath("$.requestId").exists());
     }
 }

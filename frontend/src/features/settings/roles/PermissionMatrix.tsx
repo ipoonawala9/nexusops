@@ -2,7 +2,26 @@ import { Checkbox } from '@/components/form/Checkbox'
 import { MODULE_PHASES } from '@/features/shell/nav'
 import type { PermissionView } from '@/lib/api/types'
 
-/** Permissions grouped by module; foundation permissions (module null) first. */
+/** Foundation permissions (module null) are grouped by the area their code starts with. */
+const AREAS: Array<[prefix: string, label: string]> = [
+  ['directory', 'Directory'],
+  ['catalog', 'Products'],
+  ['collaboration', 'Activities, tasks and documents'],
+]
+
+function groupKey(permission: PermissionView): string {
+  if (permission.module) return permission.module
+  const prefix = permission.code.split('.')[0]
+  return AREAS.some(([area]) => area === prefix) ? `area:${prefix}` : ''
+}
+
+function rank(key: string): number {
+  if (key === '') return 0
+  const area = AREAS.findIndex(([prefix]) => `area:${prefix}` === key)
+  return area >= 0 ? 1 + area : 1 + AREAS.length
+}
+
+/** Permissions grouped by area, then by module. */
 export function PermissionMatrix({
   catalog,
   selected,
@@ -16,21 +35,22 @@ export function PermissionMatrix({
 }) {
   const groups = new Map<string, PermissionView[]>()
   for (const permission of catalog) {
-    const key = permission.module ?? ''
+    const key = groupKey(permission)
     groups.set(key, [...(groups.get(key) ?? []), permission])
   }
-  const keys = [...groups.keys()].sort((a, b) =>
-    a === '' ? -1 : b === '' ? 1 : a.localeCompare(b),
-  )
+  const keys = [...groups.keys()].sort((a, b) => rank(a) - rank(b) || a.localeCompare(b))
 
   return (
     <div className="space-y-4">
       {keys.map((key) => {
         const items = groups.get(key) ?? []
+        const area = AREAS.find(([prefix]) => `area:${prefix}` === key)
         const label =
           key === ''
             ? 'Workspace administration'
-            : `${MODULE_PHASES[key]?.label ?? key} module${items[0]?.moduleEnabled ? '' : ' (not enabled)'}`
+            : area
+              ? area[1]
+              : `${MODULE_PHASES[key]?.label ?? key} module${items[0]?.moduleEnabled ? '' : ' (not enabled)'}`
         return (
           <fieldset key={key || 'foundation'} className="rounded-lg border p-4">
             <legend className="px-1 text-sm font-semibold">{label}</legend>

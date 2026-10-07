@@ -1,6 +1,10 @@
 spring:
   application:
     name: nexusops
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 11MB
   threads:
     virtual:
       enabled: true

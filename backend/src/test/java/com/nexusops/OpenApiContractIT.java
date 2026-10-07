@@ -29,7 +29,11 @@ class OpenApiContractIT extends IntegrationTestSupport {
                 "\"/api/v1/invitations/preview\"", "\"/api/v1/tenant/modules/{code}\"", "\"/api/v1/audit-events\"",
                 "\"/api/v1/platform/auth/login\"", "\"/api/v1/platform/auth/refresh\"",
                 "\"/api/v1/platform/auth/logout\"", "\"/api/v1/platform/me\"", "\"/api/v1/platform/tenants\"",
-                "\"/api/v1/platform/tenants/{id}/suspend\"", "\"/api/v1/platform/tenants/{id}/reactivate\"");
+                "\"/api/v1/platform/tenants/{id}/suspend\"", "\"/api/v1/platform/tenants/{id}/reactivate\"",
+                "\"/api/v1/parties\"", "\"/api/v1/parties/{id}\"", "\"/api/v1/parties/{id}/roles/{role}\"",
+                "\"/api/v1/persons\"", "\"/api/v1/organizations\"", "\"/api/v1/products\"", "\"/api/v1/products/{id}\"",
+                "\"/api/v1/activities\"", "\"/api/v1/tasks\"", "\"/api/v1/tasks/{id}/status\"",
+                "\"/api/v1/tasks/assignees\"", "\"/api/v1/documents\"", "\"/api/v1/documents/{id}/content\"");
         // hierarchy rules (ADR-0004): no changing a role, or disabling/re-enabling/re-roling a user, stronger than the caller
         for (String op : new String[] {"$.paths['/api/v1/roles/{id}'].patch", "$.paths['/api/v1/roles/{id}'].delete",
                 "$.paths['/api/v1/roles/{id}/permissions'].put", "$.paths['/api/v1/users/{id}'].patch",

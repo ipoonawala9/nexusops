@@ -120,7 +120,7 @@ public class TenantDirectory {
     @Transactional(readOnly = true)
     public PlanLimits currentLimits() {
         var row = tenants.findPlanLimits(TenantContext.requireTenantId());
-        return new PlanLimits(parse(row.getMaxUsers()), parse(row.getMaxModules()));
+        return new PlanLimits(parse(row.getMaxUsers()), parse(row.getMaxModules()), parse(row.getMaxStorageMb()));
     }
 
     @Transactional(readOnly = true)
