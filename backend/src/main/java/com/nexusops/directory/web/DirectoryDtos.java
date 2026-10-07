@@ -22,4 +22,10 @@ final class DirectoryDtos {
             return new OrganizationCommand(name, domain, website, email, phone, duplicateReason);
         }
     }
+
+    record PartyRoleRequest(com.nexusops.directory.RoleStatus status, java.time.LocalDate since, String employeeNumber) {
+        com.nexusops.directory.PartyRoleCommand command() {
+            return new com.nexusops.directory.PartyRoleCommand(status, since, employeeNumber);
+        }
+    }
 }

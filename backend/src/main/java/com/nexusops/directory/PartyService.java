@@ -7,6 +7,7 @@ import com.nexusops.directory.domain.OrganizationDetails;
 import com.nexusops.directory.domain.Party;
 import com.nexusops.directory.domain.PartyNames;
 import com.nexusops.directory.domain.PartyRepository;
+import com.nexusops.directory.domain.PartyRole;
 import com.nexusops.directory.domain.PartyRoleRepository;
 import com.nexusops.directory.domain.PersonDetails;
 import com.nexusops.shared.Ids;
@@ -15,11 +16,22 @@ import com.nexusops.shared.Text;
 import com.nexusops.shared.db.TenantLocks;
 import com.nexusops.shared.security.CurrentAuthorities;
 import com.nexusops.shared.web.ApiProblem;
+import com.nexusops.shared.web.PageResponse;
+import com.nexusops.shared.web.Paging;
+import jakarta.persistence.criteria.Root;
+import jakarta.persistence.criteria.Subquery;
+import java.time.Instant;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,7 +48,9 @@ public class PartyService {
     static final String DUPLICATE =
             "This looks like a record that already exists. Open it, or give a reason for keeping a separate one.";
     static final String FORBIDDEN = "You do not have permission to perform this action.";
+    static final String EMPLOYEE_NUMBER_TAKEN = "Another employee already has this number.";
     private static final String IDENTITY_LOCK = "party-identity";
+    private static final String ROLES_LOCK = "party-roles";
 
     private final PartyRepository parties;
     private final PartyRoleRepository roles;
@@ -112,6 +126,121 @@ public class PartyService {
         Map<String, Object> before = snapshot(party);
         party.applyOrganization(details);
         return updated(party, before, duplicates, reason);
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponse<PartySummary> list(PartyQuery query, Integer page, Integer size) {
+        TenantContext.requireTenantId();
+        boolean employees = CurrentAuthorities.has(DirectoryPermissions.EMPLOYEE_READ);
+        if (query.role() == PartyRoleType.EMPLOYEE && !employees) {
+            throw ApiProblem.forbidden(FORBIDDEN);
+        }
+        String q = Text.optional(query.q(), 100, "q");
+        Specification<Party> spec = (root, cq, cb) -> query.archived()
+                ? cb.isNotNull(root.get("archivedAt")) : cb.isNull(root.get("archivedAt"));
+        if (query.kind() != null) {
+            spec = spec.and((root, cq, cb) -> cb.equal(root.get("kind"), query.kind()));
+        }
+        if (query.organizationId() != null) {
+            spec = spec.and((root, cq, cb) -> cb.equal(root.get("organizationId"), query.organizationId()));
+        }
+        if (q != null) {
+            String like = Text.containsPattern(q);
+            spec = spec.and((root, cq, cb) -> cb.or(cb.like(cb.lower(root.get("name")), like, '\\'),
+                    cb.like(root.get("email"), like, '\\'), cb.like(root.get("domain"), like, '\\')));
+        }
+        if (query.role() != null) {
+            spec = spec.and((root, cq, cb) -> {
+                Subquery<UUID> holders = cq.subquery(UUID.class);
+                Root<PartyRole> role = holders.from(PartyRole.class);
+                holders.select(role.get("partyId")).where(cb.equal(role.get("partyId"), root.get("id")),
+                        cb.equal(role.get("role"), query.role()), cb.equal(role.get("status"), RoleStatus.ACTIVE));
+                return cb.exists(holders);
+            });
+        }
+        Page<Party> result = parties.findAll(spec, Paging.of(page, size, Sort.by("name", "id")));
+        List<UUID> ids = result.getContent().stream().map(Party::getId).toList();
+        Map<UUID, List<PartyRoleType>> activeRoles = roles.findByPartyIdIn(ids).stream()
+                .filter(r -> r.getStatus() == RoleStatus.ACTIVE && (employees || r.getRole() != PartyRoleType.EMPLOYEE))
+                .sorted(Comparator.comparing(PartyRole::getRole))
+                .collect(Collectors.groupingBy(PartyRole::getPartyId,
+                        Collectors.mapping(PartyRole::getRole, Collectors.toList())));
+        Set<UUID> organizationIds = result.getContent().stream().map(Party::getOrganizationId)
+                .filter(Objects::nonNull).collect(Collectors.toSet());
+        Map<UUID, String> organizationNames = parties.findAllById(organizationIds).stream()
+                .collect(Collectors.toMap(Party::getId, Party::getName));
+        return PageResponse.from(result, p -> new PartySummary(p.getId(), p.getKind(), p.getName(), p.getEmail(),
+                p.getPhone(), p.getDomain(),
+                p.getOrganizationId() == null ? null
+                        : new PartyRef(p.getOrganizationId(), organizationNames.get(p.getOrganizationId())),
+                activeRoles.getOrDefault(p.getId(), List.of()), p.isArchived()));
+    }
+
+    /** Idempotent: archiving an archived party changes nothing. */
+    @Transactional
+    public PartyView archive(UUID id) {
+        Party party = find(id);
+        if (!party.isArchived()) {
+            party.archive(Instant.now());
+            parties.flush();
+            audit.record(AuditEntry.of("PartyArchived", "Party", id).withBefore(snapshot(party)));
+        }
+        return view(party);
+    }
+
+    @Transactional
+    public PartyView restore(UUID id) {
+        Party party = find(id);
+        if (party.isArchived()) {
+            party.restore();
+            parties.flush();
+            audit.record(AuditEntry.of("PartyRestored", "Party", id).withAfter(snapshot(party)));
+        }
+        return view(party);
+    }
+
+    /** Creates or updates one role of a party. EMPLOYEE needs directory.employee.manage; others directory.party.manage. */
+    @Transactional
+    public PartyView setRole(UUID id, PartyRoleType role, PartyRoleCommand command) {
+        Party party = find(id);
+        String needed = role == PartyRoleType.EMPLOYEE
+                ? DirectoryPermissions.EMPLOYEE_MANAGE : DirectoryPermissions.PARTY_MANAGE;
+        if (!CurrentAuthorities.has(needed)) {
+            throw ApiProblem.forbidden(FORBIDDEN);
+        }
+        if (party.isArchived()) {
+            throw ApiProblem.conflict(ARCHIVED);
+        }
+        if (role == PartyRoleType.EMPLOYEE && party.getKind() != PartyKind.PERSON) {
+            throw ApiProblem.badRequestField("role", "Only a person can be an employee.");
+        }
+        RoleStatus status = command.status() == null ? RoleStatus.ACTIVE : command.status();
+        String number = Text.optional(command.employeeNumber(), 40, "employeeNumber");
+        if (number != null && role != PartyRoleType.EMPLOYEE) {
+            throw ApiProblem.badRequestField("employeeNumber", "Only employees have an employee number.");
+        }
+        locks.lock(ROLES_LOCK);
+        if (number != null && roles.employeeNumberTaken(number, id)) {
+            throw ApiProblem.conflictField("employeeNumber", EMPLOYEE_NUMBER_TAKEN);
+        }
+        PartyRole row = roles.findByPartyIdAndRole(id, role).orElse(null);
+        Map<String, Object> before = row == null ? null : roleSnapshot(row);
+        if (row == null) {
+            row = new PartyRole(Ids.newId(), id, role);
+        }
+        row.update(status, command.since(), number);
+        roles.saveAndFlush(row);
+        audit.record(AuditEntry.of("PartyRoleChanged", "Party", id).withBefore(before).withAfter(roleSnapshot(row)));
+        return view(party);
+    }
+
+    private static Map<String, Object> roleSnapshot(PartyRole row) {
+        Map<String, Object> values = new LinkedHashMap<>();
+        values.put("role", row.getRole().name());
+        values.put("status", row.getStatus().name());
+        putIfPresent(values, "since", row.getSince());
+        putIfPresent(values, "employeeNumber", row.getEmployeeNumber());
+        return values;
     }
 
     Party find(UUID id) {
