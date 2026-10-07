@@ -79,8 +79,6 @@ class CrossTenantApiIT extends IntegrationTestSupport {
                         .param("subjectType", "PARTY").param("subjectId", orgB.toString())));
         userBId = OwnerJdbc.ownerAs(b.tenantId()).queryForObject("select id from users where email = ?", UUID.class,
                 b.email());
-        as(ownerA, put("/api/v1/tenant/modules/CRM").contentType(MediaType.APPLICATION_JSON).content("{\"enabled\":true}"))
-                .andExpect(status().isOk());
         leadB = com.nexusops.support.Api.id(apiB.post("/api/v1/leads", "{\"companyName\":\"Beta prospect\"}"));
         opportunityB = com.nexusops.support.Api.id(apiB.post("/api/v1/opportunities",
                 "{\"name\":\"Beta deal\",\"accountId\":\"" + orgB + "\"}"));
@@ -149,9 +147,9 @@ class CrossTenantApiIT extends IntegrationTestSupport {
         as(ownerA, get("/api/v1/audit-events").param("size", "100"))
                 .andExpect(jsonPath("$.items[*].entityId", Matchers.not(Matchers.hasItem(roleB.toString()))))
                 .andExpect(jsonPath("$.items[*].entityId", Matchers.not(Matchers.hasItem(invitationB.toString()))));
-        as(ownerA, get("/api/v1/tenant/modules")).andExpect(jsonPath("$[?(@.code == 'CRM')].enabled", Matchers.contains(true)));
+        as(ownerA, get("/api/v1/tenant/modules")).andExpect(jsonPath("$[?(@.code == 'CRM')].enabled", Matchers.contains(false)));
         as(ownerA, get("/api/v1/me")).andExpect(jsonPath("$.tenant.slug").value(a.slug()))
-                .andExpect(jsonPath("$.modules", Matchers.contains("CRM")));
+                .andExpect(jsonPath("$.modules", Matchers.empty()));
     }
 
     @Test
@@ -240,6 +238,8 @@ class CrossTenantApiIT extends IntegrationTestSupport {
 
     @Test
     void crmRecordsOfAnotherTenantAreInvisibleAndUntouchable() throws Exception {
+        as(ownerA, put("/api/v1/tenant/modules/CRM").contentType(MediaType.APPLICATION_JSON).content("{\"enabled\":true}"))
+                .andExpect(status().isOk());
         as(ownerA, get("/api/v1/leads/" + leadB)).andExpect(status().isNotFound());
         as(ownerA, json(put("/api/v1/leads/" + leadB), "{\"lastName\":\"Hacked\",\"version\":0}")).andExpect(status().isNotFound());
         as(ownerA, json(post("/api/v1/leads/" + leadB + "/status"), "{\"status\":\"CONTACTED\",\"version\":0}"))
@@ -276,6 +276,7 @@ class CrossTenantApiIT extends IntegrationTestSupport {
         // lists, search, board and dashboard never contain B's rows
         as(ownerA, get("/api/v1/leads")).andExpect(jsonPath("$.items[*].name", Matchers.not(Matchers.hasItem("Beta prospect"))));
         as(ownerA, get("/api/v1/opportunities")).andExpect(jsonPath("$.total").value(0));
+        as(ownerB, get("/api/v1/search").param("q", "beta")).andExpect(jsonPath("$.length()", Matchers.greaterThan(0)));
         as(ownerA, get("/api/v1/search").param("q", "beta")).andExpect(jsonPath("$.length()").value(0));
         as(ownerA, get("/api/v1/crm/pipeline/board")).andExpect(jsonPath("$.columns[0].count").value(0));
         as(ownerA, get("/api/v1/crm/customers")).andExpect(jsonPath("$.total").value(0));
