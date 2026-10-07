@@ -129,7 +129,8 @@ directory fact.
 - Uploads:
   - the file name is sanitised (no path, no control characters, ≤255);
   - the content type is validated, else stored as `application/octet-stream`;
-  - nginx `client_max_body_size 11m`.
+  - nginx `client_max_body_size 11m` on the upload route (`POST /api/v1/documents`) only; every other API route keeps
+    nginx's 1 MB default.
 - Audit actions:
   - parties: `PersonCreated`, `OrganizationCreated`, `PartyUpdated`, `PartyArchived`, `PartyRestored`, `PartyRoleChanged`;
   - products: `ProductCreated`, `ProductUpdated`, `ProductArchived`, `ProductRestored`;
@@ -175,3 +176,5 @@ directory fact.
   see. The notice is a `role="alert"` region.
 - The task assignee and person organization pickers have a search box (`q`) over the server's first 20 matches; the
   current and the chosen option always stay listed.
+- nginx allows 11 MB bodies only on `location = /api/v1/documents` (the upload); the rest of `/api/` keeps the 1 MB
+  default, so unauthenticated routes can't be sent large bodies.
