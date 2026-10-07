@@ -233,7 +233,7 @@ public class LeadService {
         return values;
     }
 
-    private static LeadDetails withOwner(LeadDetails d, UUID owner) {
+    static LeadDetails withOwner(LeadDetails d, UUID owner) {
         return new LeadDetails(d.firstName(), d.lastName(), d.companyName(), d.jobTitle(), d.email(), d.phone(),
                 d.source(), owner, d.estimatedValue(), d.currency(), d.description());
     }

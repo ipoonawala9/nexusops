@@ -63,6 +63,11 @@ public class ApiProblem extends RuntimeException {
         return new ApiProblem(HttpStatus.BAD_REQUEST, "Request validation failed.", List.of(new FieldError(field, message)));
     }
 
+    /** 422: the request was understood but its content can't be accepted (e.g. rows of an import). */
+    public static ApiProblem unprocessable(String detail) {
+        return new ApiProblem(HttpStatus.valueOf(422), detail, List.of());
+    }
+
     public static ApiProblem unauthorized(String detail) {
         return new ApiProblem(HttpStatus.UNAUTHORIZED, detail, List.of());
     }

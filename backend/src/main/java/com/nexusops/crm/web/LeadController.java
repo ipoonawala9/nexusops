@@ -1,6 +1,8 @@
 package com.nexusops.crm.web;
 
+import com.nexusops.crm.ImportResult;
 import com.nexusops.crm.LeadConversionService;
+import com.nexusops.crm.LeadImportService;
 import com.nexusops.crm.LeadQuery;
 import com.nexusops.crm.LeadService;
 import com.nexusops.crm.LeadSource;
@@ -11,6 +13,7 @@ import com.nexusops.crm.web.CrmDtos.LeadStatusRequest;
 import com.nexusops.shared.web.PageResponse;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -19,8 +22,10 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/v1/leads")
@@ -28,10 +33,12 @@ class LeadController {
 
     private final LeadService leads;
     private final LeadConversionService conversions;
+    private final LeadImportService imports;
 
-    LeadController(LeadService leads, LeadConversionService conversions) {
+    LeadController(LeadService leads, LeadConversionService conversions, LeadImportService imports) {
         this.leads = leads;
         this.conversions = conversions;
+        this.imports = imports;
     }
 
     @GetMapping
@@ -72,5 +79,11 @@ class LeadController {
     @PreAuthorize("hasAuthority('crm.lead.manage')")
     LeadView convert(@PathVariable UUID id, @RequestBody ConversionRequest request) {
         return conversions.convert(id, request.command(), request.version());
+    }
+
+    @PostMapping(path = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAuthority('crm.lead.manage')")
+    ImportResult importLeads(@RequestPart(name = "file", required = false) MultipartFile file) {
+        return imports.importLeads(file);
     }
 }
