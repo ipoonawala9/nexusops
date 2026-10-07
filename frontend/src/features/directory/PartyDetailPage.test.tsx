@@ -81,6 +81,19 @@ describe('PartyDetailPage', () => {
     })
   })
 
+  it('keeps the current organization when the options load after the dialog opens', async () => {
+    const { server, user } = setup(GRACE)
+    server
+      .on('GET /parties', { body: pageOf([aSummary(), aSummary({ id: 'p-beta', name: 'Beta' })]) })
+      .on('PUT /persons/:id', { body: { ...GRACE, version: 1 } })
+    await user.click(await screen.findByRole('button', { name: 'Edit' }))
+    const dialog = await screen.findByRole('dialog')
+    await within(dialog).findByRole('option', { name: 'Beta' })
+    expect(within(dialog).getByLabelText('Organization')).toHaveValue('p-acme')
+    await user.click(within(dialog).getByRole('button', { name: 'Save changes' }))
+    expect(server.callsTo('PUT /persons/:id')[0].body).toMatchObject({ organizationId: 'p-acme' })
+  })
+
   it('edits with the loaded version', async () => {
     const { server, user } = setup(GRACE)
     server.on('PUT /persons/:id', { body: { ...GRACE, name: 'Grace B. Hopper', version: 1 } })

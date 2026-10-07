@@ -136,14 +136,14 @@ export function TaskDialog({
               {...form.register('assigneeId')}
             >
               <option value="">Unassigned</option>
-              {current && !options.some((o) => o.id === current.id) && (
-                <option value={current.id}>{current.name}</option>
-              )}
-              {options.map((member) => (
-                <option key={member.id} value={member.id}>
-                  {member.name}
-                </option>
-              ))}
+              {current && <option value={current.id}>{current.name}</option>}
+              {options
+                .filter((member) => member.id !== current?.id)
+                .map((member) => (
+                  <option key={member.id} value={member.id}>
+                    {member.name}
+                  </option>
+                ))}
             </NativeSelect>
           </Field>
           <FormError message={formError ?? (assignees.isError ? problemMessage(assignees.error) : null)} />

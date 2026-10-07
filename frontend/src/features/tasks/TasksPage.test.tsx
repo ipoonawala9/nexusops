@@ -92,6 +92,17 @@ describe('TasksPage', () => {
     expect(server.callsTo('PUT /tasks/:id')[0].body).toMatchObject({ title: 'Send revised quote', version: 0 })
   })
 
+  it('keeps the current assignee when the assignee list loads after the dialog opens', async () => {
+    const { server, user } = setup()
+    server.on('PUT /tasks/:id', { body: aTask({ version: 1 }) })
+    await user.click(await screen.findByRole('button', { name: 'Edit Send quote' }))
+    const dialog = await screen.findByRole('dialog')
+    await within(dialog).findByRole('option', { name: 'Grace Hopper' })
+    expect(within(dialog).getByLabelText('Assignee')).toHaveValue('u-ada')
+    await user.click(within(dialog).getByRole('button', { name: 'Save changes' }))
+    expect(server.callsTo('PUT /tasks/:id')[0].body).toMatchObject({ assigneeId: 'u-ada' })
+  })
+
   it('changes status from the list; readers can only move their own tasks', async () => {
     const { server, user } = setup(['collaboration.task.read'])
     server.on('POST /tasks/:id/status', { body: aTask({ status: 'DONE' }) })

@@ -107,14 +107,14 @@ export function PersonFormDialog({
               {...form.register('organizationId')}
             >
               <option value="">No organization</option>
-              {current && !options.some((o) => o.id === current.id) && (
-                <option value={current.id}>{current.name}</option>
-              )}
-              {options.map((organization) => (
-                <option key={organization.id} value={organization.id}>
-                  {organization.name}
-                </option>
-              ))}
+              {current && <option value={current.id}>{current.name}</option>}
+              {options
+                .filter((organization) => organization.id !== current?.id)
+                .map((organization) => (
+                  <option key={organization.id} value={organization.id}>
+                    {organization.name}
+                  </option>
+                ))}
             </NativeSelect>
           </Field>
           <div className="grid gap-3 sm:grid-cols-2">
