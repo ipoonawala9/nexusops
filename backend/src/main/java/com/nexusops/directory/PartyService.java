@@ -21,6 +21,7 @@ import com.nexusops.shared.web.Paging;
 import jakarta.persistence.criteria.Root;
 import jakarta.persistence.criteria.Subquery;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -174,6 +175,17 @@ public class PartyService {
                 p.getOrganizationId() == null ? null
                         : new PartyRef(p.getOrganizationId(), organizationNames.get(p.getOrganizationId())),
                 activeRoles.getOrDefault(p.getId(), List.of()), p.isArchived()));
+    }
+
+    /** Tenant-scoped lookup for other modules; unknown ids (or other tenants') are simply absent. */
+    @Transactional(readOnly = true)
+    public Map<UUID, PartyBrief> briefs(Collection<UUID> ids) {
+        TenantContext.requireTenantId();
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+        return parties.findAllById(Set.copyOf(ids)).stream().collect(Collectors.toMap(Party::getId,
+                p -> new PartyBrief(p.getId(), p.getKind(), p.getName(), p.getOrganizationId(), p.isArchived())));
     }
 
     /** Idempotent: archiving an archived party changes nothing. */
