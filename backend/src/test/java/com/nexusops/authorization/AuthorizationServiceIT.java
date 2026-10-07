@@ -48,7 +48,7 @@ class AuthorizationServiceIT extends IntegrationTestSupport {
 
         Set<String> withCrm = TenantContext.callAs(tenantA,
                 () -> authorization.effectivePermissions(List.of(owner), List.of("CRM")));
-        assertThat(withCrm).contains("crm.customer.read", "crm.customer.delete").doesNotContain("hr.employee.read");
+        assertThat(withCrm).contains("crm.customer.read", "crm.lead.manage").doesNotContain("hr.employee.read");
     }
 
     @Test

@@ -73,7 +73,9 @@ public class TenantDirectory {
             throw slugTaken();
         }
         try {
-            return tenants.saveAndFlush(Tenant.register(id, slug, name)).toSummary();
+            TenantSummary created = tenants.saveAndFlush(Tenant.register(id, slug, name)).toSummary();
+            events.publishEvent(new WorkspaceRegistered(id));
+            return created;
         } catch (DataIntegrityViolationException race) {
             throw slugTaken();
         }

@@ -24,7 +24,8 @@ class TenantSettingsIT extends IntegrationTestSupport {
     void register() {
         tenantId = Ids.newId();
         slug = "set-" + tenantId.toString().substring(28);
-        directory.register(tenantId, "  " + slug.toUpperCase() + " ", "Settings Co");
+        // like SignupService, register with the new workspace bound: WorkspaceRegistered listeners seed its defaults
+        TenantContext.runAs(tenantId, () -> directory.register(tenantId, "  " + slug.toUpperCase() + " ", "Settings Co"));
     }
 
     @Test
