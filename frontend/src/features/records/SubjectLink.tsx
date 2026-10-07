@@ -5,6 +5,8 @@ import type { SubjectRef } from '@/lib/api/types'
 export function subjectPath(type: string, id: string): string | null {
   if (type === 'PARTY') return `/app/directory/${id}`
   if (type === 'PRODUCT') return `/app/products/${id}`
+  if (type === 'LEAD') return `/app/crm/leads/${id}`
+  if (type === 'OPPORTUNITY') return `/app/crm/opportunities/${id}`
   return null
 }
 

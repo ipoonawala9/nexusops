@@ -211,7 +211,7 @@ export interface ProductView {
 }
 
 /** Record types activities, tasks and documents attach to (server SubjectResolver codes). */
-export type SubjectType = 'PARTY' | 'PRODUCT'
+export type SubjectType = 'PARTY' | 'PRODUCT' | 'LEAD' | 'OPPORTUNITY'
 
 export interface MemberRef {
   id: string
@@ -238,6 +238,8 @@ export interface ActivityView {
   occurredAt: string
   author: MemberRef | null
   createdAt: string
+  /** The record the activity is on; its label is null when the viewer can't read it. */
+  subject: SubjectRef | null
 }
 
 export type TaskStatus = 'OPEN' | 'IN_PROGRESS' | 'DONE' | 'CANCELLED'
@@ -275,4 +277,178 @@ export interface DocumentView {
   sha256: string
   uploadedBy: MemberRef | null
   createdAt: string
+}
+
+export type StageKind = 'OPEN' | 'WON' | 'LOST'
+
+export interface StageView {
+  id: string
+  name: string
+  probability: number
+  kind: StageKind
+  position: number
+  version: number
+}
+
+export interface StageRef {
+  id: string
+  name: string
+  kind: StageKind
+  probability: number
+}
+
+/** A sum in one currency: amounts in different currencies are never added. */
+export interface MoneyTotal {
+  currency: string
+  amount: number
+}
+
+export type LeadSource =
+  | 'WEBSITE'
+  | 'REFERRAL'
+  | 'WALK_IN'
+  | 'PHONE'
+  | 'EMAIL'
+  | 'SOCIAL'
+  | 'EVENT'
+  | 'OTHER'
+export type LeadStatus = 'NEW' | 'CONTACTED' | 'QUALIFIED' | 'DISQUALIFIED' | 'CONVERTED'
+
+export interface LeadView {
+  id: string
+  name: string
+  firstName: string | null
+  lastName: string | null
+  companyName: string | null
+  jobTitle: string | null
+  email: string | null
+  phone: string | null
+  source: LeadSource
+  status: LeadStatus
+  owner: MemberRef | null
+  estimatedValue: number | null
+  currency: string | null
+  description: string | null
+  disqualifyReason: string | null
+  disqualifiedAt: string | null
+  convertedAt: string | null
+  convertedPerson: PartyRef | null
+  convertedOrganization: PartyRef | null
+  convertedOpportunityId: string | null
+  createdBy: MemberRef | null
+  createdAt: string
+  updatedAt: string
+  version: number
+}
+
+export type OpportunityStatus = StageKind
+
+export interface OpportunityView {
+  id: string
+  name: string
+  account: PartyRef | null
+  contact: PartyRef | null
+  stage: StageRef
+  status: OpportunityStatus
+  amount: number | null
+  currency: string | null
+  expectedCloseOn: string | null
+  owner: MemberRef | null
+  leadId: string | null
+  description: string | null
+  lostReason: string | null
+  closedAt: string | null
+  createdBy: MemberRef | null
+  createdAt: string
+  updatedAt: string
+  version: number
+}
+
+export interface OpportunitySummary {
+  id: string
+  name: string
+  account: PartyRef | null
+  stage: StageRef
+  amount: number | null
+  currency: string | null
+  expectedCloseOn: string | null
+  owner: MemberRef | null
+  version: number
+}
+
+export interface BoardColumn {
+  stage: StageView
+  count: number
+  totals: MoneyTotal[]
+  weighted: MoneyTotal[]
+  opportunities: OpportunitySummary[]
+}
+
+export interface BoardView {
+  columns: BoardColumn[]
+}
+
+export interface CustomerRow {
+  party: PartySummary
+  openCount: number
+  openValue: MoneyTotal[]
+  wonCount: number
+  wonValue: MoneyTotal[]
+}
+
+export interface CustomerSummary {
+  party: PartyView
+  openCount: number
+  openValue: MoneyTotal[]
+  weightedValue: MoneyTotal[]
+  wonCount: number
+  wonValue: MoneyTotal[]
+  lostCount: number
+  leadCount: number
+}
+
+export interface LeadStats {
+  open: Partial<Record<LeadStatus, number>>
+  newLast30Days: number
+  converted90Days: number
+  disqualified90Days: number
+  /** 0–1, null when no lead closed in the last 90 days */
+  conversionRate: number | null
+}
+
+export interface StageStats {
+  stage: StageView
+  count: number
+  totals: MoneyTotal[]
+  weighted: MoneyTotal[]
+}
+
+export interface ClosedStats {
+  count: number
+  totals: MoneyTotal[]
+}
+
+export interface PipelineStats {
+  stages: StageStats[]
+  wonThisMonth: ClosedStats
+  lostThisMonth: ClosedStats
+  closingSoon: OpportunitySummary[]
+}
+
+/** A section is null when the viewer can't read it. */
+export interface DashboardView {
+  leads: LeadStats | null
+  pipeline: PipelineStats | null
+}
+
+export interface SearchHit {
+  type: string
+  id: string
+  label: string
+  detail: string | null
+  archived: boolean
+}
+
+export interface ImportResult {
+  imported: number
 }

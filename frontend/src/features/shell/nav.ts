@@ -43,6 +43,7 @@ export const SETTINGS_TABS: Array<{ to: string; label: string; anyOf: Permission
   { to: '/app/settings/users', label: 'Users', anyOf: [PERMISSIONS.userRead] },
   { to: '/app/settings/roles', label: 'Roles', anyOf: [PERMISSIONS.roleRead] },
   { to: '/app/settings/modules', label: 'Modules', anyOf: [PERMISSIONS.settingsRead] },
+  { to: '/app/settings/pipeline', label: 'Pipeline', anyOf: [PERMISSIONS.pipelineManage] },
 ]
 
 export function firstSettingsPath(can: (...codes: PermissionCode[]) => boolean): string | null {

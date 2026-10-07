@@ -1,5 +1,7 @@
 import type { RouteObject } from 'react-router'
 import { EmptyState } from '@/components/states'
+import { CrmLayout } from '@/features/crm/CrmLayout'
+import { crmChildren } from '@/features/crm/routes'
 import { AuditPage } from '@/features/audit/AuditPage'
 import { PERMISSIONS, RequirePermission } from '@/features/auth/permissions'
 import { DirectoryPage } from '@/features/directory/DirectoryPage'
@@ -8,6 +10,7 @@ import { ProductDetailPage } from '@/features/products/ProductDetailPage'
 import { ProductsPage } from '@/features/products/ProductsPage'
 import { TasksPage } from '@/features/tasks/TasksPage'
 import { ModulesSettingsPage } from '@/features/settings/ModulesSettingsPage'
+import { PipelineSettingsPage } from '@/features/settings/PipelineSettingsPage'
 import { RoleDetailPage } from '@/features/settings/roles/RoleDetailPage'
 import { RolesPage } from '@/features/settings/roles/RolesPage'
 import { SettingsLayout } from '@/features/settings/SettingsLayout'
@@ -76,6 +79,14 @@ export const settingsChildren: RouteObject[] = [
     ),
   },
   {
+    path: 'pipeline',
+    element: (
+      <RequirePermission anyOf={[PERMISSIONS.pipelineManage]}>
+        <PipelineSettingsPage />
+      </RequirePermission>
+    ),
+  },
+  {
     path: '*',
     element: <EmptyState title="Settings page not found" description="Pick a section above." />,
   },
@@ -124,7 +135,7 @@ export const appChildren: RouteObject[] = [
       </RequirePermission>
     ),
   },
-  modulePage('crm', 'CRM'),
+  { path: 'crm', element: <CrmLayout />, children: crmChildren },
   modulePage('inventory', 'INVENTORY'),
   modulePage('helpdesk', 'HELPDESK'),
   modulePage('hrms', 'HRMS'),
