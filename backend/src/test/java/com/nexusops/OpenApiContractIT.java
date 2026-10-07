@@ -33,7 +33,14 @@ class OpenApiContractIT extends IntegrationTestSupport {
                 "\"/api/v1/parties\"", "\"/api/v1/parties/{id}\"", "\"/api/v1/parties/{id}/roles/{role}\"",
                 "\"/api/v1/persons\"", "\"/api/v1/organizations\"", "\"/api/v1/products\"", "\"/api/v1/products/{id}\"",
                 "\"/api/v1/activities\"", "\"/api/v1/tasks\"", "\"/api/v1/tasks/{id}/status\"",
-                "\"/api/v1/tasks/assignees\"", "\"/api/v1/documents\"", "\"/api/v1/documents/{id}/content\"");
+                "\"/api/v1/tasks/assignees\"", "\"/api/v1/documents\"", "\"/api/v1/documents/{id}/content\"",
+                "\"/api/v1/leads\"", "\"/api/v1/leads/{id}\"", "\"/api/v1/leads/{id}/status\"",
+                "\"/api/v1/leads/{id}/convert\"", "\"/api/v1/leads/import\"", "\"/api/v1/opportunities\"",
+                "\"/api/v1/opportunities/{id}\"", "\"/api/v1/opportunities/{id}/stage\"",
+                "\"/api/v1/crm/pipeline/stages\"", "\"/api/v1/crm/pipeline/stages/{id}\"",
+                "\"/api/v1/crm/pipeline/stages/order\"", "\"/api/v1/crm/pipeline/board\"",
+                "\"/api/v1/crm/customers\"", "\"/api/v1/crm/customers/{partyId}\"", "\"/api/v1/crm/dashboard\"",
+                "\"/api/v1/crm/owners\"", "\"/api/v1/search\"");
         // hierarchy rules (ADR-0004): no changing a role, or disabling/re-enabling/re-roling a user, stronger than the caller
         for (String op : new String[] {"$.paths['/api/v1/roles/{id}'].patch", "$.paths['/api/v1/roles/{id}'].delete",
                 "$.paths['/api/v1/roles/{id}/permissions'].put", "$.paths['/api/v1/users/{id}'].patch",

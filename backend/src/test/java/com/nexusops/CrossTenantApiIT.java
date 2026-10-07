@@ -45,6 +45,7 @@ class CrossTenantApiIT extends IntegrationTestSupport {
     UUID userB;
     UUID invitationB;
     UUID orgB, personB, productB, taskB, documentB, userBId;
+    UUID leadB, opportunityB, stageB;
 
     @BeforeEach
     void twoTenants() throws Exception {
@@ -78,6 +79,14 @@ class CrossTenantApiIT extends IntegrationTestSupport {
                         .param("subjectType", "PARTY").param("subjectId", orgB.toString())));
         userBId = OwnerJdbc.ownerAs(b.tenantId()).queryForObject("select id from users where email = ?", UUID.class,
                 b.email());
+        as(ownerA, put("/api/v1/tenant/modules/CRM").contentType(MediaType.APPLICATION_JSON).content("{\"enabled\":true}"))
+                .andExpect(status().isOk());
+        leadB = com.nexusops.support.Api.id(apiB.post("/api/v1/leads", "{\"companyName\":\"Beta prospect\"}"));
+        opportunityB = com.nexusops.support.Api.id(apiB.post("/api/v1/opportunities",
+                "{\"name\":\"Beta deal\",\"accountId\":\"" + orgB + "\"}"));
+        stageB = UUID.fromString(com.nexusops.support.Api.read(apiB.get("/api/v1/crm/pipeline/stages"), "$[0].id"));
+        apiB.post("/api/v1/activities", "{\"subjectType\":\"OPPORTUNITY\",\"subjectId\":\"" + opportunityB
+                + "\",\"type\":\"NOTE\",\"summary\":\"B deal secret\"}").andExpect(status().isCreated());
     }
 
     private ResultActions as(Session s,
@@ -140,9 +149,9 @@ class CrossTenantApiIT extends IntegrationTestSupport {
         as(ownerA, get("/api/v1/audit-events").param("size", "100"))
                 .andExpect(jsonPath("$.items[*].entityId", Matchers.not(Matchers.hasItem(roleB.toString()))))
                 .andExpect(jsonPath("$.items[*].entityId", Matchers.not(Matchers.hasItem(invitationB.toString()))));
-        as(ownerA, get("/api/v1/tenant/modules")).andExpect(jsonPath("$[?(@.code == 'CRM')].enabled", Matchers.contains(false)));
+        as(ownerA, get("/api/v1/tenant/modules")).andExpect(jsonPath("$[?(@.code == 'CRM')].enabled", Matchers.contains(true)));
         as(ownerA, get("/api/v1/me")).andExpect(jsonPath("$.tenant.slug").value(a.slug()))
-                .andExpect(jsonPath("$.modules", Matchers.empty()));
+                .andExpect(jsonPath("$.modules", Matchers.contains("CRM")));
     }
 
     @Test
@@ -227,5 +236,53 @@ class CrossTenantApiIT extends IntegrationTestSupport {
         as(ownerA, get("/api/v1/tasks/assignees")).andExpect(jsonPath("$[*].id", Matchers.not(Matchers.hasItem(userBId.toString()))));
         // positive control
         as(ownerB, get("/api/v1/parties")).andExpect(jsonPath("$.total").value(2));
+    }
+
+    @Test
+    void crmRecordsOfAnotherTenantAreInvisibleAndUntouchable() throws Exception {
+        as(ownerA, get("/api/v1/leads/" + leadB)).andExpect(status().isNotFound());
+        as(ownerA, json(put("/api/v1/leads/" + leadB), "{\"lastName\":\"Hacked\",\"version\":0}")).andExpect(status().isNotFound());
+        as(ownerA, json(post("/api/v1/leads/" + leadB + "/status"), "{\"status\":\"CONTACTED\",\"version\":0}"))
+                .andExpect(status().isNotFound());
+        as(ownerA, json(post("/api/v1/leads/" + leadB + "/convert"), "{\"organization\":{\"name\":\"X\"},\"version\":0}"))
+                .andExpect(status().isNotFound());
+        as(ownerA, get("/api/v1/opportunities/" + opportunityB)).andExpect(status().isNotFound());
+        as(ownerA, json(put("/api/v1/opportunities/" + opportunityB), "{\"name\":\"H\",\"accountId\":\"" + orgB
+                + "\",\"version\":0}")).andExpect(status().isNotFound());
+        as(ownerA, json(post("/api/v1/opportunities/" + opportunityB + "/stage"), "{\"stageId\":\"" + stageB
+                + "\",\"version\":0}")).andExpect(status().isNotFound());
+        as(ownerA, json(put("/api/v1/crm/pipeline/stages/" + stageB), "{\"name\":\"H\",\"probability\":1,\"version\":0}"))
+                .andExpect(status().isNotFound());
+        as(ownerA, delete("/api/v1/crm/pipeline/stages/" + stageB)).andExpect(status().isNotFound());
+        as(ownerA, get("/api/v1/crm/customers/" + orgB)).andExpect(status().isNotFound());
+        as(ownerA, get("/api/v1/activities").param("subjectType", "OPPORTUNITY").param("subjectId", opportunityB.toString()))
+                .andExpect(status().isNotFound());
+
+        // references to another tenant's rows inside request bodies are refused
+        as(ownerA, json(post("/api/v1/opportunities"), "{\"name\":\"X\",\"accountId\":\"" + orgB + "\"}"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("accountId"));
+        String orgA = JsonPath.read(as(ownerA, json(post("/api/v1/organizations"), "{\"name\":\"Alpha\"}"))
+                .andReturn().getResponse().getContentAsString(), "$.id");
+        as(ownerA, json(post("/api/v1/opportunities"), "{\"name\":\"X\",\"accountId\":\"" + orgA + "\",\"stageId\":\""
+                + stageB + "\"}")).andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("stageId"));
+        as(ownerA, json(post("/api/v1/leads"), "{\"lastName\":\"X\",\"ownerId\":\"" + userBId + "\"}"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("ownerId"));
+        String leadA = JsonPath.read(as(ownerA, json(post("/api/v1/leads"), "{\"lastName\":\"Alpha lead\"}"))
+                .andReturn().getResponse().getContentAsString(), "$.id");
+        as(ownerA, json(post("/api/v1/leads/" + leadA + "/convert"), "{\"organization\":{\"existingId\":\"" + orgB
+                + "\"},\"version\":0}")).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[0].field").value("organization.existingId"));
+
+        // lists, search, board and dashboard never contain B's rows
+        as(ownerA, get("/api/v1/leads")).andExpect(jsonPath("$.items[*].name", Matchers.not(Matchers.hasItem("Beta prospect"))));
+        as(ownerA, get("/api/v1/opportunities")).andExpect(jsonPath("$.total").value(0));
+        as(ownerA, get("/api/v1/search").param("q", "beta")).andExpect(jsonPath("$.length()").value(0));
+        as(ownerA, get("/api/v1/crm/pipeline/board")).andExpect(jsonPath("$.columns[0].count").value(0));
+        as(ownerA, get("/api/v1/crm/customers")).andExpect(jsonPath("$.total").value(0));
+
+        // tenant B is untouched
+        as(ownerB, get("/api/v1/leads/" + leadB)).andExpect(jsonPath("$.status").value("NEW"));
+        as(ownerB, get("/api/v1/opportunities/" + opportunityB)).andExpect(jsonPath("$.name").value("Beta deal"))
+                .andExpect(jsonPath("$.stage.id").value(stageB.toString()));
     }
 }
