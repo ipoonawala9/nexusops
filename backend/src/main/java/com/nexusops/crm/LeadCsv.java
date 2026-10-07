@@ -46,8 +46,8 @@ final class LeadCsv {
         if (headerIndex == records.size()) {
             throw fileError("The file is empty.");
         }
-        List<String> header = records.get(headerIndex).stream()
-                .map(h -> h.strip().toLowerCase(Locale.ROOT).replace(' ', '_')).toList();
+        List<String> header = trimTrailingBlanks(records.get(headerIndex).stream()
+                .map(h -> h.strip().toLowerCase(Locale.ROOT).replace(' ', '_')).toList());
         checkHeader(header);
         List<Row> rows = new ArrayList<>();
         // Blank lines are skipped but still counted, so row numbers match the spreadsheet the user sees.
@@ -60,7 +60,10 @@ final class LeadCsv {
             for (int c = 0; c < Math.min(cells.size(), header.size()); c++) {
                 values.put(header.get(c), cells.get(c));
             }
-            rows.add(new Row(i + 1, values, cells.size() > header.size()));
+            // Spreadsheet exports often pad rows with empty cells; only extra cells holding text count.
+            boolean tooMany = cells.size() > header.size()
+                    && !blank(cells.subList(header.size(), cells.size()));
+            rows.add(new Row(i + 1, values, tooMany));
         }
         if (rows.size() > MAX_ROWS) {
             throw fileError("Import at most " + MAX_ROWS + " leads at a time.");
@@ -72,7 +75,7 @@ final class LeadCsv {
         Set<String> seen = new LinkedHashSet<>();
         List<String> unknown = new ArrayList<>();
         for (String column : header) {
-            if (!seen.add(column)) {
+            if (!column.isEmpty() && !seen.add(column)) {
                 throw fileError("The column " + column + " appears more than once.");
             }
             if (!COLUMNS.contains(column)) {
@@ -134,6 +137,15 @@ final class LeadCsv {
             records.add(fields);
         }
         return records;
+    }
+
+    /** Excel and Sheets pad exports with empty trailing header cells; those are not columns. */
+    private static List<String> trimTrailingBlanks(List<String> header) {
+        int end = header.size();
+        while (end > 0 && header.get(end - 1).isEmpty()) {
+            end--;
+        }
+        return header.subList(0, end);
     }
 
     private static boolean blank(List<String> record) {

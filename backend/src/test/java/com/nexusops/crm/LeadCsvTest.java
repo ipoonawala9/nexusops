@@ -51,6 +51,23 @@ class LeadCsvTest {
     }
 
     @Test
+    void ignoresTrailingEmptyColumns() {
+        List<LeadCsv.Row> rows = parse("company,email,,\r\nAcme,a@acme.test,,\r\nBeta,,,\r\n");
+        assertThat(rows).hasSize(2);
+        assertThat(rows.getFirst().values()).containsOnlyKeys("company", "email");
+        assertThat(rows.getFirst().tooManyValues()).isFalse();
+        assertThat(rows.get(1).tooManyValues()).isFalse();
+        assertThat(parse("company\nAcme,\n").getFirst().tooManyValues()).isFalse();
+    }
+
+    @Test
+    void stillFlagsExtraNonBlankValuesAndMiddleBlankHeaders() {
+        assertThat(parse("company,email,,\nAcme,a@acme.test,,x\n").getFirst().tooManyValues()).isTrue();
+        refused("company,,email,,\nA,,b,,\n".getBytes(StandardCharsets.UTF_8), "(blank)");
+        refused("company,,,email\nA,,,b\n".getBytes(StandardCharsets.UTF_8), "(blank)");
+    }
+
+    @Test
     void refusesBadFiles() {
         refused("".getBytes(StandardCharsets.UTF_8), "empty");
         refused("company,colour,size\nA,red,L\n".getBytes(StandardCharsets.UTF_8), "colour, size");

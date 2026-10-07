@@ -72,6 +72,12 @@ class LeadImportIT extends IntegrationTestSupport {
     }
 
     @Test
+    void importsAFileWithTrailingEmptyColumns() throws Exception {
+        upload(owner, "company,email,,\r\nAcme,a@acme.test,,\r\n").andExpect(status().isOk())
+                .andExpect(jsonPath("$.imported").value(1));
+    }
+
+    @Test
     void anyInvalidRowRejectsTheWholeFile() throws Exception {
         String csv = "first_name,company,email,estimated_value,source\n"
                 + "Grace,Acme,grace@acme.test,10,WEBSITE\n"
