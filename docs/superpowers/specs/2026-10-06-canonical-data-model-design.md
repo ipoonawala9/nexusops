@@ -164,3 +164,4 @@ directory fact.
 - `grant_to_system_roles(text[])` (V9) is the one way migrations grant new permission codes to existing workspaces.
 - The activity list route requires authentication only. Its authorization is the subject's read permission.
 - Task and person titles collapse internal whitespace, so assignment-email subjects stay single-line.
+- V14 closes V0_2's no-op default-privilege revoke; a test asserts the runtime role can execute no owner function.
