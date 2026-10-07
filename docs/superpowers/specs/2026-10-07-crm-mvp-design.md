@@ -126,3 +126,15 @@ give a 400 field error (`stageId`, `accountId`, `contactId`, `ownerId`) or 404 o
 - **E2E:** Playwright journey: enable CRM → create a lead → qualify → convert with a duplicate organization refused,
   then linked to the existing one, creating an opportunity → move it through the board to Won → the account appears in
   Customers with the won value and its Customer 360 timeline shows the lead's note → the header search finds the lead.
+
+## 8. Implementation deltas (from planning)
+
+- `GET /api/v1/crm/owners?q=` (needs `crm.lead.manage` or `crm.opportunity.manage`) lists the members who can own
+  leads and opportunities; `/tasks/assignees` needs a task permission.
+- `GET /leads` takes `partyId` (leads converted into that person or organization), for Customer 360.
+- Leads also store `disqualified_at`, so the dashboard's 90-day conversion rate uses real close times.
+- A lead needs a first name, a last name or a company (directory persons need only a first name).
+- `ownerId` null means the creator on create and unassigned on update.
+- `ensureCustomer` leaves archived parties alone, so a win never fails because the account was archived.
+- Conversion reports directory field errors as `person.*` / `organization.*` / `opportunity.*`, and a duplicate
+  conflict adds `party: "person" | "organization"`.
