@@ -62,7 +62,9 @@ export function TaskDialog({
       assigneeId: task?.assignee?.id ?? '',
     },
   })
-  const target = subject ?? (task?.subject ? { ...task.subject, label: task.subject.label ?? 'a record' } : undefined)
+  const target =
+    subject ??
+    (task?.subject ? { ...task.subject, label: task.subject.label ?? 'a record' } : undefined)
   const dueError = form.formState.errors.dueOn?.message
   const assigneeError = form.formState.errors.assigneeId?.message
   const current = task?.assignee
@@ -146,7 +148,9 @@ export function TaskDialog({
                 ))}
             </NativeSelect>
           </Field>
-          <FormError message={formError ?? (assignees.isError ? problemMessage(assignees.error) : null)} />
+          <FormError
+            message={formError ?? (assignees.isError ? problemMessage(assignees.error) : null)}
+          />
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={onClose}>
               Cancel

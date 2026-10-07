@@ -70,8 +70,12 @@ export function ProductDetailPage() {
               <ArchiveControls
                 name={p.name}
                 archived={archived}
-                onArchive={async () => stored(await api.post<ProductView>(`/products/${p.id}/archive`))}
-                onRestore={async () => stored(await api.post<ProductView>(`/products/${p.id}/restore`))}
+                onArchive={async () =>
+                  stored(await api.post<ProductView>(`/products/${p.id}/archive`))
+                }
+                onRestore={async () =>
+                  stored(await api.post<ProductView>(`/products/${p.id}/restore`))
+                }
               />
             </>
           )
@@ -92,11 +96,18 @@ export function ProductDetailPage() {
             <dt className="text-muted-foreground">Unit</dt>
             <dd>{p.unit}</dd>
             <dt className="text-muted-foreground">List price</dt>
-            <dd>{p.listPrice != null && p.currency ? formatMoney(p.listPrice, p.currency) : '—'}</dd>
+            <dd>
+              {p.listPrice != null && p.currency ? formatMoney(p.listPrice, p.currency) : '—'}
+            </dd>
           </dl>
         </CardContent>
       </Card>
-      <SubjectTasksPanel subjectType="PRODUCT" subjectId={p.id} label={p.name} archived={archived} />
+      <SubjectTasksPanel
+        subjectType="PRODUCT"
+        subjectId={p.id}
+        label={p.name}
+        archived={archived}
+      />
       <ActivityPanel subjectType="PRODUCT" subjectId={p.id} archived={archived} />
       <DocumentsPanel subjectType="PRODUCT" subjectId={p.id} archived={archived} />
       {editing && (

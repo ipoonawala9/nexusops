@@ -32,17 +32,25 @@ describe('ProductDetailPage', () => {
     const { server, user } = setup()
     server
       .on('PUT /products/:id', { body: aProduct({ name: 'Widget XL', version: 1 }) })
-      .on('POST /products/:id/archive', { body: aProduct({ name: 'Widget XL', archivedAt: '2026-10-06T00:00:00Z' }) })
+      .on('POST /products/:id/archive', {
+        body: aProduct({ name: 'Widget XL', archivedAt: '2026-10-06T00:00:00Z' }),
+      })
     await user.click(await screen.findByRole('button', { name: 'Edit' }))
     const dialog = await screen.findByRole('dialog')
     const name = within(dialog).getByLabelText('Name')
     await user.clear(name)
     await user.type(name, 'Widget XL')
     await user.click(within(dialog).getByRole('button', { name: 'Save changes' }))
-    expect(server.callsTo('PUT /products/:id')[0].body).toMatchObject({ name: 'Widget XL', version: 0, listPrice: 12.5 })
+    expect(server.callsTo('PUT /products/:id')[0].body).toMatchObject({
+      name: 'Widget XL',
+      version: 0,
+      listPrice: 12.5,
+    })
     expect(await screen.findByRole('heading', { name: 'Widget XL' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Archive' }))
-    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Archive' }))
+    await user.click(
+      within(await screen.findByRole('dialog')).getByRole('button', { name: 'Archive' }),
+    )
     expect(await screen.findByText(/This product is archived/)).toBeInTheDocument()
   })
 })

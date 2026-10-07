@@ -33,9 +33,15 @@ describe('DocumentsPanel', () => {
 
   it('uploads a file for the subject', async () => {
     const { server, user } = setup()
-    server.on('POST /documents', { status: 201, body: aDocument({ id: 'd-2', fileName: 'notes.txt' }) })
+    server.on('POST /documents', {
+      status: 201,
+      body: aDocument({ id: 'd-2', fileName: 'notes.txt' }),
+    })
     const panel = within(await screen.findByRole('region', { name: 'Documents' }))
-    await user.upload(panel.getByLabelText('Upload file'), new File(['hi'], 'notes.txt', { type: 'text/plain' }))
+    await user.upload(
+      panel.getByLabelText('Upload file'),
+      new File(['hi'], 'notes.txt', { type: 'text/plain' }),
+    )
     const form = server.callsTo('POST /documents')[0].form
     expect(form?.get('subjectType')).toBe('PARTY')
     expect(form?.get('subjectId')).toBe('p-acme')
@@ -57,7 +63,10 @@ describe('DocumentsPanel', () => {
     const { server, user } = setup()
     server.on('GET /documents/:id/content', {
       raw: 'pdf-bytes',
-      headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename="contract.pdf"' },
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': 'attachment; filename="contract.pdf"',
+      },
     })
     const panel = within(await screen.findByRole('region', { name: 'Documents' }))
     await user.click(await panel.findByRole('button', { name: 'Download contract.pdf' }))
@@ -70,7 +79,9 @@ describe('DocumentsPanel', () => {
     server.on('DELETE /documents/:id', { status: 204 })
     const panel = within(await screen.findByRole('region', { name: 'Documents' }))
     await user.click(await panel.findByRole('button', { name: 'Delete contract.pdf' }))
-    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Delete' }))
+    await user.click(
+      within(await screen.findByRole('dialog')).getByRole('button', { name: 'Delete' }),
+    )
     expect(server.callsTo('DELETE /documents/:id')[0].params.id).toBe('d-1')
   })
 

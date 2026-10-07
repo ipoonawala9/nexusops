@@ -28,7 +28,8 @@ export function SubjectTasksPanel({
   const canManage = can(PERMISSIONS.taskManage)
   const tasks = useQuery({
     queryKey: ['tasks', { subjectType, subjectId }],
-    queryFn: () => api.get<Page<TaskView>>(`/tasks?${toQuery({ subjectType, subjectId, size: 50 })}`),
+    queryFn: () =>
+      api.get<Page<TaskView>>(`/tasks?${toQuery({ subjectType, subjectId, size: 50 })}`),
     enabled: canRead,
   })
   if (!canRead) return null
@@ -52,7 +53,10 @@ export function SubjectTasksPanel({
       ) : (
         <ul className="divide-y rounded-lg border">
           {tasks.data.items.map((task) => (
-            <li key={task.id} className="flex flex-wrap items-center justify-between gap-2 p-3 text-sm">
+            <li
+              key={task.id}
+              className="flex flex-wrap items-center justify-between gap-2 p-3 text-sm"
+            >
               <div>
                 {canManage ? (
                   <button

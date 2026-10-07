@@ -80,7 +80,9 @@ export function OrganizationFormDialog({
     >
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{organization ? `Edit ${organization.name}` : 'New organization'}</DialogTitle>
+          <DialogTitle>
+            {organization ? `Edit ${organization.name}` : 'New organization'}
+          </DialogTitle>
           <DialogDescription>
             A company is one record, whether it buys from you, sells to you, or both.
           </DialogDescription>

@@ -82,7 +82,11 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
   ): Promise<Response> {
     const headers = new Headers(init.headers)
     if (token) headers.set('Authorization', `Bearer ${token}`)
-    if (init.body !== undefined && !(init.body instanceof FormData) && !headers.has('Content-Type')) {
+    if (
+      init.body !== undefined &&
+      !(init.body instanceof FormData) &&
+      !headers.has('Content-Type')
+    ) {
       headers.set('Content-Type', 'application/json')
     }
     headers.set('Accept', accept)

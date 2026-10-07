@@ -37,7 +37,10 @@ describe('TasksPage', () => {
   it('shows my open tasks by default with record links and overdue dates', async () => {
     const { server } = setup()
     const row = (await screen.findByText('Renew contract')).closest('tr') as HTMLElement
-    expect(within(row).getByRole('link', { name: 'Acme' })).toHaveAttribute('href', '/app/directory/p-acme')
+    expect(within(row).getByRole('link', { name: 'Acme' })).toHaveAttribute(
+      'href',
+      '/app/directory/p-acme',
+    )
     expect(within(row).getByText('Overdue')).toBeInTheDocument()
     expect(within(row).getByText('High')).toBeInTheDocument()
     expect(screen.getByText('Restricted record')).toBeInTheDocument()
@@ -89,7 +92,10 @@ describe('TasksPage', () => {
     await user.clear(title)
     await user.type(title, 'Send revised quote')
     await user.click(within(dialog).getByRole('button', { name: 'Save changes' }))
-    expect(server.callsTo('PUT /tasks/:id')[0].body).toMatchObject({ title: 'Send revised quote', version: 0 })
+    expect(server.callsTo('PUT /tasks/:id')[0].body).toMatchObject({
+      title: 'Send revised quote',
+      version: 0,
+    })
   })
 
   it('keeps the current assignee when the assignee list loads after the dialog opens', async () => {
@@ -110,7 +116,10 @@ describe('TasksPage', () => {
     expect(screen.queryByRole('button', { name: 'New task' })).not.toBeInTheDocument()
     expect(screen.getByLabelText('Status of Restricted one')).toBeDisabled()
     await user.selectOptions(screen.getByLabelText('Status of Send quote'), 'DONE')
-    expect(server.callsTo('POST /tasks/:id/status')[0]).toMatchObject({ params: { id: 't-1' }, body: { status: 'DONE' } })
+    expect(server.callsTo('POST /tasks/:id/status')[0]).toMatchObject({
+      params: { id: 't-1' },
+      body: { status: 'DONE' },
+    })
   })
 
   it('shows an empty state', async () => {

@@ -10,7 +10,17 @@ function setup(permissions: string[] = [...ALL_TENANT_PERMISSIONS]) {
   const server = fakeServer()
   signedIn(server, testProfile({ permissions }))
     .on('GET /products', {
-      body: pageOf([aProduct(), aProduct({ id: 'pr-setup', sku: 'S-1', name: 'Setup', kind: 'SERVICE', listPrice: null, currency: null })]),
+      body: pageOf([
+        aProduct(),
+        aProduct({
+          id: 'pr-setup',
+          sku: 'S-1',
+          name: 'Setup',
+          kind: 'SERVICE',
+          listPrice: null,
+          currency: null,
+        }),
+      ]),
     })
     .on('GET /products/:id', { body: aProduct() })
   return renderApp({ server, path: '/app/products' })
@@ -23,7 +33,10 @@ describe('ProductsPage', () => {
     expect(within(row).getByText('W-1')).toBeInTheDocument()
     expect(within(row).getByText('Goods')).toBeInTheDocument()
     expect(within(row).getByText(/12\.50/)).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Widget' })).toHaveAttribute('href', '/app/products/pr-widget')
+    expect(screen.getByRole('link', { name: 'Widget' })).toHaveAttribute(
+      'href',
+      '/app/products/pr-widget',
+    )
   })
 
   it('filters by kind, status and search', async () => {
@@ -43,7 +56,13 @@ describe('ProductsPage', () => {
     const { server, user, router } = setup()
     server.on('POST /products', (req) =>
       (req.body as { sku: string }).sku === 'W-1'
-        ? { status: 409, body: { detail: 'Another product already uses this SKU.', errors: [{ field: 'sku', message: 'Another product already uses this SKU.' }] } }
+        ? {
+            status: 409,
+            body: {
+              detail: 'Another product already uses this SKU.',
+              errors: [{ field: 'sku', message: 'Another product already uses this SKU.' }],
+            },
+          }
         : { status: 201, body: aProduct({ id: 'pr-new', sku: 'G-1', name: 'Gadget' }) },
     )
     await user.click(await screen.findByRole('button', { name: 'New product' }))
@@ -52,7 +71,9 @@ describe('ProductsPage', () => {
     await user.type(within(dialog).getByLabelText('Name'), 'Gadget')
     await user.type(within(dialog).getByLabelText('List price'), '9.99')
     await user.click(within(dialog).getByRole('button', { name: 'Create product' }))
-    expect(await within(dialog).findByText('Another product already uses this SKU.')).toBeInTheDocument()
+    expect(
+      await within(dialog).findByText('Another product already uses this SKU.'),
+    ).toBeInTheDocument()
     const sku = within(dialog).getByLabelText('SKU')
     await user.clear(sku)
     await user.type(sku, 'G-1')

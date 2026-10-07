@@ -30,7 +30,10 @@ describe('DirectoryPage', () => {
     const row = (await screen.findByRole('link', { name: 'Acme' })).closest('tr') as HTMLElement
     expect(within(row).getByText('Customer')).toBeInTheDocument()
     expect(within(row).getByText('Supplier')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Grace Hopper' })).toHaveAttribute('href', '/app/directory/p-grace')
+    expect(screen.getByRole('link', { name: 'Grace Hopper' })).toHaveAttribute(
+      'href',
+      '/app/directory/p-grace',
+    )
     expect(screen.getByText(/Person · Acme/)).toBeInTheDocument()
     const query = server.callsTo('GET /parties')[0].query
     expect(query.get('size')).toBe('20')
@@ -55,7 +58,9 @@ describe('DirectoryPage', () => {
   it('offers the employee filter and create buttons only with permission', async () => {
     setup(['directory.party.read'])
     await screen.findByRole('link', { name: 'Acme' })
-    const roles = within(screen.getByLabelText('Role')).getAllByRole('option').map((o) => o.textContent)
+    const roles = within(screen.getByLabelText('Role'))
+      .getAllByRole('option')
+      .map((o) => o.textContent)
     expect(roles).not.toContain('Employees')
     expect(screen.queryByRole('button', { name: 'New person' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'New organization' })).not.toBeInTheDocument()
@@ -109,7 +114,16 @@ describe('DirectoryPage', () => {
             status: 409,
             body: {
               detail: 'This looks like a record that already exists.',
-              duplicates: [{ id: 'p-acme', kind: 'ORGANIZATION', name: 'Acme', email: null, domain: 'acme.test', archived: true }],
+              duplicates: [
+                {
+                  id: 'p-acme',
+                  kind: 'ORGANIZATION',
+                  name: 'Acme',
+                  email: null,
+                  domain: 'acme.test',
+                  archived: true,
+                },
+              ],
             },
           },
     )
@@ -118,15 +132,19 @@ describe('DirectoryPage', () => {
     await user.type(within(dialog).getByLabelText('Name'), 'ACME Inc')
     await user.click(within(dialog).getByRole('button', { name: 'Create organization' }))
     const notice = await within(dialog).findByText('This looks like a record that already exists.')
-    expect(within(notice.parentElement as HTMLElement).getByRole('link', { name: 'Acme' })).toHaveAttribute(
-      'href',
-      '/app/directory/p-acme',
-    )
+    expect(
+      within(notice.parentElement as HTMLElement).getByRole('link', { name: 'Acme' }),
+    ).toHaveAttribute('href', '/app/directory/p-acme')
     expect(within(dialog).getByText(/archived/)).toBeInTheDocument()
     await user.click(within(dialog).getByRole('button', { name: 'Create anyway' }))
-    expect(await within(dialog).findByText('Give a reason, or open the existing record instead.')).toBeInTheDocument()
+    expect(
+      await within(dialog).findByText('Give a reason, or open the existing record instead.'),
+    ).toBeInTheDocument()
     expect(server.callsTo('POST /organizations')).toHaveLength(1)
-    await user.type(within(dialog).getByLabelText('Why keep a separate record?'), 'Separate legal entity')
+    await user.type(
+      within(dialog).getByLabelText('Why keep a separate record?'),
+      'Separate legal entity',
+    )
     await user.click(within(dialog).getByRole('button', { name: 'Create anyway' }))
     expect(server.callsTo('POST /organizations')[1].body).toMatchObject({
       name: 'ACME Inc',
@@ -138,7 +156,10 @@ describe('DirectoryPage', () => {
     const { server, user } = setup()
     server.on('POST /organizations', {
       status: 400,
-      body: { detail: 'Request validation failed.', errors: [{ field: 'domain', message: 'Enter a domain like example.com.' }] },
+      body: {
+        detail: 'Request validation failed.',
+        errors: [{ field: 'domain', message: 'Enter a domain like example.com.' }],
+      },
     })
     await user.click(await screen.findByRole('button', { name: 'New organization' }))
     const dialog = await screen.findByRole('dialog')

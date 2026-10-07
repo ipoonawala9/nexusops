@@ -14,7 +14,9 @@ function setup(permissions: string[] = [...ALL_TENANT_PERMISSIONS]) {
     .on('GET /activities', { body: pageOf([]) })
     .on('GET /documents', { body: [] })
     .on('GET /tasks', { body: pageOf([aTask()]) })
-    .on('GET /tasks/assignees', { body: [{ id: 'u-ada', name: 'Ada Lovelace', email: 'ada@acme.test' }] })
+    .on('GET /tasks/assignees', {
+      body: [{ id: 'u-ada', name: 'Ada Lovelace', email: 'ada@acme.test' }],
+    })
   return renderApp({ server, path: '/app/directory/p-acme' })
 }
 

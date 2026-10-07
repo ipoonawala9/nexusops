@@ -84,7 +84,9 @@ export function ProductFormDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{product ? `Edit ${product.name}` : 'New product'}</DialogTitle>
-          <DialogDescription>SKUs are unique in this workspace and can't be reused.</DialogDescription>
+          <DialogDescription>
+            SKUs are unique in this workspace and can't be reused.
+          </DialogDescription>
         </DialogHeader>
         <form noValidate onSubmit={submit} className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-2">

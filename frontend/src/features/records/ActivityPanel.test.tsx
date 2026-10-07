@@ -6,7 +6,10 @@ import { signedIn, testProfile } from '@/test/fixtures'
 import { aParty, anActivity, pageOf } from '@/test/records'
 import { renderApp } from '@/test/renderApp'
 
-function setup(permissions: string[] = [...ALL_TENANT_PERMISSIONS], archivedAt: string | null = null) {
+function setup(
+  permissions: string[] = [...ALL_TENANT_PERMISSIONS],
+  archivedAt: string | null = null,
+) {
   const server = fakeServer()
   signedIn(server, testProfile({ permissions }))
     .on('GET /parties/:id', { body: aParty({ archivedAt }) })
@@ -31,7 +34,10 @@ describe('ActivityPanel', () => {
 
   it('logs a call and refreshes the timeline', async () => {
     const { server, user } = setup()
-    server.on('POST /activities', { status: 201, body: anActivity({ id: 'a-2', type: 'CALL', summary: 'Called back' }) })
+    server.on('POST /activities', {
+      status: 201,
+      body: anActivity({ id: 'a-2', type: 'CALL', summary: 'Called back' }),
+    })
     const panel = within(await screen.findByRole('region', { name: 'Activity' }))
     await user.selectOptions(panel.getByLabelText('Type'), 'CALL')
     await user.type(panel.getByLabelText('Summary'), 'Called back')

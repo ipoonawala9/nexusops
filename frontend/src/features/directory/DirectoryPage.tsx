@@ -139,7 +139,9 @@ export function DirectoryPage() {
         <ErrorState error={parties.error} onRetry={() => void parties.refetch()} />
       ) : parties.data.items.length === 0 ? (
         <EmptyState
-          title={q || kind || role || archived ? 'No records match these filters.' : 'Nothing here yet.'}
+          title={
+            q || kind || role || archived ? 'No records match these filters.' : 'Nothing here yet.'
+          }
           description={
             canManage
               ? 'Add the people and organizations you work with.'
@@ -175,13 +177,17 @@ export function DirectoryPage() {
                         {party.name}
                       </Link>
                       <div className="text-xs text-muted-foreground">
-                        {[KIND_LABELS[party.kind], party.organization?.name].filter(Boolean).join(' · ')}
+                        {[KIND_LABELS[party.kind], party.organization?.name]
+                          .filter(Boolean)
+                          .join(' · ')}
                         {party.archived && ' · Archived'}
                       </div>
                     </TableCell>
                     <TableCell className="text-sm">
                       <div>{party.email ?? party.domain ?? '—'}</div>
-                      {party.phone && <div className="text-xs text-muted-foreground">{party.phone}</div>}
+                      {party.phone && (
+                        <div className="text-xs text-muted-foreground">{party.phone}</div>
+                      )}
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
@@ -206,7 +212,9 @@ export function DirectoryPage() {
         </>
       )}
 
-      {creating === 'PERSON' && <PersonFormDialog onClose={() => setCreating(null)} onSaved={opened} />}
+      {creating === 'PERSON' && (
+        <PersonFormDialog onClose={() => setCreating(null)} onSaved={opened} />
+      )}
       {creating === 'ORGANIZATION' && (
         <OrganizationFormDialog onClose={() => setCreating(null)} onSaved={opened} />
       )}

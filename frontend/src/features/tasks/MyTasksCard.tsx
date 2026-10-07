@@ -13,7 +13,9 @@ export function MyTasksCard() {
   const tasks = useQuery({
     queryKey: ['tasks', { view: 'mine', status: 'open', overview: true }],
     queryFn: () =>
-      api.get<Page<TaskView>>(`/tasks?${toQuery({ assignee: 'me', status: 'OPEN,IN_PROGRESS', size: 5 })}`),
+      api.get<Page<TaskView>>(
+        `/tasks?${toQuery({ assignee: 'me', status: 'OPEN,IN_PROGRESS', size: 5 })}`,
+      ),
   })
   return (
     <Card role="region" aria-label="My open tasks">

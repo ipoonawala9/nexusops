@@ -28,7 +28,12 @@ import { TaskStatusSelect } from './TaskStatusSelect'
 
 const SIZE = 20
 const VIEWS: Record<string, string> = { mine: 'me', all: '', unassigned: 'unassigned' }
-const STATUSES: Record<string, string> = { open: 'OPEN,IN_PROGRESS', done: 'DONE', cancelled: 'CANCELLED', any: '' }
+const STATUSES: Record<string, string> = {
+  open: 'OPEN,IN_PROGRESS',
+  done: 'DONE',
+  cancelled: 'CANCELLED',
+  any: '',
+}
 
 export function TasksPage() {
   const api = useApi()
@@ -78,7 +83,11 @@ export function TasksPage() {
       <div className="mb-4 flex flex-wrap items-end gap-3">
         <div className="space-y-1.5">
           <Label htmlFor="tasks-view">Show</Label>
-          <NativeSelect id="tasks-view" value={view} onChange={(e) => update({ view: e.target.value, page: '' })}>
+          <NativeSelect
+            id="tasks-view"
+            value={view}
+            onChange={(e) => update({ view: e.target.value, page: '' })}
+          >
             <option value="mine">My tasks</option>
             <option value="all">All tasks</option>
             <option value="unassigned">Unassigned</option>
@@ -166,7 +175,13 @@ export function TasksPage() {
                         {overdue && <span className="ml-1 text-xs font-medium">Overdue</span>}
                       </TableCell>
                       <TableCell>
-                        <Badge variant={task.priority === 'URGENT' || task.priority === 'HIGH' ? 'default' : 'outline'}>
+                        <Badge
+                          variant={
+                            task.priority === 'URGENT' || task.priority === 'HIGH'
+                              ? 'default'
+                              : 'outline'
+                          }
+                        >
                           {PRIORITY_LABELS[task.priority]}
                         </Badge>
                       </TableCell>

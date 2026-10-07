@@ -8,7 +8,9 @@ import { renderApp } from '@/test/renderApp'
 describe('OverviewPage', () => {
   it('shows my open tasks', async () => {
     const server = fakeServer()
-    signedIn(server, testProfile()).on('GET /tasks', { body: pageOf([aTask({ dueOn: '2030-01-15' })]) })
+    signedIn(server, testProfile()).on('GET /tasks', {
+      body: pageOf([aTask({ dueOn: '2030-01-15' })]),
+    })
     renderApp({ server, path: '/app' })
     const card = within(await screen.findByRole('region', { name: 'My open tasks' }))
     expect(await card.findByText('Send quote')).toBeInTheDocument()

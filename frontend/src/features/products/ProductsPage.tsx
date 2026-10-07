@@ -111,7 +111,11 @@ export function ProductsPage() {
       ) : products.data.items.length === 0 ? (
         <EmptyState
           title={q || kind || archived ? 'No products match these filters.' : 'No products yet.'}
-          description={canManage ? 'Add the products and services you sell.' : 'Try a different search or filter.'}
+          description={
+            canManage
+              ? 'Add the products and services you sell.'
+              : 'Try a different search or filter.'
+          }
           action={
             page > 0 && (
               <Button variant="outline" onClick={() => update({ page: '' })}>

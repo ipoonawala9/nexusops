@@ -26,7 +26,9 @@ describe('PermissionMatrix', () => {
         onToggle={vi.fn()}
       />,
     )
-    const legends = screen.getAllByRole('group').map((group) => group.querySelector('legend')?.textContent)
+    const legends = screen
+      .getAllByRole('group')
+      .map((group) => group.querySelector('legend')?.textContent)
     expect(legends).toEqual([
       'Workspace administration',
       'Directory',

@@ -64,7 +64,11 @@ export function PersonFormDialog({
     setFormError(null)
     const duplicateReason = guard.reasonToSend()
     if (duplicateReason === false) return
-    const body = { ...blankToNull(values), duplicateReason, ...(person ? { version: person.version } : {}) }
+    const body = {
+      ...blankToNull(values),
+      duplicateReason,
+      ...(person ? { version: person.version } : {}),
+    }
     try {
       const saved = person
         ? await api.put<PartyView>(`/persons/${person.id}`, body)

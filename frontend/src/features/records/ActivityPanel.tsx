@@ -21,7 +21,12 @@ import type { ActivityType, ActivityView, Page, SubjectType } from '@/lib/api/ty
 import { formatDateTime } from '@/lib/format'
 import { toQuery } from '@/lib/query'
 
-const TYPES: Record<ActivityType, string> = { NOTE: 'Note', CALL: 'Call', EMAIL: 'Email', MEETING: 'Meeting' }
+const TYPES: Record<ActivityType, string> = {
+  NOTE: 'Note',
+  CALL: 'Call',
+  EMAIL: 'Email',
+  MEETING: 'Meeting',
+}
 
 const schema = z.object({
   type: z.enum(['NOTE', 'CALL', 'EMAIL', 'MEETING']),
@@ -49,7 +54,9 @@ export function ActivityPanel({
   const activities = useQuery({
     queryKey: ['activities', subjectType, subjectId, page],
     queryFn: () =>
-      api.get<Page<ActivityView>>(`/activities?${toQuery({ subjectType, subjectId, page, size: 20 })}`),
+      api.get<Page<ActivityView>>(
+        `/activities?${toQuery({ subjectType, subjectId, page, size: 20 })}`,
+      ),
     placeholderData: keepPreviousData,
   })
   const form = useForm<Values>({

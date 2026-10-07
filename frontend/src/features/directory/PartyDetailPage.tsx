@@ -74,8 +74,12 @@ export function PartyDetailPage() {
               <ArchiveControls
                 name={p.name}
                 archived={archived}
-                onArchive={async () => stored(await api.post<PartyView>(`/parties/${p.id}/archive`))}
-                onRestore={async () => stored(await api.post<PartyView>(`/parties/${p.id}/restore`))}
+                onArchive={async () =>
+                  stored(await api.post<PartyView>(`/parties/${p.id}/archive`))
+                }
+                onRestore={async () =>
+                  stored(await api.post<PartyView>(`/parties/${p.id}/restore`))
+                }
               />
             </>
           )
@@ -132,7 +136,11 @@ function DetailsCard({ party }: { party: PartyView }) {
   if (party.organization)
     rows.push([
       'Organization',
-      <Link key="org" to={`/app/directory/${party.organization.id}`} className="underline-offset-4 hover:underline">
+      <Link
+        key="org"
+        to={`/app/directory/${party.organization.id}`}
+        className="underline-offset-4 hover:underline"
+      >
         {party.organization.name}
       </Link>,
     ])
@@ -178,7 +186,8 @@ function OrganizationPeople({ organizationId }: { organizationId: string }) {
   const api = useApi()
   const people = useQuery({
     queryKey: ['parties', { organizationId }],
-    queryFn: () => api.get<Page<PartySummary>>(`/parties?${toQuery({ organizationId, size: 100 })}`),
+    queryFn: () =>
+      api.get<Page<PartySummary>>(`/parties?${toQuery({ organizationId, size: 100 })}`),
   })
   return (
     <Card role="region" aria-label="People">
@@ -196,7 +205,10 @@ function OrganizationPeople({ organizationId }: { organizationId: string }) {
           <ul className="space-y-1">
             {people.data.items.map((person) => (
               <li key={person.id}>
-                <Link to={`/app/directory/${person.id}`} className="underline-offset-4 hover:underline">
+                <Link
+                  to={`/app/directory/${person.id}`}
+                  className="underline-offset-4 hover:underline"
+                >
                   {person.name}
                 </Link>
                 {person.email && <span className="text-muted-foreground"> · {person.email}</span>}

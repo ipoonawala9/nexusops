@@ -33,7 +33,8 @@ describe('uploads and downloads', () => {
         raw: 'hello',
         headers: {
           'Content-Type': 'text/plain',
-          'Content-Disposition': "attachment; filename=\"report.txt\"; filename*=UTF-8''r%C3%A9port.txt",
+          'Content-Disposition':
+            'attachment; filename="report.txt"; filename*=UTF-8\'\'r%C3%A9port.txt',
         },
       },
     })

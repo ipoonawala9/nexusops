@@ -119,7 +119,10 @@ export function DocumentsPanel({
       ) : (
         <ul className="divide-y rounded-lg border">
           {documents.data.map((document) => (
-            <li key={document.id} className="flex flex-wrap items-center justify-between gap-2 p-3 text-sm">
+            <li
+              key={document.id}
+              className="flex flex-wrap items-center justify-between gap-2 p-3 text-sm"
+            >
               <div>
                 <button
                   type="button"
@@ -130,8 +133,8 @@ export function DocumentsPanel({
                   {document.fileName}
                 </button>
                 <p className="text-xs text-muted-foreground">
-                  {formatBytes(document.sizeBytes)} · {document.uploadedBy?.name ?? 'Former member'} ·{' '}
-                  {formatDateTime(document.createdAt)}
+                  {formatBytes(document.sizeBytes)} · {document.uploadedBy?.name ?? 'Former member'}{' '}
+                  · {formatDateTime(document.createdAt)}
                 </p>
               </div>
               {canManage && (

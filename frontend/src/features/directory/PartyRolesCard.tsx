@@ -12,18 +12,31 @@ import { formatDate } from '@/lib/format'
 import { ROLE_LABELS } from './labels'
 
 /** CUSTOMER and SUPPLIER need directory.party.manage; EMPLOYEE is a person-only role behind the employee codes. */
-export function PartyRolesCard({ party, onChange }: { party: PartyView; onChange: (updated: PartyView) => void }) {
+export function PartyRolesCard({
+  party,
+  onChange,
+}: {
+  party: PartyView
+  onChange: (updated: PartyView) => void
+}) {
   const api = useApi()
   const can = useCan()
   const [busy, setBusy] = useState(false)
   const archived = party.archivedAt !== null
   const showEmployee = party.kind === 'PERSON' && can(PERMISSIONS.employeeRead)
-  const roles: PartyRoleType[] = showEmployee ? ['CUSTOMER', 'SUPPLIER', 'EMPLOYEE'] : ['CUSTOMER', 'SUPPLIER']
+  const roles: PartyRoleType[] = showEmployee
+    ? ['CUSTOMER', 'SUPPLIER', 'EMPLOYEE']
+    : ['CUSTOMER', 'SUPPLIER']
 
   const canManage = (role: PartyRoleType) =>
     !archived && can(role === 'EMPLOYEE' ? PERMISSIONS.employeeManage : PERMISSIONS.partyManage)
 
-  async function save(role: PartyRoleType, status: RoleStatus, current?: PartyRoleView, employeeNumber?: string) {
+  async function save(
+    role: PartyRoleType,
+    status: RoleStatus,
+    current?: PartyRoleView,
+    employeeNumber?: string,
+  ) {
     setBusy(true)
     try {
       const updated = await api.put<PartyView>(`/parties/${party.id}/roles/${role}`, {
