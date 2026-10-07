@@ -55,7 +55,7 @@ All tables are tenant-owned, with `tenant_id` and `ENABLE`/`FORCE ROW LEVEL SECU
 | Migration | Contents |
 |---|---|
 | V9 directory | `parties(id, tenant_id, kind, name, name_key, first_name, last_name, job_title, organization_id, email, phone, domain, website, duplicate_reason, archived_at, created_at, updated_at, version, UNIQUE(tenant_id,id), FK (tenant_id, organization_id) → parties(tenant_id,id))`, plus kind-specific CHECKs. `party_roles(id, tenant_id, party_id, role, status, since, employee_number, …, UNIQUE(tenant_id,party_id,role), UNIQUE(tenant_id,employee_number))`. Directory permissions, granted to existing system roles. |
-| V10 catalog | `products(id, tenant_id, sku, name, description, kind, unit, list_price numeric(19,4), currency char(3), archived_at, …, UNIQUE(tenant_id, lower(sku)))`. Catalog permissions. |
+| V10 catalog | `products(id, tenant_id, sku, name, description, kind, unit, list_price numeric(19,4), currency text CHECK (currency ~ '^[A-Z]{3}$'), archived_at, …, UNIQUE(tenant_id, lower(sku)))`. Catalog permissions. |
 | V11 activities | `activities(id, tenant_id, subject_type, subject_id, type, summary, body, occurred_at, author_id, created_at)`: app role SELECT/INSERT only. Activity permissions. |
 | V12 tasks | `tasks(id, tenant_id, title, description, status, priority, due_on, assignee_id, subject_type, subject_id, created_by, completed_at, …)`. Task permissions. |
 | V13 documents | `documents(id, tenant_id, subject_type, subject_id, file_name, content_type, size_bytes, sha256, uploaded_by, created_at)` and `document_contents(document_id PK → documents ON DELETE CASCADE, tenant_id, content bytea)`. Plan limit `maxStorageMb`. Document permissions. |
@@ -163,5 +163,15 @@ directory fact.
 - Migrations are split one per concern: V9 directory, V10 catalog, V11 activities, V12 tasks, V13 documents.
 - `grant_to_system_roles(text[])` (V9) is the one way migrations grant new permission codes to existing workspaces.
 - The activity list route requires authentication only. Its authorization is the subject's read permission.
-- Task and person titles collapse internal whitespace, so assignment-email subjects stay single-line.
+- Task titles (and phone numbers) collapse internal whitespace, so assignment-email subjects stay single-line.
 - V14 closes V0_2's no-op default-privilege revoke; a test asserts the runtime role can execute no owner function.
+- File names drop every Unicode control and format character (`\p{Cc}`, `\p{Cf}`, line/paragraph separators), so bidi
+  overrides like U+202E can't disguise an extension.
+- Person duplicate keys fold like organization keys: accents, case, punctuation, hyphens, apostrophes and spacing are
+  ignored ("Seán O’Brien" matches "Sean O'Brien"). Rows stored before this change keep their old key until next edited;
+  Phase 4 is unreleased, so there is no re-key migration.
+- The duplicate notice is cleared, with its reason, as soon as an identity field changes (person: first name, last
+  name, email, organization; organization: name, domain), so a reason can never vouch for a duplicate the user didn't
+  see. The notice is a `role="alert"` region.
+- The task assignee and person organization pickers have a search box (`q`) over the server's first 20 matches; the
+  current and the chosen option always stay listed.
