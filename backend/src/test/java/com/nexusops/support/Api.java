@@ -5,7 +5,7 @@ import java.util.UUID;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
-import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import org.springframework.test.web.servlet.request.AbstractMockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 
 /** Compact authenticated MockMvc calls for API tests. */
@@ -15,7 +15,7 @@ public record Api(MockMvc mvc, TestTenants.Session session) {
         return new Api(mvc, TestTenants.login(mvc, workspace));
     }
 
-    public ResultActions perform(MockHttpServletRequestBuilder request) throws Exception {
+    public ResultActions perform(AbstractMockHttpServletRequestBuilder<?> request) throws Exception {
         return mvc.perform(request.header("Authorization", "Bearer " + session.accessToken()));
     }
 

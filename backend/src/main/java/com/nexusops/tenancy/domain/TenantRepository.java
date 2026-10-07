@@ -16,10 +16,13 @@ public interface TenantRepository extends JpaRepository<Tenant, UUID> {
         String getMaxUsers();
 
         String getMaxModules();
+
+        String getMaxStorageMb();
     }
 
     @Query(nativeQuery = true, value = """
-            select p.limits->>'maxUsers' as maxUsers, p.limits->>'maxModules' as maxModules
+            select p.limits->>'maxUsers' as maxUsers, p.limits->>'maxModules' as maxModules,
+                   p.limits->>'maxStorageMb' as maxStorageMb
             from plans p join tenants t on t.plan_code = p.code
             where t.id = :tenantId""")
     PlanLimitsRow findPlanLimits(@Param("tenantId") UUID tenantId);

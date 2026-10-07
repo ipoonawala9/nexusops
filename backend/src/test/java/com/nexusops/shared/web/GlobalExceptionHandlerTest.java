@@ -33,6 +33,11 @@ class GlobalExceptionHandlerTest {
             throw new IllegalStateException("secret-db-detail password=hunter2");
         }
 
+        @GetMapping("/too-large")
+        String tooLarge() {
+            throw new org.springframework.web.multipart.MaxUploadSizeExceededException(10);
+        }
+
         @GetMapping("/denied")
         String denied() {
             throw new AccessDeniedException("nope");
@@ -68,6 +73,14 @@ class GlobalExceptionHandlerTest {
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .addFilters(new RequestIdFilter())
                 .build();
+    }
+
+    @Test
+    void oversizedUploadsAre413WithAPlainMessage() throws Exception {
+        mvc.perform(get("/too-large"))
+                .andExpect(status().isPayloadTooLarge())
+                .andExpect(jsonPath("$.detail").value("The file is larger than 10 MB."))
+                .andExpect(jsonPath("$.requestId").exists());
     }
 
     @Test

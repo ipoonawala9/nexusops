@@ -45,6 +45,10 @@ public class ApiProblem extends RuntimeException {
         return errors;
     }
 
+    public static ApiProblem payloadTooLarge(String detail) {
+        return new ApiProblem(HttpStatus.PAYLOAD_TOO_LARGE, detail, List.of());
+    }
+
     public static ApiProblem badRequest(String detail) {
         return new ApiProblem(HttpStatus.BAD_REQUEST, detail, List.of());
     }
