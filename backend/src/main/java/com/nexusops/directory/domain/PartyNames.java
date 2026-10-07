@@ -25,9 +25,13 @@ public final class PartyNames {
         return lastName == null ? firstName : firstName + " " + lastName;
     }
 
-    /** Case- and spacing-insensitive: "Ada  LOVELACE" and "ada lovelace" share a key. */
+    /** Ignores case, accents, punctuation and spacing: "Ada  LOVELACE" and "ada lovelace", "Seán O’Brien" and "Sean O'Brien" share a key. */
     public static String personKey(String firstName, String lastName) {
-        return limit(WHITESPACE.matcher(fullName(firstName, lastName).strip()).replaceAll(" ").toLowerCase(Locale.ROOT));
+        String name = fullName(firstName, lastName);
+        String folded = MARKS.matcher(Normalizer.normalize(name, Normalizer.Form.NFKD)).replaceAll("")
+                .toLowerCase(Locale.ROOT);
+        String key = String.join(" ", Arrays.stream(NON_ALPHANUMERIC.split(folded)).filter(t -> !t.isEmpty()).toList());
+        return limit(key.isEmpty() ? WHITESPACE.matcher(name.strip()).replaceAll(" ").toLowerCase(Locale.ROOT) : key);
     }
 
     /** Ignores case, accents, punctuation, spacing and trailing legal suffixes: "ACME, Inc." and "Acme" share a key. */

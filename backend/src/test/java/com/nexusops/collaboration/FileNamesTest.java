@@ -14,6 +14,13 @@ class FileNamesTest {
     }
 
     @Test
+    void stripsUnicodeControlAndFormatCharacters() {
+        assertThat(FileNames.sanitize("invoice\u202Efdp.exe")).isEqualTo("invoicefdp.exe");
+        assertThat(FileNames.sanitize("a\u0085b.txt")).isEqualTo("ab.txt");
+        assertThat(FileNames.sanitize("re\u200Bport\u200E.pdf\u2066")).isEqualTo("report.pdf");
+    }
+
+    @Test
     void emptyOrDotNamesBecomeFile() {
         assertThat(FileNames.sanitize(null)).isEqualTo("file");
         assertThat(FileNames.sanitize("..")).isEqualTo("file");

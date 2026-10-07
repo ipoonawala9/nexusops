@@ -7,7 +7,7 @@ import java.util.regex.Pattern;
 public final class FileNames {
 
     private static final int MAX = 255;
-    private static final Pattern UNSAFE = Pattern.compile("[\\p{Cntrl}\\p{Zl}\\p{Zp}\"]");
+    private static final Pattern UNSAFE = Pattern.compile("[\\p{Cc}\\p{Cf}\\p{Zl}\\p{Zp}\"]");
     private static final Pattern CONTENT_TYPE = Pattern.compile(
             "^[a-z0-9][a-z0-9!#$&^_.+-]{0,62}/[a-z0-9][a-z0-9!#$&^_.+-]{0,62}$");
 

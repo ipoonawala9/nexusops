@@ -15,6 +15,19 @@ class PartyNamesTest {
     }
 
     @Test
+    void personKeyIgnoresAccentsAndPunctuation() {
+        assertThat(PartyNames.personKey("Renée", "Dupont")).isEqualTo(PartyNames.personKey("Renee", "Dupont"));
+        assertThat(PartyNames.personKey("Seán", "O’Brien")).isEqualTo(PartyNames.personKey("Sean", "O'Brien"));
+        assertThat(PartyNames.personKey("Mary-Jane", "Ng")).isEqualTo(PartyNames.personKey("Mary Jane", "Ng"));
+        assertThat(PartyNames.personKey("Mary-Jane", "Ng")).isEqualTo("mary jane ng");
+    }
+
+    @Test
+    void personKeyOfOnlyPunctuationFallsBackToTheLowerCasedName() {
+        assertThat(PartyNames.personKey("  -- ", null)).isEqualTo("--");
+    }
+
+    @Test
     void fullNameJoinsOptionalLastName() {
         assertThat(PartyNames.fullName("Ada", "Lovelace")).isEqualTo("Ada Lovelace");
         assertThat(PartyNames.fullName("Plato", null)).isEqualTo("Plato");
