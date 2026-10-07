@@ -1,5 +1,6 @@
 package com.nexusops.crm.web;
 
+import com.nexusops.crm.ConversionCommand;
 import com.nexusops.crm.LeadCommand;
 import com.nexusops.crm.LeadSource;
 import com.nexusops.crm.LeadStatus;
@@ -38,6 +39,13 @@ final class CrmDtos {
         OpportunityCommand command() {
             return new OpportunityCommand(name, accountId, contactId, stageId, amount, currency, expectedCloseOn,
                     ownerId, description);
+        }
+    }
+
+    record ConversionRequest(ConversionCommand.PersonChoice person, ConversionCommand.OrganizationChoice organization,
+            ConversionCommand.NewOpportunity opportunity, Long version) {
+        ConversionCommand command() {
+            return new ConversionCommand(person, organization, opportunity);
         }
     }
 

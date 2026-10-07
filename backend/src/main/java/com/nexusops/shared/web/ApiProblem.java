@@ -37,6 +37,12 @@ public class ApiProblem extends RuntimeException {
         return new ApiProblem(status, getMessage(), errors, merged);
     }
 
+    /** A copy whose field errors are prefixed (e.g. "person." + "firstName"), for nested request objects. */
+    public ApiProblem prefixed(String prefix) {
+        return new ApiProblem(status, getMessage(),
+                errors.stream().map(e -> new FieldError(prefix + e.field(), e.message())).toList(), properties);
+    }
+
     public HttpStatus status() {
         return status;
     }

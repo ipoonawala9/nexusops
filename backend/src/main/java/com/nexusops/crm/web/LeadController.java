@@ -1,9 +1,11 @@
 package com.nexusops.crm.web;
 
+import com.nexusops.crm.LeadConversionService;
 import com.nexusops.crm.LeadQuery;
 import com.nexusops.crm.LeadService;
 import com.nexusops.crm.LeadSource;
 import com.nexusops.crm.LeadView;
+import com.nexusops.crm.web.CrmDtos.ConversionRequest;
 import com.nexusops.crm.web.CrmDtos.LeadRequest;
 import com.nexusops.crm.web.CrmDtos.LeadStatusRequest;
 import com.nexusops.shared.web.PageResponse;
@@ -25,9 +27,11 @@ import org.springframework.web.bind.annotation.RestController;
 class LeadController {
 
     private final LeadService leads;
+    private final LeadConversionService conversions;
 
-    LeadController(LeadService leads) {
+    LeadController(LeadService leads, LeadConversionService conversions) {
         this.leads = leads;
+        this.conversions = conversions;
     }
 
     @GetMapping
@@ -62,5 +66,11 @@ class LeadController {
     @PreAuthorize("hasAuthority('crm.lead.manage')")
     LeadView status(@PathVariable UUID id, @RequestBody LeadStatusRequest request) {
         return leads.changeStatus(id, request.status(), request.reason(), request.version());
+    }
+
+    @PostMapping("/{id}/convert")
+    @PreAuthorize("hasAuthority('crm.lead.manage')")
+    LeadView convert(@PathVariable UUID id, @RequestBody ConversionRequest request) {
+        return conversions.convert(id, request.command(), request.version());
     }
 }
