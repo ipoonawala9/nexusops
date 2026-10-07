@@ -44,6 +44,7 @@ class CrossTenantApiIT extends IntegrationTestSupport {
     UUID roleB;
     UUID userB;
     UUID invitationB;
+    UUID orgB, personB, productB, taskB, documentB, userBId;
 
     @BeforeEach
     void twoTenants() throws Exception {
@@ -60,6 +61,23 @@ class CrossTenantApiIT extends IntegrationTestSupport {
         invitationB = UUID.fromString(JsonPath.read(body, "$.id"));
         as(ownerB, put("/api/v1/tenant/modules/CRM").contentType(MediaType.APPLICATION_JSON).content("{\"enabled\":true}"))
                 .andExpect(status().isOk());
+
+        com.nexusops.support.Api apiB = new com.nexusops.support.Api(mvc, ownerB);
+        orgB = com.nexusops.support.Api.id(apiB.post("/api/v1/organizations", "{\"name\":\"Beta Corp\"}"));
+        personB = com.nexusops.support.Api.id(apiB.post("/api/v1/persons",
+                "{\"firstName\":\"Bea\",\"organizationId\":\"" + orgB + "\"}"));
+        productB = com.nexusops.support.Api.id(apiB.post("/api/v1/products", "{\"sku\":\"B-1\",\"name\":\"Beta widget\"}"));
+        apiB.post("/api/v1/activities", "{\"subjectType\":\"PARTY\",\"subjectId\":\"" + orgB
+                + "\",\"type\":\"NOTE\",\"summary\":\"B secret\"}").andExpect(status().isCreated());
+        taskB = com.nexusops.support.Api.id(apiB.post("/api/v1/tasks", "{\"title\":\"B task\",\"subjectType\":\"PARTY\","
+                + "\"subjectId\":\"" + orgB + "\"}"));
+        documentB = com.nexusops.support.Api.id(apiB.perform(
+                org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart("/api/v1/documents")
+                        .file(new org.springframework.mock.web.MockMultipartFile("file", "b.txt", "text/plain",
+                                "B".getBytes(java.nio.charset.StandardCharsets.UTF_8)))
+                        .param("subjectType", "PARTY").param("subjectId", orgB.toString())));
+        userBId = OwnerJdbc.ownerAs(b.tenantId()).queryForObject("select id from users where email = ?", UUID.class,
+                b.email());
     }
 
     private ResultActions as(Session s, MockHttpServletRequestBuilder b) throws Exception {
@@ -148,5 +166,56 @@ class CrossTenantApiIT extends IntegrationTestSupport {
         // positive control: the genuine token previews B's workspace
         mvc.perform(get("/api/v1/invitations/preview").param("token", token))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.workspace").value(b.slug()));
+    }
+
+    @Test
+    void canonicalRecordsOfAnotherTenantAreInvisibleAndUntouchable() throws Exception {
+        as(ownerA, get("/api/v1/parties/" + orgB)).andExpect(status().isNotFound());
+        as(ownerA, get("/api/v1/parties/" + personB)).andExpect(status().isNotFound());
+        as(ownerA, json(put("/api/v1/organizations/" + orgB), "{\"name\":\"Hacked\",\"version\":0}")).andExpect(status().isNotFound());
+        as(ownerA, json(put("/api/v1/persons/" + personB), "{\"firstName\":\"Hacked\",\"version\":0}")).andExpect(status().isNotFound());
+        as(ownerA, post("/api/v1/parties/" + orgB + "/archive")).andExpect(status().isNotFound());
+        as(ownerA, post("/api/v1/parties/" + orgB + "/restore")).andExpect(status().isNotFound());
+        as(ownerA, json(put("/api/v1/parties/" + orgB + "/roles/CUSTOMER"), "{}")).andExpect(status().isNotFound());
+        as(ownerA, get("/api/v1/products/" + productB)).andExpect(status().isNotFound());
+        as(ownerA, json(put("/api/v1/products/" + productB), "{\"sku\":\"H\",\"name\":\"H\",\"version\":0}")).andExpect(status().isNotFound());
+        as(ownerA, post("/api/v1/products/" + productB + "/archive")).andExpect(status().isNotFound());
+        as(ownerA, get("/api/v1/activities").param("subjectType", "PARTY").param("subjectId", orgB.toString()))
+                .andExpect(status().isNotFound());
+        as(ownerA, json(post("/api/v1/activities"), "{\"subjectType\":\"PARTY\",\"subjectId\":\"" + orgB
+                + "\",\"type\":\"NOTE\",\"summary\":\"x\"}")).andExpect(status().isNotFound());
+        as(ownerA, get("/api/v1/tasks/" + taskB)).andExpect(status().isNotFound());
+        as(ownerA, json(put("/api/v1/tasks/" + taskB), "{\"title\":\"Hacked\",\"version\":0}")).andExpect(status().isNotFound());
+        as(ownerA, json(post("/api/v1/tasks/" + taskB + "/status"), "{\"status\":\"DONE\"}")).andExpect(status().isNotFound());
+        as(ownerA, get("/api/v1/documents").param("subjectType", "PARTY").param("subjectId", orgB.toString()))
+                .andExpect(status().isNotFound());
+        as(ownerA, get("/api/v1/documents/" + documentB + "/content")).andExpect(status().isNotFound());
+        as(ownerA, delete("/api/v1/documents/" + documentB)).andExpect(status().isNotFound());
+
+        // references to another tenant's rows are refused too
+        as(ownerA, json(post("/api/v1/persons"), "{\"firstName\":\"X\",\"organizationId\":\"" + orgB + "\"}"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("organizationId"));
+        as(ownerA, json(post("/api/v1/tasks"), "{\"title\":\"X\",\"assigneeId\":\"" + userBId + "\"}"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("assigneeId"));
+        as(ownerA, json(post("/api/v1/tasks"), "{\"title\":\"X\",\"subjectType\":\"PARTY\",\"subjectId\":\"" + orgB + "\"}"))
+                .andExpect(status().isNotFound());
+
+        // tenant B is untouched
+        as(ownerB, get("/api/v1/parties/" + orgB)).andExpect(jsonPath("$.name").value("Beta Corp"))
+                .andExpect(jsonPath("$.archivedAt").doesNotExist()).andExpect(jsonPath("$.roles", Matchers.empty()));
+        as(ownerB, get("/api/v1/tasks/" + taskB)).andExpect(jsonPath("$.title").value("B task"))
+                .andExpect(jsonPath("$.status").value("OPEN"));
+        as(ownerB, get("/api/v1/documents/" + documentB + "/content")).andExpect(status().isOk());
+    }
+
+    @Test
+    void canonicalListsNeverContainAnotherTenantsRows() throws Exception {
+        as(ownerA, get("/api/v1/parties")).andExpect(jsonPath("$.total").value(0));
+        as(ownerA, get("/api/v1/parties").param("q", "Beta")).andExpect(jsonPath("$.total").value(0));
+        as(ownerA, get("/api/v1/products")).andExpect(jsonPath("$.total").value(0));
+        as(ownerA, get("/api/v1/tasks")).andExpect(jsonPath("$.total").value(0));
+        as(ownerA, get("/api/v1/tasks/assignees")).andExpect(jsonPath("$[*].id", Matchers.not(Matchers.hasItem(userBId.toString()))));
+        // positive control
+        as(ownerB, get("/api/v1/parties")).andExpect(jsonPath("$.total").value(2));
     }
 }

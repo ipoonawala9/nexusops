@@ -41,13 +41,13 @@ them, which CRM, Inventory, HelpDesk and HRMS (Phases 5–8) all build on instea
 | D7 | Subjects | Activities, tasks and documents attach to a subject `(subject_type, subject_id)`. A `SubjectResolver` SPI in `collaboration` is implemented by each owning module: `PARTY` by `directory`, `PRODUCT` by `catalog`, and later `LEAD`, `TICKET` and others. The resolver names the subject's read permission. Collaboration requires that permission on top of its own. |
 | D8 | Activities | Types are NOTE, CALL, EMAIL and MEETING. Each has a summary (1–200) and a body (≤10 000), and `occurredAt` defaults to now and can't be more than 5 min in the future. They're immutable: the app role has no UPDATE or DELETE on the table. |
 | D9 | Tasks | Each task has a title, description, status (OPEN, IN_PROGRESS, DONE, CANCELLED), priority (LOW, NORMAL, HIGH, URGENT), due date, assignee (an active member) and an optional subject. Managers edit any task. **The assignee may change the status of their own task with read permission only.** Assigning someone other than yourself emails them after commit. |
-| D10 | Documents | Stored behind a `DocumentStorage` port, with a PostgreSQL adapter for now (ADR-0009). Max 10 MB per file. Per-plan storage quota `maxStorageMb`: FREE 100, STARTER 1000, BUSINESS 10000, ENTERPRISE unlimited. Downloads are always `attachment` with `nosniff` and `no-store`. The SHA-256 of the content is recorded. |
+| D10 | Documents | (V13) Stored behind a `DocumentStorage` port, with a PostgreSQL adapter for now (ADR-0009). Max 10 MB per file. Per-plan storage quota `maxStorageMb`: FREE 100, STARTER 1000, BUSINESS 10000, ENTERPRISE unlimited. Downloads are always `attachment` with `nosniff` and `no-store`. The SHA-256 of the content is recorded. |
 | D11 | Permissions | 11 new codes with no module, since canonical data is shared by all modules. Existing system roles get them by migration, and new workspaces get them automatically. See §4. |
 | D12 | Edits | Edits are full-replacement `PUT`s that carry the `version` last read. A stale version gets `409 "This record was changed by someone else. Reload and try again."` |
 | D13 | Search | `q` is a case-insensitive contains match, with LIKE wildcards escaped: parties on name, email and domain; products on SKU and name; tasks on title. |
 | D14 | UI | Directory (list and detail), Products (list and detail) and Tasks pages. The detail pages share Activity, Tasks and Documents panels. The Overview shows "My open tasks". The permission matrix groups foundation permissions by area. |
 
-## 3. Data model (Flyway V9–V12)
+## 3. Data model (Flyway V9–V13)
 
 All tables are tenant-owned, with `tenant_id` and `ENABLE`/`FORCE ROW LEVEL SECURITY`. They use the standard
 `tenant_isolation` policy in both `USING` and `WITH CHECK`, created in the same migration as the table (Plan 2 delta 1).
@@ -56,8 +56,9 @@ All tables are tenant-owned, with `tenant_id` and `ENABLE`/`FORCE ROW LEVEL SECU
 |---|---|
 | V9 directory | `parties(id, tenant_id, kind, name, name_key, first_name, last_name, job_title, organization_id, email, phone, domain, website, duplicate_reason, archived_at, created_at, updated_at, version, UNIQUE(tenant_id,id), FK (tenant_id, organization_id) → parties(tenant_id,id))`, plus kind-specific CHECKs. `party_roles(id, tenant_id, party_id, role, status, since, employee_number, …, UNIQUE(tenant_id,party_id,role), UNIQUE(tenant_id,employee_number))`. Directory permissions, granted to existing system roles. |
 | V10 catalog | `products(id, tenant_id, sku, name, description, kind, unit, list_price numeric(19,4), currency char(3), archived_at, …, UNIQUE(tenant_id, lower(sku)))`. Catalog permissions. |
-| V11 collaboration | `activities(id, tenant_id, subject_type, subject_id, type, summary, body, occurred_at, author_id, created_at)`: app role SELECT/INSERT only. `tasks(id, tenant_id, title, description, status, priority, due_on, assignee_id, subject_type, subject_id, created_by, completed_at, …)`. Activity and task permissions. |
-| V12 documents | `documents(id, tenant_id, subject_type, subject_id, file_name, content_type, size_bytes, sha256, uploaded_by, created_at)` and `document_contents(document_id PK → documents ON DELETE CASCADE, tenant_id, content bytea)`. Plan limit `maxStorageMb`. Document permissions. |
+| V11 activities | `activities(id, tenant_id, subject_type, subject_id, type, summary, body, occurred_at, author_id, created_at)`: app role SELECT/INSERT only. Activity permissions. |
+| V12 tasks | `tasks(id, tenant_id, title, description, status, priority, due_on, assignee_id, subject_type, subject_id, created_by, completed_at, …)`. Task permissions. |
+| V13 documents | `documents(id, tenant_id, subject_type, subject_id, file_name, content_type, size_bytes, sha256, uploaded_by, created_at)` and `document_contents(document_id PK → documents ON DELETE CASCADE, tenant_id, content bytea)`. Plan limit `maxStorageMb`. Document permissions. |
 
 Polymorphic subjects have no FK. Their integrity is enforced at write time through `SubjectResolver`, and holds
 afterwards because subjects are never deleted (D5).
@@ -156,3 +157,10 @@ directory fact.
   5. assign and complete a task;
   6. upload and download a document;
   7. create a product and have its duplicate SKU refused.
+
+## 8. Implementation deltas
+
+- Migrations are split one per concern: V9 directory, V10 catalog, V11 activities, V12 tasks, V13 documents.
+- `grant_to_system_roles(text[])` (V9) is the one way migrations grant new permission codes to existing workspaces.
+- The activity list route requires authentication only. Its authorization is the subject's read permission.
+- Task and person titles collapse internal whitespace, so assignment-email subjects stay single-line.
