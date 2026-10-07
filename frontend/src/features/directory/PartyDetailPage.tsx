@@ -5,7 +5,9 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ErrorState, ListSkeleton, PageHeader } from '@/components/states'
 import { PERMISSIONS, useCan } from '@/features/auth/permissions'
+import { ActivityPanel } from '@/features/records/ActivityPanel'
 import { ArchiveControls } from '@/features/records/ArchiveControls'
+import { DocumentsPanel } from '@/features/records/DocumentsPanel'
 import { useApi } from '@/lib/api/ApiContext'
 import type { Page, PartySummary, PartyView } from '@/lib/api/types'
 import { toQuery } from '@/lib/query'
@@ -89,6 +91,8 @@ export function PartyDetailPage() {
       </div>
       {p.kind === 'ORGANIZATION' && <OrganizationPeople organizationId={p.id} />}
       {/* record panels */}
+      <ActivityPanel subjectType="PARTY" subjectId={p.id} archived={archived} />
+      <DocumentsPanel subjectType="PARTY" subjectId={p.id} archived={archived} />
       {editing &&
         (p.kind === 'PERSON' ? (
           <PersonFormDialog
