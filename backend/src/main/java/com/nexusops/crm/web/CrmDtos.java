@@ -3,8 +3,10 @@ package com.nexusops.crm.web;
 import com.nexusops.crm.LeadCommand;
 import com.nexusops.crm.LeadSource;
 import com.nexusops.crm.LeadStatus;
+import com.nexusops.crm.OpportunityCommand;
 import com.nexusops.crm.StageCommand;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -30,4 +32,14 @@ final class CrmDtos {
     }
 
     record LeadStatusRequest(LeadStatus status, String reason, Long version) {}
+
+    record OpportunityRequest(String name, UUID accountId, UUID contactId, UUID stageId, BigDecimal amount,
+            String currency, LocalDate expectedCloseOn, UUID ownerId, String description, Long version) {
+        OpportunityCommand command() {
+            return new OpportunityCommand(name, accountId, contactId, stageId, amount, currency, expectedCloseOn,
+                    ownerId, description);
+        }
+    }
+
+    record StageMoveRequest(UUID stageId, String lostReason, Long version) {}
 }

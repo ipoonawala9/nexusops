@@ -246,6 +246,30 @@ public class PartyService {
         return view(party);
     }
 
+    /**
+     * CRM's business rule (spec D7): converting a lead and winning a deal make the party a customer. Not a user action,
+     * so no permission check here (callers hold their own). Idempotent; archived parties are left alone.
+     */
+    @Transactional
+    public void ensureCustomer(UUID id) {
+        Party party = find(id);
+        if (party.isArchived()) {
+            return;
+        }
+        locks.lock(ROLES_LOCK);
+        PartyRole row = roles.findByPartyIdAndRole(id, PartyRoleType.CUSTOMER).orElse(null);
+        if (row != null && row.getStatus() == RoleStatus.ACTIVE) {
+            return;
+        }
+        Map<String, Object> before = row == null ? null : roleSnapshot(row);
+        if (row == null) {
+            row = new PartyRole(Ids.newId(), id, PartyRoleType.CUSTOMER);
+        }
+        row.update(RoleStatus.ACTIVE, row.getSince(), null);
+        roles.saveAndFlush(row);
+        audit.record(AuditEntry.of("PartyRoleChanged", "Party", id).withBefore(before).withAfter(roleSnapshot(row)));
+    }
+
     private static Map<String, Object> roleSnapshot(PartyRole row) {
         Map<String, Object> values = new LinkedHashMap<>();
         values.put("role", row.getRole().name());
