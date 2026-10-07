@@ -7,11 +7,15 @@ export interface FakeRequest {
   params: Record<string, string>
   body: unknown
   headers: Headers
+  form?: FormData
 }
 
 export interface FakeReply {
   status?: number
   body?: unknown
+  /** A raw (non-JSON) body, e.g. a file download. */
+  raw?: BodyInit
+  headers?: Record<string, string>
 }
 
 export type FakeHandler = FakeReply | ((request: FakeRequest) => FakeReply)
@@ -44,6 +48,7 @@ export function fakeServer(routes: Record<string, FakeHandler> = {}): FakeServer
         params,
         body,
         headers: new Headers(init?.headers),
+        form: init?.body instanceof FormData ? init.body : undefined,
       }
       calls.push(request)
       return toResponse(typeof handler === 'function' ? handler(request) : handler)
@@ -79,7 +84,8 @@ function match(route: string, method: string, path: string): Record<string, stri
   return params
 }
 
-function toResponse({ status = 200, body }: FakeReply): Response {
+function toResponse({ status = 200, body, raw, headers }: FakeReply): Response {
+  if (raw !== undefined) return new Response(raw, { status, headers })
   if (body === undefined) return new Response(null, { status: status === 200 ? 204 : status })
   const isProblem = status >= 400
   const payload =

@@ -84,4 +84,17 @@ describe('AppLayout', () => {
     await screen.findByRole('navigation', { name: 'Settings' })
     expect(router.state.location.pathname).toBe('/app/settings/roles')
   })
+
+  it('shows Directory, Products and Tasks only with their read permissions', async () => {
+    const server = fakeServer()
+    signedIn(
+      server,
+      testProfile({ permissions: ['directory.party.read', 'collaboration.task.read'] }),
+    ).on('GET /tasks', { body: { items: [], page: 0, size: 5, total: 0 } })
+    renderApp({ server, path: '/app' })
+    await screen.findByRole('heading', { name: 'Welcome, Ada' })
+    expect(nav().getByRole('link', { name: 'Directory' })).toHaveAttribute('href', '/app/directory')
+    expect(nav().getByRole('link', { name: 'Tasks' })).toHaveAttribute('href', '/app/tasks')
+    expect(nav().queryByRole('link', { name: 'Products' })).not.toBeInTheDocument()
+  })
 })

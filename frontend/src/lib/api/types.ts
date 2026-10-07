@@ -135,3 +135,144 @@ export interface PlatformTenant {
   activeUsers: number
   ownerEmails: string[]
 }
+
+export type PartyKind = 'PERSON' | 'ORGANIZATION'
+export type PartyRoleType = 'CUSTOMER' | 'SUPPLIER' | 'EMPLOYEE'
+export type RoleStatus = 'ACTIVE' | 'INACTIVE'
+
+export interface PartyRef {
+  id: string
+  name: string
+}
+
+export interface PartyRoleView {
+  role: PartyRoleType
+  status: RoleStatus
+  since: string | null
+  employeeNumber: string | null
+}
+
+export interface PartyView {
+  id: string
+  kind: PartyKind
+  name: string
+  firstName: string | null
+  lastName: string | null
+  jobTitle: string | null
+  organization: PartyRef | null
+  email: string | null
+  phone: string | null
+  domain: string | null
+  website: string | null
+  roles: PartyRoleView[]
+  duplicateReason: string | null
+  archivedAt: string | null
+  createdAt: string
+  updatedAt: string
+  version: number
+}
+
+export interface PartySummary {
+  id: string
+  kind: PartyKind
+  name: string
+  email: string | null
+  phone: string | null
+  domain: string | null
+  organization: PartyRef | null
+  roles: PartyRoleType[]
+  archived: boolean
+}
+
+export interface DuplicateCandidate {
+  id: string
+  kind: PartyKind
+  name: string
+  email: string | null
+  domain: string | null
+  archived: boolean
+}
+
+export type ProductKind = 'GOODS' | 'SERVICE'
+
+export interface ProductView {
+  id: string
+  sku: string
+  name: string
+  description: string | null
+  kind: ProductKind
+  unit: string
+  listPrice: number | null
+  currency: string | null
+  archivedAt: string | null
+  createdAt: string
+  updatedAt: string
+  version: number
+}
+
+/** Record types activities, tasks and documents attach to (server SubjectResolver codes). */
+export type SubjectType = 'PARTY' | 'PRODUCT'
+
+export interface MemberRef {
+  id: string
+  name: string
+}
+
+export interface SubjectRef {
+  type: string
+  id: string
+  /** null when the viewer can't read that record */
+  label: string | null
+  archived: boolean
+}
+
+export type ActivityType = 'NOTE' | 'CALL' | 'EMAIL' | 'MEETING'
+
+export interface ActivityView {
+  id: string
+  subjectType: string
+  subjectId: string
+  type: ActivityType
+  summary: string
+  body: string | null
+  occurredAt: string
+  author: MemberRef | null
+  createdAt: string
+}
+
+export type TaskStatus = 'OPEN' | 'IN_PROGRESS' | 'DONE' | 'CANCELLED'
+export type TaskPriority = 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT'
+
+export interface TaskView {
+  id: string
+  title: string
+  description: string | null
+  status: TaskStatus
+  priority: TaskPriority
+  dueOn: string | null
+  assignee: MemberRef | null
+  subject: SubjectRef | null
+  createdBy: MemberRef | null
+  completedAt: string | null
+  createdAt: string
+  updatedAt: string
+  version: number
+}
+
+export interface AssigneeView {
+  id: string
+  name: string
+  email: string
+}
+
+export interface DocumentView {
+  id: string
+  subjectType: string
+  subjectId: string
+  fileName: string
+  contentType: string
+  sizeBytes: number
+  sha256: string
+  uploadedBy: MemberRef | null
+  createdAt: string
+}

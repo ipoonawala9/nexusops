@@ -25,6 +25,9 @@ export const MODULE_PHASES: Record<string, { label: string; phase: number; descr
 
 export const NAV_ITEMS: NavItem[] = [
   { to: '/app', label: 'Overview' },
+  { to: '/app/directory', label: 'Directory', anyOf: [PERMISSIONS.partyRead] },
+  { to: '/app/products', label: 'Products', anyOf: [PERMISSIONS.productRead] },
+  { to: '/app/tasks', label: 'Tasks', anyOf: [PERMISSIONS.taskRead] },
   { to: '/app/crm', label: 'CRM', module: 'CRM' },
   { to: '/app/inventory', label: 'Inventory', module: 'INVENTORY' },
   { to: '/app/helpdesk', label: 'HelpDesk', module: 'HELPDESK' },
