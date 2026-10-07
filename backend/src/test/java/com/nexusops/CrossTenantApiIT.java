@@ -80,7 +80,8 @@ class CrossTenantApiIT extends IntegrationTestSupport {
                 b.email());
     }
 
-    private ResultActions as(Session s, MockHttpServletRequestBuilder b) throws Exception {
+    private ResultActions as(Session s,
+            org.springframework.test.web.servlet.request.AbstractMockHttpServletRequestBuilder<?> b) throws Exception {
         return mvc.perform(b.header("Authorization", "Bearer " + s.accessToken()));
     }
 
@@ -180,6 +181,7 @@ class CrossTenantApiIT extends IntegrationTestSupport {
         as(ownerA, get("/api/v1/products/" + productB)).andExpect(status().isNotFound());
         as(ownerA, json(put("/api/v1/products/" + productB), "{\"sku\":\"H\",\"name\":\"H\",\"version\":0}")).andExpect(status().isNotFound());
         as(ownerA, post("/api/v1/products/" + productB + "/archive")).andExpect(status().isNotFound());
+        as(ownerA, post("/api/v1/products/" + productB + "/restore")).andExpect(status().isNotFound());
         as(ownerA, get("/api/v1/activities").param("subjectType", "PARTY").param("subjectId", orgB.toString()))
                 .andExpect(status().isNotFound());
         as(ownerA, json(post("/api/v1/activities"), "{\"subjectType\":\"PARTY\",\"subjectId\":\"" + orgB
@@ -191,6 +193,10 @@ class CrossTenantApiIT extends IntegrationTestSupport {
                 .andExpect(status().isNotFound());
         as(ownerA, get("/api/v1/documents/" + documentB + "/content")).andExpect(status().isNotFound());
         as(ownerA, delete("/api/v1/documents/" + documentB)).andExpect(status().isNotFound());
+        as(ownerA, org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart("/api/v1/documents")
+                .file(new org.springframework.mock.web.MockMultipartFile("file", "a.txt", "text/plain",
+                        "A".getBytes(java.nio.charset.StandardCharsets.UTF_8)))
+                .param("subjectType", "PARTY").param("subjectId", orgB.toString())).andExpect(status().isNotFound());
 
         // references to another tenant's rows are refused too
         as(ownerA, json(post("/api/v1/persons"), "{\"firstName\":\"X\",\"organizationId\":\"" + orgB + "\"}"))
@@ -203,6 +209,10 @@ class CrossTenantApiIT extends IntegrationTestSupport {
         // tenant B is untouched
         as(ownerB, get("/api/v1/parties/" + orgB)).andExpect(jsonPath("$.name").value("Beta Corp"))
                 .andExpect(jsonPath("$.archivedAt").doesNotExist()).andExpect(jsonPath("$.roles", Matchers.empty()));
+        as(ownerB, get("/api/v1/parties/" + personB)).andExpect(jsonPath("$.firstName").value("Bea"))
+                .andExpect(jsonPath("$.archivedAt").doesNotExist()).andExpect(jsonPath("$.roles", Matchers.empty()));
+        as(ownerB, get("/api/v1/products/" + productB)).andExpect(jsonPath("$.name").value("Beta widget"))
+                .andExpect(jsonPath("$.archivedAt").doesNotExist());
         as(ownerB, get("/api/v1/tasks/" + taskB)).andExpect(jsonPath("$.title").value("B task"))
                 .andExpect(jsonPath("$.status").value("OPEN"));
         as(ownerB, get("/api/v1/documents/" + documentB + "/content")).andExpect(status().isOk());
