@@ -5,6 +5,7 @@ one permission model, one operational event stream — with modular business cap
 
 - Blueprint: `docs/research/master-blueprint.md`
 - Current design: `docs/superpowers/specs/2026-10-04-platform-foundation-design.md`
+- Canonical data model (Phase 4): `docs/superpowers/specs/2026-10-06-canonical-data-model-design.md`
 - Decisions: `docs/decisions/`
 - Implementation plans: `docs/superpowers/plans/`
 
@@ -37,6 +38,15 @@ Host ports can be overridden through `infra/docker/.env` (see `.env.example`).
   to create a workspace. The verification email arrives in Mailpit (http://localhost:8025).
 - The staff console is at http://localhost:5173/platform/login. Create an operator first with
   `make platform-admin EMAIL=you@example.com`.
+
+## Records (Phase 4)
+Shared by every module, in the app under **Directory**, **Products** and **Tasks**:
+- **Directory:** people and organizations, one record each. A probable duplicate is refused until you give a reason
+  (ADR-0008). A record plays roles (customer, supplier, employee); employee details need the employee permissions.
+- **Products:** goods and services with unique SKUs and list prices.
+- **Activity, tasks and documents:** attached to any person, organization or product. Documents are up to 10 MB each,
+  with a per-plan storage quota, and are always downloaded, never opened in the browser (ADR-0009).
+- Records are archived, never deleted. Every change is in the audit log.
 
 ## Try the API (local)
 ```bash
