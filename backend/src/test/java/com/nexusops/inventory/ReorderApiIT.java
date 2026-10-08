@@ -219,4 +219,114 @@ class ReorderApiIT extends IntegrationTestSupport {
         planner.post("/api/v1/inventory/reorder-suggestions/purchase-orders", "{\"items\":[]}")
                 .andExpect(status().isForbidden());
     }
+
+    @Test
+    void aRuleThatWasDeletedMeanwhileIsNotSilentlyRecreated() throws Exception {
+        UUID id = Api.id(rule(widget, "20", "60", null, null).andExpect(status().isOk()));
+        owner.delete("/api/v1/inventory/reorder-rules/" + id).andExpect(status().isNoContent());
+        rule(widget, "20", "60", null, 0L).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail").value("This record was changed by someone else. Reload and try again."));
+        owner.get("/api/v1/inventory/reorder-rules").andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    void aNullItemIsAFieldError() throws Exception {
+        owner.post("/api/v1/inventory/reorder-suggestions/purchase-orders", "{\"items\":[null]}")
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("items[0]"));
+    }
+
+    @Test
+    void usageOlderThanThirtyDaysIsLeftOut() throws Exception {
+        count(widget, "50");
+        sell(widget, "10");
+        sell(widget, "5");
+        int moved = OwnerJdbc.ownerAs(ws.tenantId()).update("update stock_movements set occurred_at = now() - "
+                + "interval '40 days' where tenant_id = ? and kind = 'ISSUE' and quantity = -10", ws.tenantId());
+        assertThat(moved).isEqualTo(1);
+        rule(widget, "100", "200", null, null).andExpect(status().isOk());
+        owner.get("/api/v1/inventory/reorder-suggestions").andExpect(jsonPath("$[0].usedLast30Days").value(5.0));
+    }
+
+    @Test
+    void tinyUsageStillGivesDaysOfCover() throws Exception {
+        count(widget, "1");
+        sell(widget, "0.001");
+        rule(widget, "5", "10", null, null).andExpect(status().isOk());
+        owner.get("/api/v1/inventory/reorder-suggestions")
+                .andExpect(jsonPath("$[0].daysOfCover").value(29970.0))
+                .andExpect(jsonPath("$[0].usedLast30Days").value(0.001));
+    }
+
+    @Test
+    void searchTreatsPercentAndUnderscoreLiterally() throws Exception {
+        UUID odd = TestInventory.goods(owner, "P-50", "50% off_x");
+        count(odd, "1");
+        count(widget, "1");
+        count(gadget, "1");
+        owner.get("/api/v1/inventory/stock?q=50% off_x").andExpect(jsonPath("$.items[*].product.sku")
+                .value(Matchers.contains("P-50")));
+        owner.get("/api/v1/inventory/stock?q=%").andExpect(jsonPath("$.items[*].product.sku")
+                .value(Matchers.contains("P-50")));
+        owner.get("/api/v1/inventory/stock?q=_").andExpect(jsonPath("$.items[*].product.sku")
+                .value(Matchers.contains("P-50")));
+        owner.get("/api/v1/inventory/stock?q=o_f").andExpect(jsonPath("$.total").value(0));
+        owner.get("/api/v1/inventory/stock?q=off%x").andExpect(jsonPath("$.total").value(0));
+    }
+
+    @Test
+    void theStockListPages() throws Exception {
+        count(widget, "1");
+        count(gadget, "1");
+        UUID third = TestInventory.goods(owner, "H-1", "Hinge");
+        count(third, "1");
+        owner.get("/api/v1/inventory/stock?size=1&page=0").andExpect(jsonPath("$.total").value(3))
+                .andExpect(jsonPath("$.items.length()").value(1)).andExpect(jsonPath("$.items[0].product.sku").value("G-1"));
+        owner.get("/api/v1/inventory/stock?size=1&page=1").andExpect(jsonPath("$.total").value(3))
+                .andExpect(jsonPath("$.items[0].product.sku").value("H-1"));
+        owner.get("/api/v1/inventory/stock?size=1&page=2").andExpect(jsonPath("$.items[0].product.sku").value("W-1"));
+        owner.get("/api/v1/inventory/stock?size=1&page=3").andExpect(jsonPath("$.items.length()").value(0));
+    }
+
+    @Test
+    void whatIsStillToArriveOnAPartlyReceivedOrderCountsAsOnOrder() throws Exception {
+        UUID po = Api.id(owner.post("/api/v1/purchase-orders", "{\"supplierId\":\"" + supplier + "\",\"warehouseId\":\""
+                + main + "\",\"lines\":[{\"productId\":\"" + gadget + "\",\"quantity\":10,\"unitCost\":3}]}"));
+        owner.post("/api/v1/purchase-orders/" + po + "/order", "{\"version\":0}").andExpect(status().isOk());
+        String line = Api.<List<String>>read(owner.get("/api/v1/purchase-orders/" + po), "$.lines[*].id").get(0);
+        owner.post("/api/v1/purchase-orders/" + po + "/receipts", "{\"lines\":[{\"lineId\":\"" + line
+                + "\",\"quantity\":4}],\"version\":1}").andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PARTIALLY_RECEIVED"));
+        owner.get("/api/v1/inventory/stock").andExpect(jsonPath("$.items[0].onHand").value(4.0))
+                .andExpect(jsonPath("$.items[0].onOrder").value(6.0));
+    }
+
+    @Test
+    void exactlyTheMinimumIsNotBelowIt() throws Exception {
+        count(widget, "12");
+        UUID po = Api.id(owner.post("/api/v1/purchase-orders", "{\"supplierId\":\"" + supplier + "\",\"warehouseId\":\""
+                + main + "\",\"lines\":[{\"productId\":\"" + widget + "\",\"quantity\":8,\"unitCost\":3}]}"));
+        owner.post("/api/v1/purchase-orders/" + po + "/order", "{\"version\":0}").andExpect(status().isOk());
+        rule(widget, "20", "60", null, null).andExpect(status().isOk());
+        owner.get("/api/v1/inventory/stock").andExpect(jsonPath("$.items[0].belowMin").value(false));
+        owner.get("/api/v1/inventory/reorder-suggestions").andExpect(jsonPath("$.length()").value(0));
+        owner.get("/api/v1/inventory/overview").andExpect(jsonPath("$.belowMinimum").value(0));
+        rule(widget, "21", "60", null, 0L).andExpect(status().isOk());
+        owner.get("/api/v1/inventory/stock").andExpect(jsonPath("$.items[0].belowMin").value(true));
+        owner.get("/api/v1/inventory/reorder-suggestions").andExpect(jsonPath("$.length()").value(1));
+    }
+
+    @Test
+    void anArchivedWarehouseDropsOutOfTheStockList() throws Exception {
+        UUID pune = Api.id(owner.post("/api/v1/inventory/warehouses", "{\"code\":\"PUNE\",\"name\":\"Pune\"}"));
+        count(widget, "3");
+        owner.put("/api/v1/inventory/reorder-rules", "{\"productId\":\"" + widget + "\",\"warehouseId\":\"" + pune
+                + "\",\"minQuantity\":5,\"maxQuantity\":9}").andExpect(status().isOk());
+        owner.get("/api/v1/inventory/stock").andExpect(jsonPath("$.total").value(2));
+        owner.get("/api/v1/inventory/reorder-suggestions").andExpect(jsonPath("$.length()").value(1));
+        owner.post("/api/v1/inventory/warehouses/" + pune + "/archive", "").andExpect(status().isOk());
+        owner.get("/api/v1/inventory/stock").andExpect(jsonPath("$.total").value(1))
+                .andExpect(jsonPath("$.items[0].warehouse.code").value("MAIN"));
+        owner.get("/api/v1/inventory/reorder-suggestions").andExpect(jsonPath("$.length()").value(0));
+        owner.get("/api/v1/inventory/overview").andExpect(jsonPath("$.belowMinimum").value(0));
+    }
 }

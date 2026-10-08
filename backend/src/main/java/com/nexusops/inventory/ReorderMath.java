@@ -25,13 +25,17 @@ final class ReorderMath {
             return usedLast30Days.divide(WINDOW_DAYS, 4, RoundingMode.HALF_UP);
         }
 
-        /** Null when nothing was used: no usage means no rate to divide by. */
+        /** Null when nothing was used: no usage means no rate to divide by. Uses the unrounded usage. */
         BigDecimal daysOfCover() {
-            BigDecimal daily = averageDailyUsage();
-            if (daily.signum() == 0) {
+            if (usedLast30Days.signum() == 0) {
                 return null;
             }
-            return available.max(BigDecimal.ZERO).divide(daily, 1, RoundingMode.HALF_UP);
+            return coverDays(1);
+        }
+
+        private BigDecimal coverDays(int scale) {
+            return available.max(BigDecimal.ZERO).multiply(WINDOW_DAYS).divide(usedLast30Days, scale,
+                    RoundingMode.HALF_UP);
         }
 
         BigDecimal suggestedQuantity() {
@@ -42,12 +46,10 @@ final class ReorderMath {
             StringBuilder text = new StringBuilder()
                     .append(plain(available)).append(" available, ")
                     .append(plain(onOrder)).append(" on order, below the minimum of ").append(plain(min)).append("; ");
-            BigDecimal daily = averageDailyUsage();
-            if (daily.signum() == 0) {
+            if (usedLast30Days.signum() == 0) {
                 text.append("no usage in the last 30 days; ");
             } else {
-                long days = available.max(BigDecimal.ZERO).divide(daily, 4, RoundingMode.HALF_UP)
-                        .setScale(0, RoundingMode.HALF_UP).longValue();
+                long days = coverDays(0).longValue();
                 text.append(plain(usedLast30Days)).append(" used in the last 30 days (about ").append(days)
                         .append(days == 1 ? " day" : " days").append(" of cover); ");
             }

@@ -95,6 +95,8 @@ public class ReorderService {
                 .orElse(null);
         if (rule != null) {
             Orders.checkVersion(rule.getVersion(), version);
+        } else if (version != null) {
+            throw ApiProblem.conflict(Orders.STALE);
         }
         // 400s first (product, warehouse, then the supplier last: it can answer 403), then the 409 archived checks.
         ProductBrief product = products.resolve(command.productId(), "productId");
@@ -158,6 +160,9 @@ public class ReorderService {
         Set<String> seen = new HashSet<>();
         for (int i = 0; i < items.size(); i++) {
             DraftOrdersCommand.Item item = items.get(i);
+            if (item == null) {
+                throw ApiProblem.badRequestField("items[" + i + "]", "Choose a suggestion.");
+            }
             String field = "items[" + i + "].";
             BigDecimal quantity = Quantities.positive(item.quantity(), field + "quantity");
             if (item.productId() == null || item.warehouseId() == null) {

@@ -54,4 +54,13 @@ class ReorderMathTest {
         assertThat(figures("0", "0", "5", "10", "30").daysOfCover()).isEqualByComparingTo("0");
         assertThat(figures("50", "20", "5", "10", "0").suggestedQuantity()).isEqualByComparingTo("0");
     }
+
+    @Test
+    void tinyUsageStillCounts() {
+        ReorderMath.Figures f = figures("1", "0", "5", "10", "0.001");
+        assertThat(f.daysOfCover()).isEqualByComparingTo("30000.0");
+        assertThat(f.explanation()).isEqualTo("1 available, 0 on order, below the minimum of 5; "
+                + "0.001 used in the last 30 days (about 30000 days of cover); order 9 to reach 10");
+        assertThat(figures("100", "0", "200", "300", "0.1").daysOfCover()).isEqualByComparingTo("30000.0");
+    }
 }

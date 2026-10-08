@@ -58,6 +58,9 @@ class InventoryQueries {
             )
             """;
 
+    /** A total order, so pages never repeat or skip a row. */
+    private static final String ORDER = "lower(product_name), lower(sku), warehouse_code, product_id, warehouse_id";
+
     private static final String BELOW_MIN = "rule_id is not null and available + on_order < min_quantity";
 
     record Row(UUID productId, String sku, String productName, String unit, UUID warehouseId, String warehouseCode,
@@ -73,7 +76,8 @@ class InventoryQueries {
         }
 
         boolean belowMin() {
-            return ruleId != null && available.add(onOrder).compareTo(minQuantity) < 0;
+            return ruleId != null
+                    && new ReorderMath.Figures(available, onOrder, minQuantity, maxQuantity, used).belowMin();
         }
     }
 
@@ -88,7 +92,7 @@ class InventoryQueries {
     List<Row> stockRows(StockQuery query, int limit, long offset) {
         MapSqlParameterSource params = params().addValue("limit", limit).addValue("offset", offset);
         return jdbc.query(PAIRS + "select * from rows where " + filters(query, params)
-                + " order by lower(product_name), lower(sku), warehouse_code limit :limit offset :offset", params,
+                + " order by " + ORDER + " limit :limit offset :offset", params,
                 InventoryQueries::row);
     }
 
@@ -102,7 +106,7 @@ class InventoryQueries {
     /** Every rule below its minimum, for active products in active warehouses. */
     List<Row> belowMinimum() {
         return jdbc.query(PAIRS + "select * from rows where " + BELOW_MIN
-                + " order by lower(product_name), lower(sku), warehouse_code", params(), InventoryQueries::row);
+                + " order by " + ORDER, params(), InventoryQueries::row);
     }
 
     Counts counts() {
