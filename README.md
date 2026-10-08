@@ -6,6 +6,7 @@ one permission model, one operational event stream — with modular business cap
 - Blueprint: `docs/research/master-blueprint.md`
 - Current design: `docs/superpowers/specs/2026-10-04-platform-foundation-design.md`
 - Canonical data model (Phase 4): `docs/superpowers/specs/2026-10-06-canonical-data-model-design.md`
+- CRM (Phase 5): `docs/superpowers/specs/2026-10-07-crm-mvp-design.md`
 - Decisions: `docs/decisions/`
 - Implementation plans: `docs/superpowers/plans/`
 
@@ -47,6 +48,19 @@ Shared by every module, in the app under **Directory**, **Products** and **Tasks
 - **Activity, tasks and documents:** attached to any person, organization or product. Documents are up to 10 MB each,
   with a per-plan storage quota, and are always downloaded, never opened in the browser (ADR-0009).
 - Records are archived, never deleted. Every change is in the audit log.
+
+## CRM (Phase 5)
+Switch the module on under **Settings → Modules**; every CRM permission switches off with it (ADR-0010).
+- **Leads:** prospects as you heard of them, entered by hand or imported from a CSV file (up to 500 rows; all or
+  nothing, with per-row errors). New → Contacted → Qualified, or Disqualified with a reason.
+- **Conversion:** links or creates the canonical person and organization (the directory's duplicate check applies),
+  makes the account a customer, and can open an opportunity.
+- **Pipeline:** your own stages (Settings → Pipeline) with probabilities; a board with per-currency totals; Lost needs
+  a reason; Won makes the account a customer.
+- **Customers and Customer 360:** people, deals, converted leads and one timeline that includes the deals' and leads'
+  activity. **Dashboard:** open leads, 90-day conversion rate, pipeline by stage, won and lost this month.
+- **Search:** the box at the top of every page (press `/`) finds people, organizations, leads, deals and products you
+  may see.
 
 ## Try the API (local)
 ```bash
