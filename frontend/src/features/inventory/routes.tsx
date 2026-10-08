@@ -3,11 +3,12 @@ import { PERMISSIONS, RequirePermission } from '@/features/auth/permissions'
 import { InventoryOverviewPage } from './InventoryOverviewPage'
 import { PurchaseOrderDetailPage } from './PurchaseOrderDetailPage'
 import { PurchaseOrdersPage } from './PurchaseOrdersPage'
+import { ReorderPage } from './ReorderPage'
 import { SalesOrderDetailPage } from './SalesOrderDetailPage'
 import { SalesOrdersPage } from './SalesOrdersPage'
 import { StockPage } from './StockPage'
 
-/** /app/inventory/* children; later tasks append theirs. */
+/** /app/inventory/* children. */
 export const inventoryChildren: RouteObject[] = [
   {
     index: true,
@@ -54,6 +55,14 @@ export const inventoryChildren: RouteObject[] = [
     element: (
       <RequirePermission anyOf={[PERMISSIONS.orderRead]}>
         <SalesOrderDetailPage />
+      </RequirePermission>
+    ),
+  },
+  {
+    path: 'reorder',
+    element: (
+      <RequirePermission anyOf={[PERMISSIONS.stockRead]}>
+        <ReorderPage />
       </RequirePermission>
     ),
   },
