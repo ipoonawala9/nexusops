@@ -19,3 +19,10 @@ export const positiveQuantitySchema = quantitySchema.refine(
   (v) => Number(v) > 0,
   'Enter a quantity greater than 0.',
 )
+
+/** A unit cost or price typed as text: 0 or more, at most 4 decimals. */
+export const priceSchema = z
+  .string()
+  .trim()
+  .refine((v) => /^\d+(\.\d+)?$/.test(v), 'Enter an amount like 12.50.')
+  .refine((v) => !/\.\d{5,}$/.test(v), 'Use at most 4 decimal places.')

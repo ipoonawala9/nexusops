@@ -10,6 +10,11 @@ import { cn } from '@/lib/utils'
 export const TABS: Array<{ to: string; label: string; anyOf: PermissionCode[]; end?: boolean }> = [
   { to: '/app/inventory', label: 'Overview', anyOf: [PERMISSIONS.stockRead], end: true },
   { to: '/app/inventory/stock', label: 'Stock', anyOf: [PERMISSIONS.stockRead] },
+  {
+    to: '/app/inventory/purchase-orders',
+    label: 'Purchase orders',
+    anyOf: [PERMISSIONS.purchaseRead],
+  },
 ]
 
 /** The Inventory area: only when the module is enabled; tabs follow the user's Inventory permissions. */
