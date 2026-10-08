@@ -23,6 +23,7 @@ import { problemMessage } from '@/lib/api/problems'
 import type { DuplicateCandidate, LeadView, PartyRef, StageView } from '@/lib/api/types'
 import { duplicatesOf } from '@/features/records/duplicates'
 import { PartyPicker } from './PartyPicker'
+import { moneySchema } from './schemas'
 
 type Mode = 'create' | 'link' | 'none'
 
@@ -89,9 +90,32 @@ export function ConvertLeadDialog({
     return { ...fields(), duplicateReason: value.candidates ? value.reason.trim() || null : null }
   }
 
+  /** Field keys that have a visible input right now; any other server message goes to the form error. */
+  function visibleFields() {
+    const keys = new Set<string>()
+    if (org.mode === 'create') keys.add('organization.name').add('organization.domain')
+    if (org.mode === 'link') keys.add('organization.existingId')
+    if (person.mode === 'create') keys.add('person.firstName').add('person.lastName')
+    if (person.mode === 'link') keys.add('person.existingId')
+    if (withDeal) {
+      keys
+        .add('opportunity.name')
+        .add('opportunity.amount')
+        .add('opportunity.stageId')
+        .add('opportunity.expectedCloseOn')
+    }
+    return keys
+  }
+
   async function submit() {
     setErrors({})
     setFormError(null)
+    const money = moneySchema.safeParse(amount)
+    if (withDeal && !money.success) {
+      setErrors({ 'opportunity.amount': money.error.issues[0].message })
+      return
+    }
+    const amountText = withDeal && money.success ? money.data : ''
     setBusy(true)
     const body = {
       organization: section(org.mode, org, () => ({
@@ -108,8 +132,8 @@ export function ConvertLeadDialog({
       opportunity: withDeal
         ? {
             name: dealName.trim(),
-            amount: amount === '' ? null : Number(amount),
-            currency: amount === '' ? null : lead.currency,
+            amount: amountText === '' ? null : Number(amountText),
+            currency: amountText === '' ? null : lead.currency,
             stageId: stageId || openStages[0]?.id || null,
             expectedCloseOn: closeOn || null,
           }
@@ -121,6 +145,7 @@ export function ConvertLeadDialog({
       queryClient.setQueryData(['lead', converted.id], converted)
       await queryClient.invalidateQueries({ queryKey: ['leads'] })
       await queryClient.invalidateQueries({ queryKey: ['crm-board'] })
+      await queryClient.invalidateQueries({ queryKey: ['parties'] })
       toast.success('Lead converted.')
       onConverted(converted)
     } catch (error) {
@@ -130,7 +155,11 @@ export function ConvertLeadDialog({
       if (candidates && party === 'organization') setOrg((s) => ({ ...s, candidates }))
       else if (candidates && party === 'person') setPerson((s) => ({ ...s, candidates }))
       else if (error instanceof ApiError && error.problem.errors?.length) {
-        setErrors(Object.fromEntries(error.problem.errors.map((e) => [e.field, e.message])))
+        const visible = visibleFields()
+        const matched = error.problem.errors.filter((e) => visible.has(e.field))
+        const unmatched = error.problem.errors.filter((e) => !visible.has(e.field))
+        setErrors(Object.fromEntries(matched.map((e) => [e.field, e.message])))
+        setFormError(unmatched.length ? unmatched.map((e) => e.message).join(' ') : null)
       } else setFormError(problemMessage(error))
     } finally {
       setBusy(false)
@@ -199,6 +228,7 @@ export function ConvertLeadDialog({
           )}
           {org.candidates && (
             <Duplicates
+              id="convert-org-duplicate-reason"
               candidates={org.candidates}
               reason={org.reason}
               onClose={onClose}
@@ -256,6 +286,7 @@ export function ConvertLeadDialog({
           )}
           {person.candidates && (
             <Duplicates
+              id="convert-person-duplicate-reason"
               candidates={person.candidates}
               reason={person.reason}
               onClose={onClose}
@@ -326,7 +357,7 @@ export function ConvertLeadDialog({
           )}
         </fieldset>
 
-        <FormError message={formError ?? (errors.person ? errors.person : null)} />
+        <FormError message={formError} />
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>
             Cancel
@@ -399,12 +430,14 @@ function TextInput({
 }
 
 function Duplicates({
+  id,
   candidates,
   reason,
   onReason,
   onUse,
   onClose,
 }: {
+  id: string
   candidates: DuplicateCandidate[]
   reason: string
   onReason: (v: string) => void
@@ -429,9 +462,9 @@ function Duplicates({
           </li>
         ))}
       </ul>
-      <Label htmlFor="convert-duplicate-reason">Or keep a separate record because…</Label>
+      <Label htmlFor={id}>Or keep a separate record because…</Label>
       <Textarea
-        id="convert-duplicate-reason"
+        id={id}
         rows={2}
         maxLength={500}
         value={reason}

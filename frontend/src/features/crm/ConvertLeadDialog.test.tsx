@@ -121,4 +121,77 @@ describe('ConvertLeadDialog', () => {
       await within(dialog).findByText('Enter between 1 and 80 characters.'),
     ).toBeInTheDocument()
   })
+
+  it('keeps the organization and person duplicate reasons apart', async () => {
+    const { server, user } = setup()
+    const duplicate = (party: string, id: string, name: string) => ({
+      status: 409,
+      body: {
+        detail: 'This looks like a record that already exists.',
+        party,
+        duplicates: [
+          {
+            id,
+            kind: party === 'organization' ? 'ORGANIZATION' : 'PERSON',
+            name,
+            email: null,
+            domain: null,
+            archived: false,
+          },
+        ],
+      },
+    })
+    server.on('POST /leads/:id/convert', (req) => {
+      const body = req.body as {
+        organization?: { duplicateReason?: string | null }
+        person?: { duplicateReason?: string | null }
+      }
+      if (!body.organization?.duplicateReason)
+        return duplicate('organization', 'p-acme-ltd', 'Acme Ltd')
+      if (!body.person?.duplicateReason) return duplicate('person', 'p-grace-h', 'Grace H.')
+      return { body: converted() }
+    })
+    const dialog = await open(user)
+    await user.click(within(dialog).getByRole('button', { name: 'Convert lead' }))
+    const orgGroup = within(await within(dialog).findByRole('group', { name: 'Organization' }))
+    await user.type(await orgGroup.findByLabelText(/keep a separate record/), 'Another branch')
+    await user.click(within(dialog).getByRole('button', { name: 'Convert lead' }))
+    const personGroup = within(within(dialog).getByRole('group', { name: 'Person' }))
+    await personGroup.findByText('Grace H.')
+    expect(within(dialog).getAllByRole('alert')).toHaveLength(2)
+    await user.type(personGroup.getByLabelText(/keep a separate record/), 'Different Grace')
+    await user.click(within(dialog).getByRole('button', { name: 'Convert lead' }))
+    const calls = server.callsTo('POST /leads/:id/convert')
+    expect(calls).toHaveLength(3)
+    expect(calls[2].body).toMatchObject({
+      organization: { duplicateReason: 'Another branch' },
+      person: { duplicateReason: 'Different Grace' },
+    })
+  })
+
+  it('shows server errors for fields the dialog has no input for', async () => {
+    const { server, user } = setup()
+    server.on('POST /leads/:id/convert', {
+      status: 400,
+      body: {
+        detail: 'Request validation failed.',
+        errors: [{ field: 'person.email', message: 'Enter a valid email address.' }],
+      },
+    })
+    const dialog = await open(user)
+    await user.click(within(dialog).getByRole('button', { name: 'Convert lead' }))
+    expect(await within(dialog).findByText('Enter a valid email address.')).toBeInTheDocument()
+  })
+
+  it('does not submit an amount that is not a number', async () => {
+    const { server, user } = setup()
+    server.on('POST /leads/:id/convert', { body: converted() })
+    const dialog = await open(user)
+    const amount = within(dialog).getByLabelText('Amount (USD)')
+    await user.clear(amount)
+    await user.type(amount, '1,000')
+    await user.click(within(dialog).getByRole('button', { name: 'Convert lead' }))
+    expect(await within(dialog).findByText('Enter a number like 1200.50.')).toBeInTheDocument()
+    expect(server.callsTo('POST /leads/:id/convert')).toHaveLength(0)
+  })
 })
