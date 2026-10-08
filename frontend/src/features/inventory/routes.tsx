@@ -3,6 +3,8 @@ import { PERMISSIONS, RequirePermission } from '@/features/auth/permissions'
 import { InventoryOverviewPage } from './InventoryOverviewPage'
 import { PurchaseOrderDetailPage } from './PurchaseOrderDetailPage'
 import { PurchaseOrdersPage } from './PurchaseOrdersPage'
+import { SalesOrderDetailPage } from './SalesOrderDetailPage'
+import { SalesOrdersPage } from './SalesOrdersPage'
 import { StockPage } from './StockPage'
 
 /** /app/inventory/* children; later tasks append theirs. */
@@ -36,6 +38,22 @@ export const inventoryChildren: RouteObject[] = [
     element: (
       <RequirePermission anyOf={[PERMISSIONS.purchaseRead]}>
         <PurchaseOrderDetailPage />
+      </RequirePermission>
+    ),
+  },
+  {
+    path: 'sales-orders',
+    element: (
+      <RequirePermission anyOf={[PERMISSIONS.orderRead]}>
+        <SalesOrdersPage />
+      </RequirePermission>
+    ),
+  },
+  {
+    path: 'sales-orders/:orderId',
+    element: (
+      <RequirePermission anyOf={[PERMISSIONS.orderRead]}>
+        <SalesOrderDetailPage />
       </RequirePermission>
     ),
   },

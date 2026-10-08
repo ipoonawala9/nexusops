@@ -6,7 +6,7 @@ import { ComingSoonPage } from '@/features/shell/ComingSoonPage'
 import { MODULE_PHASES } from '@/features/shell/nav'
 import { cn } from '@/lib/utils'
 
-/** Later tasks append Purchase orders, Sales orders and Reorder. */
+/** Later tasks append Reorder. */
 export const TABS: Array<{ to: string; label: string; anyOf: PermissionCode[]; end?: boolean }> = [
   { to: '/app/inventory', label: 'Overview', anyOf: [PERMISSIONS.stockRead], end: true },
   { to: '/app/inventory/stock', label: 'Stock', anyOf: [PERMISSIONS.stockRead] },
@@ -15,6 +15,7 @@ export const TABS: Array<{ to: string; label: string; anyOf: PermissionCode[]; e
     label: 'Purchase orders',
     anyOf: [PERMISSIONS.purchaseRead],
   },
+  { to: '/app/inventory/sales-orders', label: 'Sales orders', anyOf: [PERMISSIONS.orderRead] },
 ]
 
 /** The Inventory area: only when the module is enabled; tabs follow the user's Inventory permissions. */
