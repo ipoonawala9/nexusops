@@ -4,6 +4,7 @@ import com.nexusops.inventory.AdjustCommand;
 import com.nexusops.inventory.PurchaseLineCommand;
 import com.nexusops.inventory.PurchaseOrderCommand;
 import com.nexusops.inventory.ReceiptCommand;
+import com.nexusops.inventory.ReorderRuleCommand;
 import com.nexusops.inventory.SalesLineCommand;
 import com.nexusops.inventory.SalesOrderCommand;
 import com.nexusops.inventory.TransferCommand;
@@ -52,4 +53,11 @@ final class InventoryDtos {
     record VersionRequest(Long version) {}
 
     record ReceiptRequest(List<ReceiptCommand.Line> lines, Long version) {}
+
+    record ReorderRuleRequest(UUID productId, UUID warehouseId, BigDecimal minQuantity, BigDecimal maxQuantity,
+            UUID supplierId, Long version) {
+        ReorderRuleCommand command() {
+            return new ReorderRuleCommand(productId, warehouseId, minQuantity, maxQuantity, supplierId);
+        }
+    }
 }

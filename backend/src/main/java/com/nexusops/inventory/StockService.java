@@ -27,6 +27,7 @@ import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
@@ -47,9 +48,11 @@ public class StockService {
     private final WarehouseService warehouses;
     private final Members members;
     private final AuditService audit;
+    private final InventoryQueries queries;
 
     StockService(StockLedger ledger, StockLevelRepository levels, StockMovementRepository movements,
-            InventoryProducts products, WarehouseService warehouses, Members members, AuditService audit) {
+            InventoryProducts products, WarehouseService warehouses, Members members, AuditService audit,
+            InventoryQueries queries) {
         this.ledger = ledger;
         this.levels = levels;
         this.movements = movements;
@@ -57,6 +60,7 @@ public class StockService {
         this.warehouses = warehouses;
         this.members = members;
         this.audit = audit;
+        this.queries = queries;
     }
 
     @Transactional(readOnly = true)
@@ -102,6 +106,25 @@ public class StockService {
                 Paging.of(page, size, Sort.by(Sort.Order.desc("occurredAt"), Sort.Order.desc("id"))));
         return new PageResponse<>(views(result.getContent()), result.getNumber(), result.getSize(),
                 result.getTotalElements());
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponse<StockRow> list(StockQuery query, Integer page, Integer size) {
+        TenantContext.requireTenantId();
+        Pageable paging = Paging.of(page, size);
+        List<StockRow> rows = queries.stockRows(query, paging.getPageSize(), paging.getOffset()).stream()
+                .map(r -> new StockRow(r.product(), r.warehouse(), r.onHand(), r.reserved(), r.available(),
+                        r.onOrder(), r.ruleId(), r.minQuantity(), r.maxQuantity(), r.belowMin()))
+                .toList();
+        return new PageResponse<>(rows, paging.getPageNumber(), paging.getPageSize(), queries.countStockRows(query));
+    }
+
+    @Transactional(readOnly = true)
+    public InventoryOverview overview() {
+        TenantContext.requireTenantId();
+        InventoryQueries.Counts counts = queries.counts();
+        return new InventoryOverview(counts.belowMinimum(), counts.purchaseOrdersAwaitingReceipt(),
+                counts.salesOrdersAwaitingFulfilment(), movements(new MovementQuery(null, null, null), 0, 10).items());
     }
 
     @Transactional

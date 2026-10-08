@@ -1,9 +1,12 @@
 package com.nexusops.inventory.web;
 
+import com.nexusops.inventory.InventoryOverview;
 import com.nexusops.inventory.MovementKind;
 import com.nexusops.inventory.MovementQuery;
 import com.nexusops.inventory.MovementView;
 import com.nexusops.inventory.ProductStock;
+import com.nexusops.inventory.StockQuery;
+import com.nexusops.inventory.StockRow;
 import com.nexusops.inventory.StockService;
 import com.nexusops.inventory.web.InventoryDtos.AdjustRequest;
 import com.nexusops.inventory.web.InventoryDtos.TransferRequest;
@@ -26,6 +29,20 @@ class StockController {
 
     StockController(StockService stock) {
         this.stock = stock;
+    }
+
+    @GetMapping("/stock")
+    @PreAuthorize("hasAuthority('inventory.stock.read')")
+    PageResponse<StockRow> stock(@RequestParam(required = false) String q,
+            @RequestParam(required = false) UUID warehouseId, @RequestParam(defaultValue = "false") boolean belowMin,
+            @RequestParam(required = false) Integer page, @RequestParam(required = false) Integer size) {
+        return stock.list(new StockQuery(q, warehouseId, belowMin), page, size);
+    }
+
+    @GetMapping("/overview")
+    @PreAuthorize("hasAuthority('inventory.stock.read')")
+    InventoryOverview overview() {
+        return stock.overview();
     }
 
     @GetMapping("/stock/products/{productId}")
