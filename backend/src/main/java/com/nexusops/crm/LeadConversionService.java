@@ -16,7 +16,6 @@ import com.nexusops.directory.PersonCommand;
 import com.nexusops.identity.Members;
 import com.nexusops.shared.security.CurrentAuthorities;
 import com.nexusops.shared.web.ApiProblem;
-import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -122,12 +121,10 @@ public class LeadConversionService {
 
     private UUID openOpportunity(Lead lead, NewOpportunity o, UUID account, UUID contact) {
         String name = o.name() == null || o.name().isBlank() ? lead.getName() : o.name();
-        BigDecimal amount = o.amount() != null ? o.amount() : lead.getEstimatedValue();
-        String currency = o.amount() != null ? o.currency() : lead.getCurrency();
         UUID owner = lead.getOwnerId() != null && members.findActive(lead.getOwnerId()).isPresent()
                 ? lead.getOwnerId() : null;
         try {
-            return opportunities.open(new OpportunityCommand(name, account, contact, o.stageId(), amount, currency,
+            return opportunities.open(new OpportunityCommand(name, account, contact, o.stageId(), o.amount(), o.currency(),
                     o.expectedCloseOn(), owner, null), lead.getId()).getId();
         } catch (ApiProblem problem) {
             throw problem.prefixed("opportunity.");

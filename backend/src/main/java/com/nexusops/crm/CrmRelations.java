@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Component;
 
@@ -19,6 +20,7 @@ import org.springframework.stereotype.Component;
 class CrmRelations implements SubjectRelations {
 
     private static final int LIMIT = 100;
+    private static final Sort ORDER = Sort.by(Sort.Order.desc("createdAt"), Sort.Order.asc("id"));
 
     private final OpportunityRepository opportunities;
     private final LeadRepository leads;
@@ -34,11 +36,11 @@ class CrmRelations implements SubjectRelations {
         if (type.equals("PARTY")) {
             Specification<Opportunity> deals = (root, cq, cb) -> cb.or(cb.equal(root.get("accountId"), id),
                     cb.equal(root.get("contactId"), id));
-            opportunities.findAll(deals, PageRequest.of(0, LIMIT))
+            opportunities.findAll(deals, PageRequest.of(0, LIMIT, ORDER))
                     .forEach(o -> keys.add(new SubjectKey(OpportunitySubjects.TYPE, o.getId())));
             Specification<Lead> converted = (root, cq, cb) -> cb.or(cb.equal(root.get("convertedPersonId"), id),
                     cb.equal(root.get("convertedOrganizationId"), id));
-            leads.findAll(converted, PageRequest.of(0, LIMIT))
+            leads.findAll(converted, PageRequest.of(0, LIMIT, ORDER))
                     .forEach(l -> keys.add(new SubjectKey(LeadSubjects.TYPE, l.getId())));
         } else if (type.equals(OpportunitySubjects.TYPE)) {
             opportunities.findById(id).map(Opportunity::getLeadId)

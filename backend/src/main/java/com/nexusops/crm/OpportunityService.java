@@ -36,6 +36,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -169,7 +170,11 @@ public class OpportunityService {
                 : current.getKind() == target.getKind() ? opportunity.getClosedAt() : Instant.now();
         Map<String, Object> before = Map.of("stageId", current.getId().toString(), "stage", current.getName());
         opportunity.moveTo(target.getId(), closed, reason);
-        opportunities.flush();
+        try {
+            opportunities.flush();
+        } catch (DataIntegrityViolationException stageGone) {
+            throw ApiProblem.badRequestField("stageId", PipelineService.UNKNOWN_STAGE);
+        }
         Map<String, Object> after = new LinkedHashMap<>();
         after.put("stageId", target.getId().toString());
         after.put("stage", target.getName());

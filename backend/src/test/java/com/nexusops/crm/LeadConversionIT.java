@@ -48,7 +48,7 @@ class LeadConversionIT extends IntegrationTestSupport {
     }
 
     private static final String CREATE_BOTH = "{\"person\":{\"firstName\":\"Grace\",\"lastName\":\"Hopper\","
-            + "\"email\":\"grace@acme.test\"},\"organization\":{\"name\":\"Acme Robotics\"},\"opportunity\":{},\"version\":0}";
+            + "\"email\":\"grace@acme.test\"},\"organization\":{\"name\":\"Acme Robotics\"},\"opportunity\":{\"amount\":5000},\"version\":0}";
 
     @Test
     void createsThePersonTheOrganizationAndAnOpportunity() throws Exception {
@@ -76,6 +76,15 @@ class LeadConversionIT extends IntegrationTestSupport {
         owner.post("/api/v1/leads/" + lead + "/convert", CREATE_BOTH.replace("\"version\":0", "\"version\":1"))
                 .andExpect(status().isConflict());
         assertThat(count("select count(*) from audit_events where action = 'LeadConverted'")).isEqualTo(1);
+    }
+
+    @Test
+    void anOpportunityWithoutAnAmountHasNone() throws Exception {
+        owner.post("/api/v1/leads/" + lead + "/convert", CREATE_BOTH.replace("{\"amount\":5000}", "{}"))
+                .andExpect(status().isOk());
+        String opportunity = Api.read(owner.get("/api/v1/leads/" + lead), "$.convertedOpportunityId");
+        owner.get("/api/v1/opportunities/" + opportunity).andExpect(jsonPath("$.amount").doesNotExist())
+                .andExpect(jsonPath("$.currency").doesNotExist());
     }
 
     @Test

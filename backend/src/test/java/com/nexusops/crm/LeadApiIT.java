@@ -106,6 +106,25 @@ class LeadApiIT extends IntegrationTestSupport {
     }
 
     @Test
+    void auditsWhatChangedAndSkipsEditsThatChangeNothing() throws Exception {
+        UUID id = lead("{\"firstName\":\"Grace\",\"lastName\":\"Hopper\",\"email\":\"grace@acme.test\"}");
+        var jdbc = OwnerJdbc.ownerAs(ws.tenantId());
+        String updates = "select count(*) from audit_events where action = 'LeadUpdated'";
+        owner.put("/api/v1/leads/" + id, "{\"firstName\":\"Grace\",\"lastName\":\"Hopper\","
+                + "\"email\":\"grace@navy.test\",\"ownerId\":\"" + ownerId + "\",\"version\":0}")
+                .andExpect(status().isOk());
+        assertThat(jdbc.queryForObject(updates, Long.class)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("select \"before\"::text from audit_events where action = 'LeadUpdated'",
+                String.class)).contains("grace@acme.test");
+        assertThat(jdbc.queryForObject("select \"after\"::text from audit_events where action = 'LeadUpdated'",
+                String.class)).contains("grace@navy.test");
+        owner.put("/api/v1/leads/" + id, "{\"firstName\":\"Grace\",\"lastName\":\"Hopper\","
+                + "\"email\":\"grace@navy.test\",\"ownerId\":\"" + ownerId + "\",\"version\":1}")
+                .andExpect(status().isOk());
+        assertThat(jdbc.queryForObject(updates, Long.class)).isEqualTo(1);
+    }
+
+    @Test
     void statusChangesFollowTheRules() throws Exception {
         UUID id = lead("{\"lastName\":\"Patil\"}");
         owner.post("/api/v1/leads/" + id + "/status", "{\"status\":\"CONTACTED\",\"version\":0}")
@@ -137,6 +156,8 @@ class LeadApiIT extends IntegrationTestSupport {
         owner.get("/api/v1/leads?status=DISQUALIFIED").andExpect(jsonPath("$.items[*].id").value(Matchers.contains(c.toString())));
         owner.get("/api/v1/leads?q=KONKAN").andExpect(jsonPath("$.items[*].id").value(Matchers.contains(b.toString())));
         owner.get("/api/v1/leads?q=ops@").andExpect(jsonPath("$.total").value(1));
+        owner.get("/api/v1/leads?q=anjali deshpande").andExpect(jsonPath("$.items[*].id").value(Matchers.contains(a.toString())));
+        owner.get("/api/v1/leads?q=Deshpande, A").andExpect(jsonPath("$.total").value(0));
         owner.get("/api/v1/leads?source=WEBSITE").andExpect(jsonPath("$.items[*].id").value(Matchers.contains(a.toString())));
         owner.get("/api/v1/leads?owner=me").andExpect(jsonPath("$.total").value(2));
         owner.get("/api/v1/leads?owner=unassigned").andExpect(jsonPath("$.total").value(0));

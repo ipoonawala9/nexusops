@@ -92,14 +92,21 @@ public class LeadService {
         String q = Text.optional(query.q(), 100, "q");
         if (q != null) {
             String like = Text.containsPattern(q);
-            spec = spec.and((root, cq, cb) -> cb.or(cb.like(cb.lower(root.get("firstName")), like, '\\'),
-                    cb.like(cb.lower(root.get("lastName")), like, '\\'),
-                    cb.like(cb.lower(root.get("companyName")), like, '\\'), cb.like(root.get("email"), like, '\\')));
+            spec = spec.and(matching(like));
         }
         Page<Lead> result = leads.findAll(spec,
                 Paging.of(page, size, Sort.by(Sort.Order.desc("createdAt"), Sort.Order.asc("id"))));
         return new PageResponse<>(views(result.getContent()), result.getNumber(), result.getSize(),
                 result.getTotalElements());
+    }
+
+    /** Leads whose first name, last name, full name, company or email contains the (already escaped) pattern. */
+    static Specification<Lead> matching(String pattern) {
+        return (root, cq, cb) -> cb.or(cb.like(cb.lower(root.get("firstName")), pattern, '\\'),
+                cb.like(cb.lower(root.get("lastName")), pattern, '\\'),
+                cb.like(cb.lower(cb.concat(cb.concat(cb.coalesce(root.<String>get("firstName"), ""), " "),
+                        cb.coalesce(root.<String>get("lastName"), ""))), pattern, '\\'),
+                cb.like(cb.lower(root.get("companyName")), pattern, '\\'), cb.like(root.get("email"), pattern, '\\'));
     }
 
     @Transactional
@@ -126,7 +133,10 @@ public class LeadService {
         Map<String, Object> before = snapshot(lead);
         lead.apply(details);
         leads.flush();
-        audit.record(AuditEntry.of("LeadUpdated", "Lead", id).withBefore(before).withAfter(snapshot(lead)));
+        Map<String, Object> after = snapshot(lead);
+        if (!before.equals(after)) {
+            audit.record(AuditEntry.of("LeadUpdated", "Lead", id).withBefore(before).withAfter(after));
+        }
         return view(lead);
     }
 
@@ -224,7 +234,13 @@ public class LeadService {
         values.put("name", lead.getName());
         values.put("status", lead.getStatus().name());
         values.put("source", lead.getSource().name());
+        if (lead.getFirstName() != null) values.put("firstName", lead.getFirstName());
+        if (lead.getLastName() != null) values.put("lastName", lead.getLastName());
         if (lead.getCompanyName() != null) values.put("companyName", lead.getCompanyName());
+        if (lead.getJobTitle() != null) values.put("jobTitle", lead.getJobTitle());
+        if (lead.getEmail() != null) values.put("email", lead.getEmail());
+        if (lead.getPhone() != null) values.put("phone", lead.getPhone());
+        if (lead.getDescription() != null) values.put("descriptionLength", lead.getDescription().length());
         if (lead.getOwnerId() != null) values.put("ownerId", lead.getOwnerId().toString());
         if (lead.getEstimatedValue() != null) {
             values.put("estimatedValue", lead.getEstimatedValue().toPlainString());

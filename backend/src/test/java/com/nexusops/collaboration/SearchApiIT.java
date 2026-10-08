@@ -53,6 +53,13 @@ class SearchApiIT extends IntegrationTestSupport {
     }
 
     @Test
+    void findsALeadByItsFullName() throws Exception {
+        owner.post("/api/v1/leads", "{\"firstName\":\"Grace\",\"lastName\":\"Hopper\"}").andExpect(status().isCreated());
+        owner.get("/api/v1/search?q=grace hopper").andExpect(jsonPath("$[*].type").value(Matchers.contains("LEAD")))
+                .andExpect(jsonPath("$[0].label").value("Grace Hopper"));
+    }
+
+    @Test
     void returnsAtMostFivePerType() throws Exception {
         for (int i = 0; i < 7; i++) {
             owner.post("/api/v1/organizations", "{\"name\":\"Zebra " + i + "\"}").andExpect(status().isCreated());
