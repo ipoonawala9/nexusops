@@ -23,7 +23,7 @@ import { problemMessage } from '@/lib/api/problems'
 import type { DuplicateCandidate, LeadView, PartyRef, StageView } from '@/lib/api/types'
 import { duplicatesOf } from '@/features/records/duplicates'
 import { invalidateCrmFigures } from './invalidation'
-import { PartyPicker } from './PartyPicker'
+import { PartyPicker } from '@/features/records/PartyPicker'
 import { moneySchema } from './schemas'
 
 type Mode = 'create' | 'link' | 'none'

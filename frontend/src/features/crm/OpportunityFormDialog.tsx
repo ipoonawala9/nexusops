@@ -23,7 +23,7 @@ import { applyFieldErrors, problemMessage } from '@/lib/api/problems'
 import type { OpportunityView, PartyRef, StageView } from '@/lib/api/types'
 import { invalidateCrmFigures } from './invalidation'
 import { OwnerSelect } from './OwnerSelect'
-import { PartyPicker } from './PartyPicker'
+import { PartyPicker } from '@/features/records/PartyPicker'
 import { opportunitySchema, type OpportunityValues } from './schemas'
 
 const FIELDS = [

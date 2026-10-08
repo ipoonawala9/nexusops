@@ -7,6 +7,7 @@ one permission model, one operational event stream — with modular business cap
 - Current design: `docs/superpowers/specs/2026-10-04-platform-foundation-design.md`
 - Canonical data model (Phase 4): `docs/superpowers/specs/2026-10-06-canonical-data-model-design.md`
 - CRM (Phase 5): `docs/superpowers/specs/2026-10-07-crm-mvp-design.md`
+- Inventory (Phase 6): `docs/superpowers/specs/2026-10-08-inventory-mvp-design.md`
 - Decisions: `docs/decisions/`
 - Implementation plans: `docs/superpowers/plans/`
 
@@ -61,6 +62,20 @@ Switch the module on under **Settings → Modules**; every CRM permission switch
   activity. **Dashboard:** open leads, 90-day conversion rate, pipeline by stage, won and lost this month.
 - **Search:** the box at the top of every page (press `/`) finds people, organizations, leads, deals and products you
   may see.
+
+## Inventory (Phase 6)
+Switch the module on under **Settings → Modules**; every Inventory permission switches off with it (ADR-0011).
+- **Warehouses:** Settings → Warehouses. Every workspace starts with MAIN and keeps at least one active warehouse; a
+  warehouse that holds stock or has open orders can't be archived.
+- **Stock:** on hand, reserved, available and on order per product and warehouse. Counts set on hand to what you
+  found; transfers move available stock. Every change is one row in an append-only ledger, shown on the product page.
+- **Purchase orders:** draft → place → receive, in as many parts as deliveries arrive. Placing makes the party a
+  supplier.
+- **Sales orders:** confirming reserves every line or lists what is short; fulfilling ships it; cancelling releases
+  it. Confirming makes the party a customer.
+- **Reorder:** per product and warehouse, a minimum and maximum with a preferred supplier. Suggestions explain
+  themselves ("12 available, 0 on order, below the minimum of 20; 38 used in the last 30 days …") and become draft
+  purchase orders a person reviews and places.
 
 ## Try the API (local)
 ```bash
@@ -131,8 +146,10 @@ database backups. Losing it means every operator must re-enrol.
 ## Tests
 - `make test` runs the backend (including Testcontainers integration tests, so Docker must be running), the frontend and the ai-service.
 - `make e2e` starts the full Docker stack (UI http://localhost:3000, Mailpit http://localhost:8025) and runs the
-  Playwright journeys: sign up → verify → sign in → custom role → invite → accept → assign → audit trail, and a
-  platform admin suspending and reactivating a workspace. The stack stays up afterwards; `make down` stops it.
+  Playwright journeys: sign up → verify → sign in → custom role → invite → accept → assign → audit trail, a
+  platform admin suspending and reactivating a workspace, a lead becoming a customer with a won deal, and stock
+  counted, sold, explained by a reorder suggestion and received in two parts. The stack stays up afterwards;
+  `make down` stops it.
 - `make e2e` seeds a local-only platform operator (`e2e-ops@nexusops.test`); `make reset-db` removes it, and the next
   `make e2e` seeds it again.
 

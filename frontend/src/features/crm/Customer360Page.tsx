@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/table'
 import { ErrorState, ListSkeleton, PageHeader } from '@/components/states'
 import { PERMISSIONS, useCan } from '@/features/auth/permissions'
+import { PartyOrdersPanel } from '@/features/inventory/PartyOrdersPanel'
 import { ActivityPanel } from '@/features/records/ActivityPanel'
 import { DocumentsPanel } from '@/features/records/DocumentsPanel'
 import { SubjectTasksPanel } from '@/features/records/SubjectTasksPanel'
@@ -217,6 +218,7 @@ export function Customer360Page() {
           </ul>
         </section>
       )}
+      <PartyOrdersPanel partyId={party.id} />
       <SubjectTasksPanel
         subjectType="PARTY"
         subjectId={party.id}

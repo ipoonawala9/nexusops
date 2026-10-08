@@ -7,18 +7,18 @@ import { renderApp } from '@/test/renderApp'
 describe('ComingSoonPage', () => {
   it('names the blueprint phase of an enabled module', async () => {
     const server = fakeServer()
-    signedIn(server, testProfile({ modules: ['INVENTORY'] }))
-    renderApp({ server, path: '/app/inventory' })
-    expect(await screen.findByRole('heading', { name: 'Inventory' })).toBeInTheDocument()
-    expect(screen.getByText(/Phase 6/)).toBeInTheDocument()
+    signedIn(server, testProfile({ modules: ['HELPDESK'] }))
+    renderApp({ server, path: '/app/helpdesk' })
+    expect(await screen.findByRole('heading', { name: 'HelpDesk' })).toBeInTheDocument()
+    expect(screen.getByText(/Phase 7/)).toBeInTheDocument()
   })
 
   it('explains a module that is not enabled', async () => {
     const server = fakeServer()
     signedIn(server, testProfile({ modules: [] }))
-    renderApp({ server, path: '/app/inventory' })
+    renderApp({ server, path: '/app/helpdesk' })
     expect(
-      await screen.findByText('Inventory is not enabled for this workspace.'),
+      await screen.findByText('HelpDesk is not enabled for this workspace.'),
     ).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Manage modules' })).toHaveAttribute(
       'href',

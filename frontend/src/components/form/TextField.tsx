@@ -20,7 +20,7 @@ export function TextField<T extends FieldValues>({
   type?: 'text' | 'email' | 'password'
   autoComplete?: string
   hint?: string
-  inputMode?: 'text' | 'numeric' | 'email'
+  inputMode?: 'text' | 'numeric' | 'decimal' | 'email'
   maxLength?: number
   onValueChange?: (value: string) => void
 }) {

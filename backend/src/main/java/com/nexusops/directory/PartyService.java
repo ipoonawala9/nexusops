@@ -24,6 +24,7 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -31,6 +32,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
@@ -188,6 +190,18 @@ public class PartyService {
                 p -> new PartyBrief(p.getId(), p.getKind(), p.getName(), p.getOrganizationId(), p.isArchived())));
     }
 
+    /**
+     * For other modules' searches (orders by party name): ids of parties of any kind, archived included, whose name
+     * matches {@code likePattern} (already lowered and escaped, as {@code Text.containsPattern} makes it).
+     */
+    @Transactional(readOnly = true)
+    public Set<UUID> idsMatching(String likePattern, int limit) {
+        TenantContext.requireTenantId();
+        Specification<Party> spec = (root, cq, cb) -> cb.like(cb.lower(root.get("name")), likePattern, '\\');
+        return parties.findAll(spec, PageRequest.of(0, limit, Sort.by("name", "id"))).stream().map(Party::getId)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
     /** Idempotent: archiving an archived party changes nothing. */
     @Transactional
     public PartyView archive(UUID id) {
@@ -246,24 +260,33 @@ public class PartyService {
         return view(party);
     }
 
-    /**
-     * CRM's business rule (spec D7): converting a lead and winning a deal make the party a customer. Not a user action,
-     * so no permission check here (callers hold their own). Idempotent; archived parties are left alone.
-     */
+    /** CRM's business rule (spec D7): kept for its callers. */
     @Transactional
     public void ensureCustomer(UUID id) {
+        ensureRole(id, PartyRoleType.CUSTOMER);
+    }
+
+    /**
+     * Business rules of other modules (CRM: customers; Inventory: suppliers and customers) make a party play a role.
+     * Not a user action, so no permission check here. Idempotent; archived parties are left alone.
+     */
+    @Transactional
+    public void ensureRole(UUID id, PartyRoleType role) {
+        if (role == PartyRoleType.EMPLOYEE) {
+            throw new IllegalArgumentException("Employee roles are managed in the directory");
+        }
         Party party = find(id);
         if (party.isArchived()) {
             return;
         }
         locks.lock(ROLES_LOCK);
-        PartyRole row = roles.findByPartyIdAndRole(id, PartyRoleType.CUSTOMER).orElse(null);
+        PartyRole row = roles.findByPartyIdAndRole(id, role).orElse(null);
         if (row != null && row.getStatus() == RoleStatus.ACTIVE) {
             return;
         }
         Map<String, Object> before = row == null ? null : roleSnapshot(row);
         if (row == null) {
-            row = new PartyRole(Ids.newId(), id, PartyRoleType.CUSTOMER);
+            row = new PartyRole(Ids.newId(), id, role);
         }
         row.update(RoleStatus.ACTIVE, row.getSince(), null);
         roles.saveAndFlush(row);

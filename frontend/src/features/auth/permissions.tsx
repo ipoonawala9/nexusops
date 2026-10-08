@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { NoAccess } from '@/components/states'
 import { useTenantSession } from './tenantSession'
 
-/** Tenant permission codes (V3, V9–V15 catalog). The UI hides what these deny; the server enforces them. */
+/** Tenant permission codes (V3, V9–V22 catalog). The UI hides what these deny; the server enforces them. */
 export const PERMISSIONS = {
   settingsRead: 'tenant.settings.read',
   settingsUpdate: 'tenant.settings.update',
@@ -32,6 +32,14 @@ export const PERMISSIONS = {
   opportunityManage: 'crm.opportunity.manage',
   pipelineManage: 'crm.pipeline.manage',
   customerRead: 'crm.customer.read',
+  stockRead: 'inventory.stock.read',
+  stockAdjust: 'inventory.stock.adjust',
+  warehouseManage: 'inventory.warehouse.manage',
+  purchaseRead: 'inventory.purchase.read',
+  purchaseManage: 'inventory.purchase.manage',
+  orderRead: 'inventory.order.read',
+  orderManage: 'inventory.order.manage',
+  reorderManage: 'inventory.reorder.manage',
 } as const
 
 export type PermissionCode = (typeof PERMISSIONS)[keyof typeof PERMISSIONS]

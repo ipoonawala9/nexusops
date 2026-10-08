@@ -6,6 +6,8 @@ import { AuditPage } from '@/features/audit/AuditPage'
 import { PERMISSIONS, RequirePermission } from '@/features/auth/permissions'
 import { DirectoryPage } from '@/features/directory/DirectoryPage'
 import { PartyDetailPage } from '@/features/directory/PartyDetailPage'
+import { InventoryLayout } from '@/features/inventory/InventoryLayout'
+import { inventoryChildren } from '@/features/inventory/routes'
 import { ProductDetailPage } from '@/features/products/ProductDetailPage'
 import { ProductsPage } from '@/features/products/ProductsPage'
 import { TasksPage } from '@/features/tasks/TasksPage'
@@ -15,6 +17,7 @@ import { RoleDetailPage } from '@/features/settings/roles/RoleDetailPage'
 import { RolesPage } from '@/features/settings/roles/RolesPage'
 import { SettingsLayout } from '@/features/settings/SettingsLayout'
 import { UsersPage } from '@/features/settings/users/UsersPage'
+import { WarehousesSettingsPage } from '@/features/settings/WarehousesSettingsPage'
 import { WorkspaceSettingsPage } from '@/features/settings/WorkspaceSettingsPage'
 import { AppLayout } from './AppLayout'
 import { ComingSoonPage } from './ComingSoonPage'
@@ -87,6 +90,14 @@ export const settingsChildren: RouteObject[] = [
     ),
   },
   {
+    path: 'warehouses',
+    element: (
+      <RequirePermission anyOf={[PERMISSIONS.warehouseManage]}>
+        <WarehousesSettingsPage />
+      </RequirePermission>
+    ),
+  },
+  {
     path: '*',
     element: <EmptyState title="Settings page not found" description="Pick a section above." />,
   },
@@ -136,7 +147,7 @@ export const appChildren: RouteObject[] = [
     ),
   },
   { path: 'crm', element: <CrmLayout />, children: crmChildren },
-  modulePage('inventory', 'INVENTORY'),
+  { path: 'inventory', element: <InventoryLayout />, children: inventoryChildren },
   modulePage('helpdesk', 'HELPDESK'),
   modulePage('hrms', 'HRMS'),
   {

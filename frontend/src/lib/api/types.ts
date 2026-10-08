@@ -211,7 +211,8 @@ export interface ProductView {
 }
 
 /** Record types activities, tasks and documents attach to (server SubjectResolver codes). */
-export type SubjectType = 'PARTY' | 'PRODUCT' | 'LEAD' | 'OPPORTUNITY'
+export type SubjectType =
+  'PARTY' | 'PRODUCT' | 'LEAD' | 'OPPORTUNITY' | 'PURCHASE_ORDER' | 'SALES_ORDER'
 
 export interface MemberRef {
   id: string
@@ -444,4 +445,201 @@ export interface SearchHit {
 
 export interface ImportResult {
   imported: number
+}
+
+export interface WarehouseRef {
+  id: string
+  code: string
+  name: string
+}
+
+export interface WarehouseView extends WarehouseRef {
+  address: string | null
+  archivedAt: string | null
+  version: number
+}
+
+export interface StockProductRef {
+  id: string
+  sku: string
+  name: string
+  unit: string
+}
+
+export interface StockLevelView {
+  warehouse: WarehouseRef
+  onHand: number
+  reserved: number
+  available: number
+}
+
+export interface ProductStock {
+  product: StockProductRef
+  levels: StockLevelView[]
+  onHand: number
+  reserved: number
+  available: number
+}
+
+export type MovementKind = 'RECEIPT' | 'ISSUE' | 'ADJUSTMENT' | 'TRANSFER_OUT' | 'TRANSFER_IN'
+export type ReferenceType = 'PURCHASE_ORDER' | 'SALES_ORDER' | 'TRANSFER' | 'ADJUSTMENT'
+
+export interface MovementView {
+  id: string
+  product: StockProductRef
+  warehouse: WarehouseRef
+  kind: MovementKind
+  /** Signed: issues and transfers out are negative. */
+  quantity: number
+  onHandAfter: number
+  referenceType: ReferenceType
+  referenceId: string
+  reason: string | null
+  actor: MemberRef | null
+  occurredAt: string
+}
+
+export interface StockRow {
+  product: StockProductRef
+  warehouse: WarehouseRef
+  onHand: number
+  reserved: number
+  available: number
+  onOrder: number
+  ruleId: string | null
+  minQuantity: number | null
+  maxQuantity: number | null
+  belowMin: boolean
+}
+
+/** 409 "Not enough stock." carries these in `shortages`. */
+export interface Shortage {
+  productId: string
+  sku: string
+  requested: number
+  available: number
+}
+
+export type PurchaseOrderStatus =
+  'DRAFT' | 'ORDERED' | 'PARTIALLY_RECEIVED' | 'RECEIVED' | 'CANCELLED'
+
+export interface PurchaseLineView {
+  id: string
+  lineNo: number
+  product: StockProductRef
+  quantity: number
+  receivedQuantity: number
+  remainingQuantity: number
+  unitCost: number
+  lineTotal: number
+}
+
+export interface PurchaseOrderView {
+  id: string
+  number: string
+  supplier: PartyRef | null
+  warehouse: WarehouseRef
+  status: PurchaseOrderStatus
+  currency: string
+  expectedOn: string | null
+  notes: string | null
+  lines: PurchaseLineView[]
+  total: number
+  orderedAt: string | null
+  receivedAt: string | null
+  cancelledAt: string | null
+  createdBy: MemberRef | null
+  createdAt: string
+  updatedAt: string
+  version: number
+}
+
+export interface PurchaseOrderSummary {
+  id: string
+  number: string
+  supplier: PartyRef | null
+  warehouse: WarehouseRef
+  status: PurchaseOrderStatus
+  currency: string
+  total: number
+  lineCount: number
+  expectedOn: string | null
+  createdAt: string
+}
+
+export type SalesOrderStatus = 'DRAFT' | 'CONFIRMED' | 'FULFILLED' | 'CANCELLED'
+
+export interface SalesLineView {
+  id: string
+  lineNo: number
+  product: StockProductRef
+  quantity: number
+  unitPrice: number
+  lineTotal: number
+}
+
+export interface SalesOrderView {
+  id: string
+  number: string
+  customer: PartyRef | null
+  warehouse: WarehouseRef
+  status: SalesOrderStatus
+  currency: string
+  notes: string | null
+  lines: SalesLineView[]
+  total: number
+  confirmedAt: string | null
+  fulfilledAt: string | null
+  cancelledAt: string | null
+  createdBy: MemberRef | null
+  createdAt: string
+  updatedAt: string
+  version: number
+}
+
+export interface SalesOrderSummary {
+  id: string
+  number: string
+  customer: PartyRef | null
+  warehouse: WarehouseRef
+  status: SalesOrderStatus
+  currency: string
+  total: number
+  lineCount: number
+  createdAt: string
+}
+
+export interface ReorderRuleView {
+  id: string
+  product: StockProductRef
+  warehouse: WarehouseRef
+  minQuantity: number
+  maxQuantity: number
+  supplier: PartyRef | null
+  updatedAt: string
+  version: number
+}
+
+export interface ReorderSuggestion {
+  ruleId: string
+  product: StockProductRef
+  warehouse: WarehouseRef
+  available: number
+  onOrder: number
+  minQuantity: number
+  maxQuantity: number
+  supplier: PartyRef | null
+  usedLast30Days: number
+  averageDailyUsage: number
+  /** null when nothing was used in the last 30 days */
+  daysOfCover: number | null
+  suggestedQuantity: number
+  explanation: string
+}
+
+export interface InventoryOverview {
+  belowMinimum: number
+  purchaseOrdersAwaitingReceipt: number
+  salesOrdersAwaitingFulfilment: number
+  recentMovements: MovementView[]
 }

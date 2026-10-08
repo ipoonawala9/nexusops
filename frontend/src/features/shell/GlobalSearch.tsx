@@ -12,6 +12,8 @@ const TYPE_LABELS: Record<string, string> = {
   LEAD: 'Lead',
   OPPORTUNITY: 'Opportunity',
   PRODUCT: 'Product',
+  PURCHASE_ORDER: 'Purchase order',
+  SALES_ORDER: 'Sales order',
 }
 
 /** Workspace search (D12): 2+ characters, debounced; results are only the record types you may read. */
