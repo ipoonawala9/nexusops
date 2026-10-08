@@ -27,4 +27,5 @@ become customers.
 ## Consequences
 - The directory isn't flooded with prospects; customers stay unique.
 - An opportunity shows its account's and contact's names to anyone who can read the opportunity.
+- CRM routes check the record's state (404, stale 409) before validating the body (400); this deviates from the platform's 400→403→404→409 order and is accepted for consistency across CRM.
 - Several pipelines, line items, merging duplicates and AI summaries are later work (spec §1 non-goals).
