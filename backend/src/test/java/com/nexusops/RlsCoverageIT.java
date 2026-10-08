@@ -23,7 +23,7 @@ class RlsCoverageIT extends IntegrationTestSupport {
             "tenant_modules", "users", "refresh_tokens", "email_verifications",
             "roles", "role_permissions", "user_roles", "audit_events", "invitations",
             "parties", "party_roles", "products", "activities", "tasks",
-            "documents", "document_contents");
+            "documents", "document_contents", "pipeline_stages", "leads", "opportunities");
 
     @Autowired JdbcTemplate jdbc;
 

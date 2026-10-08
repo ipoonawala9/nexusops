@@ -72,11 +72,14 @@ public class TenantDirectory {
         if (tenants.existsBySlug(slug)) {
             throw slugTaken();
         }
+        TenantSummary created;
         try {
-            return tenants.saveAndFlush(Tenant.register(id, slug, name)).toSummary();
+            created = tenants.saveAndFlush(Tenant.register(id, slug, name)).toSummary();
         } catch (DataIntegrityViolationException race) {
             throw slugTaken();
         }
+        events.publishEvent(new WorkspaceRegistered(id));
+        return created;
     }
 
     @Transactional(readOnly = true)

@@ -29,9 +29,9 @@ class ActivityController {
     @GetMapping
     @PreAuthorize("isAuthenticated()")
     PageResponse<ActivityView> list(@RequestParam(required = false) String subjectType,
-            @RequestParam(required = false) UUID subjectId, @RequestParam(required = false) Integer page,
-            @RequestParam(required = false) Integer size) {
-        return activities.list(subjectType, subjectId, page, size);
+            @RequestParam(required = false) UUID subjectId, @RequestParam(defaultValue = "false") boolean includeRelated,
+            @RequestParam(required = false) Integer page, @RequestParam(required = false) Integer size) {
+        return activities.list(subjectType, subjectId, includeRelated, page, size);
     }
 
     @PostMapping

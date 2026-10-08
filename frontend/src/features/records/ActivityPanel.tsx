@@ -20,6 +20,7 @@ import { applyFieldErrors, problemMessage } from '@/lib/api/problems'
 import type { ActivityType, ActivityView, Page, SubjectType } from '@/lib/api/types'
 import { formatDateTime } from '@/lib/format'
 import { toQuery } from '@/lib/query'
+import { SubjectLink } from './SubjectLink'
 
 const TYPES: Record<ActivityType, string> = {
   NOTE: 'Note',
@@ -40,10 +41,12 @@ export function ActivityPanel({
   subjectType,
   subjectId,
   archived,
+  includeRelated = false,
 }: {
   subjectType: SubjectType
   subjectId: string
   archived: boolean
+  includeRelated?: boolean
 }) {
   const api = useApi()
   const can = useCan()
@@ -52,10 +55,16 @@ export function ActivityPanel({
   const [formError, setFormError] = useState<string | null>(null)
   const canLog = can(PERMISSIONS.activityCreate) && !archived
   const activities = useQuery({
-    queryKey: ['activities', subjectType, subjectId, page],
+    queryKey: ['activities', subjectType, subjectId, includeRelated, page],
     queryFn: () =>
       api.get<Page<ActivityView>>(
-        `/activities?${toQuery({ subjectType, subjectId, page, size: 20 })}`,
+        `/activities?${toQuery({
+          subjectType,
+          subjectId,
+          includeRelated: includeRelated ? 'true' : '',
+          page,
+          size: 20,
+        })}`,
       ),
     placeholderData: keepPreviousData,
   })
@@ -123,6 +132,12 @@ export function ActivityPanel({
                   <Badge variant="outline">{TYPES[activity.type]}</Badge>
                   <span className="font-medium">{activity.summary}</span>
                 </div>
+                {activity.subject &&
+                  (activity.subject.type !== subjectType || activity.subject.id !== subjectId) && (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      On <SubjectLink subject={activity.subject} />
+                    </p>
+                  )}
                 {activity.body && <p className="mt-2 whitespace-pre-wrap">{activity.body}</p>}
                 <p className="mt-2 text-xs text-muted-foreground">
                   {activity.author?.name ?? 'Former member'} · {formatDateTime(activity.occurredAt)}

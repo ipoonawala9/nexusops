@@ -21,6 +21,7 @@ import com.nexusops.shared.web.Paging;
 import jakarta.persistence.criteria.Root;
 import jakarta.persistence.criteria.Subquery;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -176,6 +177,17 @@ public class PartyService {
                 activeRoles.getOrDefault(p.getId(), List.of()), p.isArchived()));
     }
 
+    /** Tenant-scoped lookup for other modules; unknown ids (or other tenants') are simply absent. */
+    @Transactional(readOnly = true)
+    public Map<UUID, PartyBrief> briefs(Collection<UUID> ids) {
+        TenantContext.requireTenantId();
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+        return parties.findAllById(Set.copyOf(ids)).stream().collect(Collectors.toMap(Party::getId,
+                p -> new PartyBrief(p.getId(), p.getKind(), p.getName(), p.getOrganizationId(), p.isArchived())));
+    }
+
     /** Idempotent: archiving an archived party changes nothing. */
     @Transactional
     public PartyView archive(UUID id) {
@@ -232,6 +244,30 @@ public class PartyService {
         roles.saveAndFlush(row);
         audit.record(AuditEntry.of("PartyRoleChanged", "Party", id).withBefore(before).withAfter(roleSnapshot(row)));
         return view(party);
+    }
+
+    /**
+     * CRM's business rule (spec D7): converting a lead and winning a deal make the party a customer. Not a user action,
+     * so no permission check here (callers hold their own). Idempotent; archived parties are left alone.
+     */
+    @Transactional
+    public void ensureCustomer(UUID id) {
+        Party party = find(id);
+        if (party.isArchived()) {
+            return;
+        }
+        locks.lock(ROLES_LOCK);
+        PartyRole row = roles.findByPartyIdAndRole(id, PartyRoleType.CUSTOMER).orElse(null);
+        if (row != null && row.getStatus() == RoleStatus.ACTIVE) {
+            return;
+        }
+        Map<String, Object> before = row == null ? null : roleSnapshot(row);
+        if (row == null) {
+            row = new PartyRole(Ids.newId(), id, PartyRoleType.CUSTOMER);
+        }
+        row.update(RoleStatus.ACTIVE, row.getSince(), null);
+        roles.saveAndFlush(row);
+        audit.record(AuditEntry.of("PartyRoleChanged", "Party", id).withBefore(before).withAfter(roleSnapshot(row)));
     }
 
     private static Map<String, Object> roleSnapshot(PartyRole row) {
