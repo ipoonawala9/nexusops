@@ -51,3 +51,16 @@ export const leadSchema = z
 export type LeadValues = z.infer<typeof leadSchema>
 
 export const reasonSchema = z.object({ reason: requiredText(500) })
+
+export const opportunitySchema = z.object({
+  name: requiredText(200),
+  accountId: z.string().min(1, 'Choose an account.'),
+  contactId: z.string(),
+  stageId: z.string(),
+  amount: moneySchema,
+  currency: currencySchema,
+  expectedCloseOn: z.string(),
+  ownerId: z.string(),
+  description: z.string().max(5000, 'Use at most 5000 characters.'),
+})
+export type OpportunityValues = z.infer<typeof opportunitySchema>

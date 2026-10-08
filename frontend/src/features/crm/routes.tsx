@@ -3,6 +3,8 @@ import { EmptyState } from '@/components/states'
 import { PERMISSIONS, RequirePermission } from '@/features/auth/permissions'
 import { LeadDetailPage } from './LeadDetailPage'
 import { LeadsPage } from './LeadsPage'
+import { OpportunityDetailPage } from './OpportunityDetailPage'
+import { PipelinePage } from './PipelinePage'
 
 function Pending({ title }: { title: string }) {
   return <EmptyState title={title} description="This page is being built." />
@@ -37,7 +39,7 @@ export const crmChildren: RouteObject[] = [
     path: 'pipeline',
     element: (
       <RequirePermission anyOf={[PERMISSIONS.opportunityRead]}>
-        <Pending title="Pipeline" />
+        <PipelinePage />
       </RequirePermission>
     ),
   },
@@ -45,7 +47,7 @@ export const crmChildren: RouteObject[] = [
     path: 'opportunities/:opportunityId',
     element: (
       <RequirePermission anyOf={[PERMISSIONS.opportunityRead]}>
-        <Pending title="Opportunity" />
+        <OpportunityDetailPage />
       </RequirePermission>
     ),
   },
