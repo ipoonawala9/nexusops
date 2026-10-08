@@ -103,7 +103,7 @@ public class SalesOrderService {
         String q = Text.optional(query.q(), 100, "q");
         if (q != null) {
             String like = Text.containsPattern(q);
-            spec = spec.and((root, cq, cb) -> cb.like(cb.lower(root.get("number")), like, '\\'));
+            spec = spec.and(orderParties.numberOrPartyName(like, "customerId"));
         }
         Page<SalesOrder> result = orders.findAll(spec,
                 Paging.of(page, size, Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id"))));
@@ -246,6 +246,9 @@ public class SalesOrderService {
         List<SalesLineCommand> checked = new ArrayList<>();
         for (int i = 0; i < command.lines().size(); i++) {
             SalesLineCommand l = command.lines().get(i);
+            if (l == null) {
+                throw ApiProblem.badRequestField(Orders.item(i), Orders.EMPTY_LINE);
+            }
             BigDecimal quantity = Quantities.positive(l.quantity(), Orders.field(i, "quantity"));
             BigDecimal price = Decimals.nonNegative(l.unitPrice(), Orders.field(i, "unitPrice"),
                     "Enter a price of 0 or more.");

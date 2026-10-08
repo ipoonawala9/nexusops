@@ -121,6 +121,14 @@ class SalesOrderApiIT extends IntegrationTestSupport {
             owner.post("/api/v1/sales-orders", c[0]).andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.errors[0].field").value(c[1]));
         }
+        owner.post("/api/v1/sales-orders", body("null")).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[0].field").value("lines[0]"))
+                .andExpect(jsonPath("$.errors[0].message").value("Add a product and quantity."));
+        UUID order = draft(line(widget, "1", null));
+        owner.put("/api/v1/sales-orders/" + order, body(line(widget, "1", null) + ",null")
+                .replace("]}", "],\"version\":0}")).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[0].field").value("lines[1]"))
+                .andExpect(jsonPath("$.errors[0].message").value("Add a product and quantity."));
     }
 
     @Test
@@ -242,6 +250,8 @@ class SalesOrderApiIT extends IntegrationTestSupport {
                 () -> act(order, "fulfil", 1).andReturn().getResponse().getStatus());
         assertThat(statuses).containsExactlyInAnyOrder(200, 409);
         stock(widget).andExpect(jsonPath("$.onHand").value(6.0)).andExpect(jsonPath("$.reserved").value(0.0));
+
+        TestInventory.assertLedgerBalances(ws.tenantId());
     }
 
     @Test
@@ -256,6 +266,8 @@ class SalesOrderApiIT extends IntegrationTestSupport {
         assertThat(statuses).containsExactlyInAnyOrder(200, 409);
         // only the cancelled order's 4 were released; the other order's reservation stands
         stock(widget).andExpect(jsonPath("$.onHand").value(10.0)).andExpect(jsonPath("$.reserved").value(3.0));
+
+        TestInventory.assertLedgerBalances(ws.tenantId());
     }
 
     @Test
@@ -282,6 +294,8 @@ class SalesOrderApiIT extends IntegrationTestSupport {
             pool.shutdownNow();
         }
         stock(gadget).andExpect(jsonPath("$.reserved").value(2.0)).andExpect(jsonPath("$.available").value(1.0));
+
+        TestInventory.assertLedgerBalances(ws.tenantId());
     }
 
     @Test
@@ -307,6 +321,12 @@ class SalesOrderApiIT extends IntegrationTestSupport {
                 .andExpect(jsonPath("$.items[*].id").value(Matchers.contains(second.toString())));
         owner.get("/api/v1/sales-orders?q=00001")
                 .andExpect(jsonPath("$.items[*].id").value(Matchers.contains(first.toString())));
+        owner.get("/api/v1/sales-orders?q=deccan").andExpect(jsonPath("$.total").value(2));
+        UUID other = Api.id(owner.post("/api/v1/organizations", "{\"name\":\"Malabar Traders\"}"));
+        UUID third = Api.id(owner.post("/api/v1/sales-orders", body(line(widget, "1", null))
+                .replace(customer.toString(), other.toString())).andExpect(status().isCreated()));
+        owner.get("/api/v1/sales-orders?q=bar trad").andExpect(jsonPath("$.items[*].id")
+                .value(Matchers.contains(third.toString())));
         owner.get("/api/v1/sales-orders?customerId=" + customer).andExpect(jsonPath("$.total").value(2));
         owner.get("/api/v1/sales-orders/" + UUID.randomUUID()).andExpect(status().isNotFound());
 
@@ -318,7 +338,7 @@ class SalesOrderApiIT extends IntegrationTestSupport {
                 + "\",\"type\":\"NOTE\",\"summary\":\"Customer wants it gift-wrapped\"}").andExpect(status().isCreated());
         owner.get("/api/v1/activities?subjectType=PARTY&subjectId=" + customer + "&includeRelated=true")
                 .andExpect(jsonPath("$.items[*].summary").value(Matchers.hasItem("Customer wants it gift-wrapped")));
-        assertThat(audits("SalesOrderCreated")).isEqualTo(2);
+        assertThat(audits("SalesOrderCreated")).isEqualTo(3);
         assertThat(audits("SalesOrderConfirmed")).isEqualTo(1);
     }
 }

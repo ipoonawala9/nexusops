@@ -24,6 +24,7 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -31,6 +32,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
@@ -186,6 +188,18 @@ public class PartyService {
         }
         return parties.findAllById(Set.copyOf(ids)).stream().collect(Collectors.toMap(Party::getId,
                 p -> new PartyBrief(p.getId(), p.getKind(), p.getName(), p.getOrganizationId(), p.isArchived())));
+    }
+
+    /**
+     * For other modules' searches (orders by party name): ids of parties of any kind, archived included, whose name
+     * matches {@code likePattern} (already lowered and escaped, as {@code Text.containsPattern} makes it).
+     */
+    @Transactional(readOnly = true)
+    public Set<UUID> idsMatching(String likePattern, int limit) {
+        TenantContext.requireTenantId();
+        Specification<Party> spec = (root, cq, cb) -> cb.like(cb.lower(root.get("name")), likePattern, '\\');
+        return parties.findAll(spec, PageRequest.of(0, limit, Sort.by("name", "id"))).stream().map(Party::getId)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
     /** Idempotent: archiving an archived party changes nothing. */

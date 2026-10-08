@@ -77,7 +77,7 @@ class WarehouseApiIT extends IntegrationTestSupport {
         owner.get("/api/v1/inventory/warehouses").andExpect(jsonPath("$[*].code").value(Matchers.contains("MAIN")));
         owner.get("/api/v1/inventory/warehouses?archived=true").andExpect(jsonPath("$[*].code").value(Matchers.contains("PUNE-1")));
         owner.put("/api/v1/inventory/warehouses/" + pune, "{\"code\":\"P\",\"name\":\"P\",\"version\":2}")
-                .andExpect(status().isConflict());
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.detail").value("This record is archived."));
         owner.post("/api/v1/inventory/warehouses/" + pune + "/restore", "").andExpect(status().isOk())
                 .andExpect(jsonPath("$.archivedAt").doesNotExist());
         assertThat(OwnerJdbc.ownerAs(ws.tenantId()).queryForObject("select count(*) from audit_events where action in "
@@ -100,6 +100,9 @@ class WarehouseApiIT extends IntegrationTestSupport {
         }
         owner.post("/api/v1/inventory/warehouses", "{\"code\":\"main\",\"name\":\"Again\"}").andExpect(status().isConflict())
                 .andExpect(jsonPath("$.errors[0].field").value("code"));
+        UUID main = TestInventory.mainWarehouse(owner);
+        owner.put("/api/v1/inventory/warehouses/" + main, "{\"code\":\"MAIN\",\"name\":\"Main\"}")
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("version"));
     }
 
     @Test
@@ -116,5 +119,14 @@ class WarehouseApiIT extends IntegrationTestSupport {
         Api reader = Api.login(mvc, members.create(ws.tenantId(), Set.of(role)));
         reader.get("/api/v1/inventory/warehouses").andExpect(status().isOk());
         reader.post("/api/v1/inventory/warehouses", "{\"code\":\"X\",\"name\":\"X\"}").andExpect(status().isForbidden());
+    }
+
+    @Test
+    void managersWithoutStockReadStillListWarehouses() throws Exception {
+        UUID role = TestRoles.create(mvc, owner.session(), "Warehouse keeper", "inventory.warehouse.manage");
+        Api keeper = Api.login(mvc, members.create(ws.tenantId(), Set.of(role)));
+        keeper.get("/api/v1/inventory/warehouses").andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].code").value(Matchers.contains("MAIN")));
+        keeper.get("/api/v1/inventory/stock").andExpect(status().isForbidden());
     }
 }

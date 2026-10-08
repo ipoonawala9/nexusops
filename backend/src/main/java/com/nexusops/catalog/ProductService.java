@@ -18,6 +18,7 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.Currency;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -45,12 +46,15 @@ public class ProductService {
     private final TenantDirectory tenants;
     private final TenantLocks locks;
     private final AuditService audit;
+    private final List<ProductKindGuard> kindGuards;
 
-    ProductService(ProductRepository products, TenantDirectory tenants, TenantLocks locks, AuditService audit) {
+    ProductService(ProductRepository products, TenantDirectory tenants, TenantLocks locks, AuditService audit,
+            List<ProductKindGuard> kindGuards) {
         this.products = products;
         this.tenants = tenants;
         this.locks = locks;
         this.audit = audit;
+        this.kindGuards = kindGuards;
     }
 
     @Transactional(readOnly = true)
@@ -120,6 +124,10 @@ public class ProductService {
             if (products.existsBySkuIgnoreCaseAndIdNot(details.sku(), id)) {
                 throw ApiProblem.conflictField("sku", SKU_TAKEN);
             }
+        }
+        if (details.kind() != product.getKind()) {
+            ProductKind from = product.getKind();
+            kindGuards.forEach(guard -> guard.beforeKindChange(id, from, details.kind()));
         }
         Map<String, Object> before = snapshot(product);
         product.apply(details);

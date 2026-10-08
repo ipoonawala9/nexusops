@@ -27,8 +27,9 @@ class WarehouseController {
         this.warehouses = warehouses;
     }
 
+    /** Stock readers pick warehouses; warehouse managers keep them in Settings without needing stock. */
     @GetMapping
-    @PreAuthorize("hasAuthority('inventory.stock.read')")
+    @PreAuthorize("hasAnyAuthority('inventory.stock.read', 'inventory.warehouse.manage')")
     List<WarehouseView> list(@RequestParam(defaultValue = "false") boolean archived) {
         return warehouses.list(archived);
     }

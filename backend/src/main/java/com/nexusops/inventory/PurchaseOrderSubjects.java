@@ -54,7 +54,7 @@ class PurchaseOrderSubjects implements SubjectResolver {
 
     @Override
     public List<SearchHit> search(String pattern, int limit) {
-        Specification<PurchaseOrder> spec = (root, cq, cb) -> cb.like(cb.lower(root.get("number")), pattern, '\\');
+        Specification<PurchaseOrder> spec = parties.numberOrPartyName(pattern, "supplierId");
         List<PurchaseOrder> found = orders.findAll(spec,
                 PageRequest.of(0, limit, Sort.by(Sort.Order.desc("createdAt"), Sort.Order.asc("id")))).getContent();
         Map<UUID, PartyRef> names = parties.refs(found.stream().map(PurchaseOrder::getSupplierId)

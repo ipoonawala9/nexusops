@@ -73,6 +73,25 @@ class SearchApiIT extends IntegrationTestSupport {
     }
 
     @Test
+    void findsOrdersByTheirPartysName() throws Exception {
+        TestInventory.enable(owner);
+        UUID party = Api.id(owner.post("/api/v1/organizations", "{\"name\":\"Malabar Spice Co\"}"));
+        UUID widget = TestInventory.goods(owner, "MS-W", "Pepper sack");
+        UUID main = TestInventory.mainWarehouse(owner);
+        owner.post("/api/v1/purchase-orders", "{\"supplierId\":\"" + party + "\",\"warehouseId\":\"" + main
+                + "\",\"lines\":[{\"productId\":\"" + widget + "\",\"quantity\":1,\"unitCost\":1}]}")
+                .andExpect(status().isCreated());
+        owner.post("/api/v1/sales-orders", "{\"customerId\":\"" + party + "\",\"warehouseId\":\"" + main
+                + "\",\"lines\":[{\"productId\":\"" + widget + "\",\"quantity\":1,\"unitPrice\":1}]}")
+                .andExpect(status().isCreated());
+        owner.get("/api/v1/search?q=malabar spice").andExpect(jsonPath("$[*].type")
+                .value(Matchers.contains("PARTY", "PURCHASE_ORDER", "SALES_ORDER")))
+                .andExpect(jsonPath("$[1].label").value("PO-00001"))
+                .andExpect(jsonPath("$[1].detail").value("Malabar Spice Co"))
+                .andExpect(jsonPath("$[2].label").value("SO-00001"));
+    }
+
+    @Test
     void findsALeadByItsFullName() throws Exception {
         owner.post("/api/v1/leads", "{\"firstName\":\"Grace\",\"lastName\":\"Hopper\"}").andExpect(status().isCreated());
         owner.get("/api/v1/search?q=grace hopper").andExpect(jsonPath("$[*].type").value(Matchers.contains("LEAD")))

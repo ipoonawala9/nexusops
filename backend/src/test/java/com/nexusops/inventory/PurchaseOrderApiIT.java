@@ -112,6 +112,17 @@ class PurchaseOrderApiIT extends IntegrationTestSupport {
             owner.post("/api/v1/purchase-orders", c[0]).andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.errors[0].field").value(c[1]));
         }
+        owner.post("/api/v1/purchase-orders", body(main, line(widget, "1", "1") + ",null"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("lines[1]"))
+                .andExpect(jsonPath("$.errors[0].message").value("Add a product and quantity."));
+        UUID order = draft();
+        owner.put("/api/v1/purchase-orders/" + order, body(main, "null").replace("]}", "],\"version\":0}"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("lines[0]"))
+                .andExpect(jsonPath("$.errors[0].message").value("Add a product and quantity."));
+        owner.post("/api/v1/purchase-orders/" + order + "/order", "{\"version\":0}").andExpect(status().isOk());
+        receive(order, "null", 1).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[0].field").value("lines[0]"))
+                .andExpect(jsonPath("$.errors[0].message").value("Choose a line of this order."));
     }
 
     @Test
@@ -157,11 +168,15 @@ class PurchaseOrderApiIT extends IntegrationTestSupport {
         owner.get("/api/v1/inventory/stock/products/" + widget).andExpect(jsonPath("$.onHand").value(4.0));
         receive(order, "{\"lineId\":\"" + first + "\",\"quantity\":7}", 2).andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors[0].field").value("lines[0].quantity"));
+        owner.get("/api/v1/inventory/stock/products/" + widget).andExpect(jsonPath("$.onHand").value(4.0));
         receive(order, "{\"lineId\":\"" + first + "\",\"quantity\":6},{\"lineId\":\"" + second + "\",\"quantity\":4}", 2)
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("RECEIVED"))
                 .andExpect(jsonPath("$.receivedAt").exists());
         receive(order, "{\"lineId\":\"" + first + "\",\"quantity\":1}", 3).andExpect(status().isConflict());
+        owner.get("/api/v1/inventory/stock/products/" + widget).andExpect(jsonPath("$.onHand").value(10.0));
         owner.get("/api/v1/inventory/movements?productId=" + widget).andExpect(jsonPath("$.total").value(2))
+                .andExpect(jsonPath("$.items[*].kind").value(Matchers.contains("RECEIPT", "RECEIPT")))
+                .andExpect(jsonPath("$.items[*].quantity").value(Matchers.containsInAnyOrder(6.0, 4.0)))
                 .andExpect(jsonPath("$.items[0].kind").value("RECEIPT"))
                 .andExpect(jsonPath("$.items[0].referenceType").value("PURCHASE_ORDER"))
                 .andExpect(jsonPath("$.items[0].referenceId").value(order.toString()))
@@ -210,6 +225,7 @@ class PurchaseOrderApiIT extends IntegrationTestSupport {
         }
         assertThat(statuses).containsExactlyInAnyOrder(200, 409);
         owner.get("/api/v1/inventory/stock/products/" + widget).andExpect(jsonPath("$.onHand").value(10.0));
+        TestInventory.assertLedgerBalances(ws.tenantId());
     }
 
     @Test
@@ -220,11 +236,46 @@ class PurchaseOrderApiIT extends IntegrationTestSupport {
         UUID ordered = draft();
         owner.post("/api/v1/purchase-orders/" + ordered + "/order", "{\"version\":0}").andExpect(status().isOk());
         owner.post("/api/v1/purchase-orders/" + ordered + "/cancel", "{\"version\":1}").andExpect(status().isOk());
+        // a partly received order is closed: the rest won't arrive
+        UUID partly = draft();
+        owner.post("/api/v1/purchase-orders/" + partly + "/order", "{\"version\":0}").andExpect(status().isOk());
+        receive(partly, "{\"lineId\":\"" + lineIds(partly, 0) + "\",\"quantity\":1}", 1).andExpect(status().isOk());
+        owner.post("/api/v1/purchase-orders/" + partly + "/cancel", "{\"version\":2}").andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CANCELLED"));
         UUID received = draft();
         owner.post("/api/v1/purchase-orders/" + received + "/order", "{\"version\":0}").andExpect(status().isOk());
-        receive(received, "{\"lineId\":\"" + lineIds(received, 0) + "\",\"quantity\":1}", 1).andExpect(status().isOk());
-        owner.post("/api/v1/purchase-orders/" + received + "/cancel", "{\"version\":2}").andExpect(status().isConflict());
-        assertThat(audits("PurchaseOrderCancelled")).isEqualTo(2);
+        receive(received, "{\"lineId\":\"" + lineIds(received, 0) + "\",\"quantity\":10},{\"lineId\":\""
+                + lineIds(received, 1) + "\",\"quantity\":4}", 1).andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("RECEIVED"));
+        owner.post("/api/v1/purchase-orders/" + received + "/cancel", "{\"version\":2}").andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail").value("A received purchase order can't be cancelled."));
+        owner.post("/api/v1/purchase-orders/" + drafted + "/cancel", "{\"version\":1}").andExpect(status().isConflict());
+        assertThat(audits("PurchaseOrderCancelled")).isEqualTo(3);
+    }
+
+    @Test
+    void closingAPartlyReceivedOrderKeepsWhatArrived() throws Exception {
+        UUID pune = Api.id(owner.post("/api/v1/inventory/warehouses", "{\"code\":\"PUNE\",\"name\":\"Pune\"}"));
+        UUID order = Api.id(owner.post("/api/v1/purchase-orders", body(pune, line(widget, "10", "2")))
+                .andExpect(status().isCreated()));
+        owner.post("/api/v1/purchase-orders/" + order + "/order", "{\"version\":0}").andExpect(status().isOk());
+        receive(order, "{\"lineId\":\"" + lineIds(order, 0) + "\",\"quantity\":4}", 1).andExpect(status().isOk());
+        owner.get("/api/v1/inventory/stock?warehouseId=" + pune).andExpect(jsonPath("$.items[0].onOrder").value(6.0));
+        owner.post("/api/v1/purchase-orders/" + order + "/cancel", "{\"version\":2}").andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CANCELLED"))
+                .andExpect(jsonPath("$.cancelledAt").exists())
+                .andExpect(jsonPath("$.receivedAt").doesNotExist())
+                .andExpect(jsonPath("$.lines[0].receivedQuantity").value(4.0))
+                .andExpect(jsonPath("$.lines[0].remainingQuantity").value(6.0));
+        owner.get("/api/v1/inventory/stock?warehouseId=" + pune).andExpect(jsonPath("$.items[0].onOrder").value(0.0))
+                .andExpect(jsonPath("$.items[0].onHand").value(4.0));
+        // only the stock holds the warehouse now; once it's counted out, the closed order doesn't
+        owner.post("/api/v1/inventory/warehouses/" + pune + "/archive", "").andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail").value("Move or count out this warehouse's stock first."));
+        owner.post("/api/v1/inventory/adjustments", "{\"productId\":\"" + widget + "\",\"warehouseId\":\"" + pune
+                + "\",\"countedQuantity\":0,\"reason\":\"Count\"}").andExpect(status().isOk());
+        owner.post("/api/v1/inventory/warehouses/" + pune + "/archive", "").andExpect(status().isOk());
+        TestInventory.assertLedgerBalances(ws.tenantId());
     }
 
     @Test
@@ -248,8 +299,14 @@ class PurchaseOrderApiIT extends IntegrationTestSupport {
                 .andExpect(jsonPath("$.items[0].total").value(65.0));
         owner.get("/api/v1/purchase-orders?status=ORDERED").andExpect(jsonPath("$.items[*].id").value(Matchers.contains(second.toString())));
         owner.get("/api/v1/purchase-orders?q=00001").andExpect(jsonPath("$.items[*].id").value(Matchers.contains(first.toString())));
+        owner.get("/api/v1/purchase-orders?q=konkan sup").andExpect(jsonPath("$.total").value(2));
+        UUID other = Api.id(owner.post("/api/v1/organizations", "{\"name\":\"Malabar Traders\"}"));
+        UUID third = Api.id(owner.post("/api/v1/purchase-orders", body(main, line(widget, "1", "1"))
+                .replace(supplier.toString(), other.toString())).andExpect(status().isCreated()));
+        owner.get("/api/v1/purchase-orders?q=MALABAR").andExpect(jsonPath("$.items[*].id")
+                .value(Matchers.contains(third.toString())));
         owner.get("/api/v1/purchase-orders?supplierId=" + supplier).andExpect(jsonPath("$.total").value(2));
-        owner.get("/api/v1/purchase-orders?warehouseId=" + main).andExpect(jsonPath("$.total").value(2));
+        owner.get("/api/v1/purchase-orders?warehouseId=" + main).andExpect(jsonPath("$.total").value(3));
         owner.get("/api/v1/purchase-orders/" + UUID.randomUUID()).andExpect(status().isNotFound());
     }
 

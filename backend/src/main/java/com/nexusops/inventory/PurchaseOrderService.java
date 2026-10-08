@@ -42,14 +42,17 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Purchase orders (D9): DRAFT → ORDERED → PARTIALLY_RECEIVED → RECEIVED; DRAFT/ORDERED → CANCELLED. */
+/**
+ * Purchase orders (D9): DRAFT → ORDERED → PARTIALLY_RECEIVED → RECEIVED; DRAFT/ORDERED → CANCELLED, and a partly
+ * received order can be closed (CANCELLED) when the rest won't arrive — what was received stays in stock.
+ */
 @Service
 public class PurchaseOrderService {
 
     static final String DRAFT_ONLY = "Only a draft can be changed.";
     static final String ORDER_DRAFT_ONLY = "Only a draft can be ordered.";
     static final String NOT_RECEIVABLE = "Only an ordered purchase order can be received.";
-    static final String NOT_CANCELLABLE = "Only a draft or ordered purchase order can be cancelled.";
+    static final String NOT_CANCELLABLE = "A received purchase order can't be cancelled.";
 
     private final PurchaseOrderRepository orders;
     private final PurchaseOrderLineRepository lines;
@@ -104,7 +107,7 @@ public class PurchaseOrderService {
         String q = Text.optional(query.q(), 100, "q");
         if (q != null) {
             String like = Text.containsPattern(q);
-            spec = spec.and((root, cq, cb) -> cb.like(cb.lower(root.get("number")), like, '\\'));
+            spec = spec.and(orderParties.numberOrPartyName(like, "supplierId"));
         }
         Page<PurchaseOrder> result = orders.findAll(spec,
                 Paging.of(page, size, Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id"))));
@@ -206,9 +209,12 @@ public class PurchaseOrderService {
         Map<PurchaseOrderLine, BigDecimal> amounts = new LinkedHashMap<>();
         for (int i = 0; i < receipt.size(); i++) {
             ReceiptCommand.Line r = receipt.get(i);
+            if (r == null) {
+                throw ApiProblem.badRequestField(Orders.item(i), Orders.CHOOSE_LINE);
+            }
             PurchaseOrderLine line = r.lineId() == null ? null : byId.get(r.lineId());
             if (line == null) {
-                throw ApiProblem.badRequestField(Orders.field(i, "lineId"), "Choose a line of this order.");
+                throw ApiProblem.badRequestField(Orders.field(i, "lineId"), Orders.CHOOSE_LINE);
             }
             if (!seen.add(line.getId())) {
                 throw ApiProblem.badRequestField(Orders.field(i, "lineId"), "This line is already in the receipt.");
@@ -250,6 +256,9 @@ public class PurchaseOrderService {
         List<PurchaseLineCommand> clean = new ArrayList<>();
         for (int i = 0; i < command.lines().size(); i++) {
             PurchaseLineCommand l = command.lines().get(i);
+            if (l == null) {
+                throw ApiProblem.badRequestField(Orders.item(i), Orders.EMPTY_LINE);
+            }
             BigDecimal quantity = Quantities.positive(l.quantity(), Orders.field(i, "quantity"));
             if (l.unitCost() == null) {
                 throw ApiProblem.badRequestField(Orders.field(i, "unitCost"), "Enter a cost.");

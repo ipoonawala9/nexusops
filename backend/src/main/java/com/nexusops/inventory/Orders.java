@@ -13,11 +13,18 @@ final class Orders {
     static final String STALE = "This record was changed by someone else. Reload and try again.";
     static final String FORBIDDEN = "You do not have permission to perform this action.";
     static final String ARCHIVED = "This record is archived.";
+    static final String EMPTY_LINE = "Add a product and quantity.";
+    static final String CHOOSE_LINE = "Choose a line of this order.";
 
     private Orders() {}
 
     static String field(int index, String name) {
-        return "lines[" + index + "]." + name;
+        return item(index) + "." + name;
+    }
+
+    /** The field of a whole list item, for a {@code null} element. */
+    static String item(int index) {
+        return "lines[" + index + "]";
     }
 
     static void requireCount(List<?> lines) {

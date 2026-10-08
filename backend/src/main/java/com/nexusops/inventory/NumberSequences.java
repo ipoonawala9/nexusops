@@ -1,6 +1,7 @@
 package com.nexusops.inventory;
 
 import com.nexusops.shared.TenantContext;
+import java.util.Locale;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
@@ -24,6 +25,6 @@ class NumberSequences {
                 tenant, kind.name());
         Long value = jdbc.queryForObject("update number_sequences set next_value = next_value + 1 "
                 + "where tenant_id = ? and kind = ? returning next_value - 1", Long.class, tenant, kind.name());
-        return kind.prefix() + String.format("%05d", value);
+        return kind.prefix() + String.format(Locale.ROOT, "%05d", value);
     }
 }

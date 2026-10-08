@@ -48,6 +48,7 @@ class InventoryQueries {
                        r.id as rule_id, r.min_quantity, r.max_quantity, r.supplier_id
                 from pairs x
                 join products p on p.tenant_id = :tenant and p.id = x.product_id and p.archived_at is null
+                     and p.kind = 'GOODS'
                 join warehouses w on w.tenant_id = :tenant and w.id = x.warehouse_id and w.archived_at is null
                 left join stock_levels s on s.tenant_id = :tenant and s.product_id = x.product_id
                      and s.warehouse_id = x.warehouse_id
