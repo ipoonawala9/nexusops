@@ -46,6 +46,7 @@ class CrossTenantApiIT extends IntegrationTestSupport {
     UUID invitationB;
     UUID orgB, personB, productB, taskB, documentB, userBId;
     UUID leadB, opportunityB, stageB;
+    UUID warehouseB, goodsB, purchaseOrderB, purchaseLineB, salesOrderB, ruleB;
 
     @BeforeEach
     void twoTenants() throws Exception {
@@ -85,6 +86,23 @@ class CrossTenantApiIT extends IntegrationTestSupport {
         stageB = UUID.fromString(com.nexusops.support.Api.read(apiB.get("/api/v1/crm/pipeline/stages"), "$[0].id"));
         apiB.post("/api/v1/activities", "{\"subjectType\":\"OPPORTUNITY\",\"subjectId\":\"" + opportunityB
                 + "\",\"type\":\"NOTE\",\"summary\":\"B deal secret\"}").andExpect(status().isCreated());
+        as(ownerB, put("/api/v1/tenant/modules/INVENTORY").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"enabled\":true}")).andExpect(status().isOk());
+        warehouseB = UUID.fromString(com.nexusops.support.Api.read(apiB.get("/api/v1/inventory/warehouses"), "$[0].id"));
+        goodsB = com.nexusops.support.Api.id(apiB.post("/api/v1/products",
+                "{\"sku\":\"B-G\",\"name\":\"Beta goods\",\"kind\":\"GOODS\"}"));
+        apiB.post("/api/v1/inventory/adjustments", "{\"productId\":\"" + goodsB + "\",\"warehouseId\":\"" + warehouseB
+                + "\",\"countedQuantity\":5,\"reason\":\"Opening\"}").andExpect(status().isOk());
+        purchaseOrderB = com.nexusops.support.Api.id(apiB.post("/api/v1/purchase-orders", "{\"supplierId\":\"" + orgB
+                + "\",\"warehouseId\":\"" + warehouseB + "\",\"lines\":[{\"productId\":\"" + goodsB
+                + "\",\"quantity\":2,\"unitCost\":1}]}"));
+        purchaseLineB = UUID.fromString(com.nexusops.support.Api.<java.util.List<String>>read(
+                apiB.get("/api/v1/purchase-orders/" + purchaseOrderB), "$.lines[*].id").get(0));
+        salesOrderB = com.nexusops.support.Api.id(apiB.post("/api/v1/sales-orders", "{\"customerId\":\"" + orgB
+                + "\",\"warehouseId\":\"" + warehouseB + "\",\"lines\":[{\"productId\":\"" + goodsB
+                + "\",\"quantity\":1,\"unitPrice\":1}]}"));
+        ruleB = com.nexusops.support.Api.id(apiB.put("/api/v1/inventory/reorder-rules", "{\"productId\":\"" + goodsB
+                + "\",\"warehouseId\":\"" + warehouseB + "\",\"minQuantity\":1,\"maxQuantity\":9}"));
     }
 
     private ResultActions as(Session s,
@@ -285,5 +303,68 @@ class CrossTenantApiIT extends IntegrationTestSupport {
         as(ownerB, get("/api/v1/leads/" + leadB)).andExpect(jsonPath("$.status").value("NEW"));
         as(ownerB, get("/api/v1/opportunities/" + opportunityB)).andExpect(jsonPath("$.name").value("Beta deal"))
                 .andExpect(jsonPath("$.stage.id").value(stageB.toString()));
+    }
+
+    @Test
+    void inventoryRecordsOfAnotherTenantAreInvisibleAndUntouchable() throws Exception {
+        as(ownerA, put("/api/v1/tenant/modules/INVENTORY").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"enabled\":true}")).andExpect(status().isOk());
+        as(ownerA, json(put("/api/v1/inventory/warehouses/" + warehouseB), "{\"code\":\"H\",\"name\":\"H\",\"version\":0}"))
+                .andExpect(status().isNotFound());
+        as(ownerA, post("/api/v1/inventory/warehouses/" + warehouseB + "/archive")).andExpect(status().isNotFound());
+        as(ownerA, post("/api/v1/inventory/warehouses/" + warehouseB + "/restore")).andExpect(status().isNotFound());
+        as(ownerA, get("/api/v1/inventory/stock/products/" + goodsB)).andExpect(status().isNotFound());
+        as(ownerA, get("/api/v1/purchase-orders/" + purchaseOrderB)).andExpect(status().isNotFound());
+        as(ownerA, json(put("/api/v1/purchase-orders/" + purchaseOrderB), "{\"supplierId\":\"" + orgB
+                + "\",\"warehouseId\":\"" + warehouseB + "\",\"lines\":[],\"version\":0}")).andExpect(status().isNotFound());
+        for (String action : new String[] {"order", "cancel"}) {
+            as(ownerA, json(post("/api/v1/purchase-orders/" + purchaseOrderB + "/" + action), "{\"version\":0}"))
+                    .andExpect(status().isNotFound());
+        }
+        as(ownerA, json(post("/api/v1/purchase-orders/" + purchaseOrderB + "/receipts"), "{\"lines\":[{\"lineId\":\""
+                + purchaseLineB + "\",\"quantity\":1}],\"version\":0}")).andExpect(status().isNotFound());
+        as(ownerA, get("/api/v1/sales-orders/" + salesOrderB)).andExpect(status().isNotFound());
+        as(ownerA, json(put("/api/v1/sales-orders/" + salesOrderB), "{\"customerId\":\"" + orgB
+                + "\",\"warehouseId\":\"" + warehouseB + "\",\"lines\":[],\"version\":0}")).andExpect(status().isNotFound());
+        for (String action : new String[] {"confirm", "fulfil", "cancel"}) {
+            as(ownerA, json(post("/api/v1/sales-orders/" + salesOrderB + "/" + action), "{\"version\":0}"))
+                    .andExpect(status().isNotFound());
+        }
+        as(ownerA, delete("/api/v1/inventory/reorder-rules/" + ruleB)).andExpect(status().isNotFound());
+        as(ownerA, get("/api/v1/activities").param("subjectType", "PURCHASE_ORDER")
+                .param("subjectId", purchaseOrderB.toString())).andExpect(status().isNotFound());
+
+        // references to another tenant's rows inside request bodies are refused
+        String warehouseA = JsonPath.<java.util.List<String>>read(as(ownerA, get("/api/v1/inventory/warehouses"))
+                .andReturn().getResponse().getContentAsString(), "$[*].id").get(0);
+        as(ownerA, json(post("/api/v1/inventory/adjustments"), "{\"productId\":\"" + goodsB + "\",\"warehouseId\":\""
+                + warehouseA + "\",\"countedQuantity\":1,\"reason\":\"x\"}")).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[0].field").value("productId"));
+        String goodsA = JsonPath.read(as(ownerA, json(post("/api/v1/products"),
+                "{\"sku\":\"A-G\",\"name\":\"Alpha goods\",\"kind\":\"GOODS\"}")).andReturn().getResponse()
+                .getContentAsString(), "$.id");
+        as(ownerA, json(post("/api/v1/inventory/transfers"), "{\"productId\":\"" + goodsA + "\",\"fromWarehouseId\":\""
+                + warehouseA + "\",\"toWarehouseId\":\"" + warehouseB + "\",\"quantity\":1}"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("toWarehouseId"));
+        as(ownerA, json(post("/api/v1/purchase-orders"), "{\"supplierId\":\"" + orgB + "\",\"warehouseId\":\""
+                + warehouseA + "\",\"lines\":[{\"productId\":\"" + goodsA + "\",\"quantity\":1,\"unitCost\":1}]}"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("supplierId"));
+        as(ownerA, json(put("/api/v1/inventory/reorder-rules"), "{\"productId\":\"" + goodsA + "\",\"warehouseId\":\""
+                + warehouseB + "\",\"minQuantity\":1,\"maxQuantity\":2}")).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[0].field").value("warehouseId"));
+
+        // lists, search and the overview never contain B's rows
+        as(ownerA, get("/api/v1/inventory/stock")).andExpect(jsonPath("$.total").value(0));
+        as(ownerA, get("/api/v1/inventory/movements")).andExpect(jsonPath("$.total").value(0));
+        as(ownerA, get("/api/v1/purchase-orders")).andExpect(jsonPath("$.total").value(0));
+        as(ownerA, get("/api/v1/sales-orders")).andExpect(jsonPath("$.total").value(0));
+        as(ownerA, get("/api/v1/inventory/reorder-rules")).andExpect(jsonPath("$.length()").value(0));
+        as(ownerA, get("/api/v1/inventory/warehouses")).andExpect(jsonPath("$.length()").value(1));
+        as(ownerA, get("/api/v1/search").param("q", "o-0000")).andExpect(jsonPath("$.length()").value(0));
+        as(ownerA, get("/api/v1/inventory/overview")).andExpect(jsonPath("$.recentMovements.length()").value(0));
+
+        // tenant B is untouched
+        as(ownerB, get("/api/v1/purchase-orders/" + purchaseOrderB)).andExpect(jsonPath("$.status").value("DRAFT"));
+        as(ownerB, get("/api/v1/inventory/stock/products/" + goodsB)).andExpect(jsonPath("$.onHand").value(5.0));
     }
 }

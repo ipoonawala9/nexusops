@@ -267,4 +267,13 @@ class PurchaseOrderApiIT extends IntegrationTestSupport {
         blind.post("/api/v1/purchase-orders", body(main, line(widget, "1", "1"))).andExpect(status().isForbidden());
         assertThat(audits("PurchaseOrderCreated")).isEqualTo(1);
     }
+
+    @Test
+    void theSuppliersTimelineIncludesItsOrders() throws Exception {
+        UUID order = draft();
+        owner.post("/api/v1/activities", "{\"subjectType\":\"PURCHASE_ORDER\",\"subjectId\":\"" + order
+                + "\",\"type\":\"NOTE\",\"summary\":\"Chased the supplier\"}").andExpect(status().isCreated());
+        owner.get("/api/v1/activities?subjectType=PARTY&subjectId=" + supplier + "&includeRelated=true")
+                .andExpect(jsonPath("$.items[*].summary").value(Matchers.hasItem("Chased the supplier")));
+    }
 }

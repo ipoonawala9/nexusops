@@ -7,6 +7,7 @@ import com.nexusops.support.Api;
 import com.nexusops.support.IntegrationTestSupport;
 import com.nexusops.support.RecordingMailSender;
 import com.nexusops.support.TestCrm;
+import com.nexusops.support.TestInventory;
 import com.nexusops.support.TestMembers;
 import com.nexusops.support.TestRoles;
 import com.nexusops.support.TestTenants;
@@ -50,6 +51,24 @@ class SearchApiIT extends IntegrationTestSupport {
                 .andExpect(jsonPath("$[0].detail").value("konkan.test"))
                 .andExpect(jsonPath("$[2].detail").value("Konkan Logistics"))
                 .andExpect(jsonPath("$[3].detail").value("KON-1"));
+    }
+
+    @Test
+    void findsOrdersByNumberAfterTheOtherTypes() throws Exception {
+        TestInventory.enable(owner);
+        UUID supplier = Api.id(owner.post("/api/v1/organizations", "{\"name\":\"Ordering Co\"}"));
+        UUID widget = TestInventory.goods(owner, "PO-W", "Order widget");
+        UUID main = TestInventory.mainWarehouse(owner);
+        owner.post("/api/v1/purchase-orders", "{\"supplierId\":\"" + supplier + "\",\"warehouseId\":\"" + main
+                + "\",\"lines\":[{\"productId\":\"" + widget + "\",\"quantity\":1,\"unitCost\":1}]}")
+                .andExpect(status().isCreated());
+        owner.post("/api/v1/sales-orders", "{\"customerId\":\"" + supplier + "\",\"warehouseId\":\"" + main
+                + "\",\"lines\":[{\"productId\":\"" + widget + "\",\"quantity\":1,\"unitPrice\":1}]}")
+                .andExpect(status().isCreated());
+        owner.get("/api/v1/search?q=o-0000").andExpect(jsonPath("$[*].type")
+                .value(Matchers.contains("PURCHASE_ORDER", "SALES_ORDER")))
+                .andExpect(jsonPath("$[0].label").value("PO-00001"))
+                .andExpect(jsonPath("$[0].detail").value("Ordering Co"));
     }
 
     @Test

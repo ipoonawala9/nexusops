@@ -315,6 +315,8 @@ class SalesOrderApiIT extends IntegrationTestSupport {
         reader.post("/api/v1/sales-orders/" + first + "/confirm", "{\"version\":0}").andExpect(status().isForbidden());
         owner.post("/api/v1/activities", "{\"subjectType\":\"SALES_ORDER\",\"subjectId\":\"" + first
                 + "\",\"type\":\"NOTE\",\"summary\":\"Customer wants it gift-wrapped\"}").andExpect(status().isCreated());
+        owner.get("/api/v1/activities?subjectType=PARTY&subjectId=" + customer + "&includeRelated=true")
+                .andExpect(jsonPath("$.items[*].summary").value(Matchers.hasItem("Customer wants it gift-wrapped")));
         assertThat(audits("SalesOrderCreated")).isEqualTo(2);
         assertThat(audits("SalesOrderConfirmed")).isEqualTo(1);
     }

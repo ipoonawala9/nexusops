@@ -13,7 +13,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class SearchService {
 
-    static final List<String> ORDER = List.of("PARTY", "LEAD", "OPPORTUNITY", "PRODUCT");
+    static final List<String> ORDER = List.of("PARTY", "LEAD", "OPPORTUNITY", "PRODUCT", "PURCHASE_ORDER",
+            "SALES_ORDER");
     static final int PER_TYPE = 5;
 
     private final List<SubjectResolver> resolvers;

@@ -40,7 +40,18 @@ class OpenApiContractIT extends IntegrationTestSupport {
                 "\"/api/v1/crm/pipeline/stages\"", "\"/api/v1/crm/pipeline/stages/{id}\"",
                 "\"/api/v1/crm/pipeline/stages/order\"", "\"/api/v1/crm/pipeline/board\"",
                 "\"/api/v1/crm/customers\"", "\"/api/v1/crm/customers/{partyId}\"", "\"/api/v1/crm/dashboard\"",
-                "\"/api/v1/crm/owners\"", "\"/api/v1/search\"");
+                "\"/api/v1/crm/owners\"", "\"/api/v1/search\"",
+                "\"/api/v1/inventory/warehouses\"", "\"/api/v1/inventory/warehouses/{id}\"",
+                "\"/api/v1/inventory/warehouses/{id}/archive\"", "\"/api/v1/inventory/warehouses/{id}/restore\"",
+                "\"/api/v1/inventory/stock\"", "\"/api/v1/inventory/stock/products/{productId}\"",
+                "\"/api/v1/inventory/movements\"", "\"/api/v1/inventory/adjustments\"", "\"/api/v1/inventory/transfers\"",
+                "\"/api/v1/inventory/overview\"", "\"/api/v1/inventory/reorder-rules\"",
+                "\"/api/v1/inventory/reorder-rules/{id}\"", "\"/api/v1/inventory/reorder-suggestions\"",
+                "\"/api/v1/inventory/reorder-suggestions/purchase-orders\"", "\"/api/v1/purchase-orders\"",
+                "\"/api/v1/purchase-orders/{id}\"", "\"/api/v1/purchase-orders/{id}/order\"",
+                "\"/api/v1/purchase-orders/{id}/cancel\"", "\"/api/v1/purchase-orders/{id}/receipts\"",
+                "\"/api/v1/sales-orders\"", "\"/api/v1/sales-orders/{id}\"", "\"/api/v1/sales-orders/{id}/confirm\"",
+                "\"/api/v1/sales-orders/{id}/fulfil\"", "\"/api/v1/sales-orders/{id}/cancel\"");
         // hierarchy rules (ADR-0004): no changing a role, or disabling/re-enabling/re-roling a user, stronger than the caller
         for (String op : new String[] {"$.paths['/api/v1/roles/{id}'].patch", "$.paths['/api/v1/roles/{id}'].delete",
                 "$.paths['/api/v1/roles/{id}/permissions'].put", "$.paths['/api/v1/users/{id}'].patch",
