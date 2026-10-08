@@ -20,6 +20,7 @@ import { TextAreaField } from '@/components/form/TextAreaField'
 import { TextField } from '@/components/form/TextField'
 import { PartyPicker } from '@/features/records/PartyPicker'
 import { useApi } from '@/lib/api/ApiContext'
+import { ApiError } from '@/lib/api/client'
 import { applyFieldErrors, problemMessage } from '@/lib/api/problems'
 import type { PurchaseOrderView } from '@/lib/api/types'
 import { invalidateInventory } from './invalidation'
@@ -106,6 +107,11 @@ export function PurchaseOrderFormDialog({
         toast.success(order ? 'Changes saved.' : `${saved.number} created.`)
         onSaved(saved)
       } catch (error) {
+        // a conflict means the cached order is stale: reload it so the next save carries the current version
+        if (order && error instanceof ApiError && error.status === 409)
+          void queryClient.invalidateQueries({
+            queryKey: ['inventory', 'purchase-order', order.id],
+          })
         const fromServer = serverLineErrors(error)
         if (fromServer) setLineErrors(fromServer)
         const header = applyFieldErrors(error, form.setError, FIELDS)

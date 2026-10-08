@@ -40,6 +40,10 @@ export function PurchaseOrderDetailPage() {
   const action = useOrderAction(key)
   const [dialog, setDialog] = useState<'edit' | 'receive' | 'cancel' | null>(null)
   const canManage = can(PERMISSIONS.purchaseManage)
+  function open(next: 'edit' | 'receive' | 'cancel') {
+    action.setError(null)
+    setDialog(next)
+  }
   const back = (
     <Link
       to="/app/inventory/purchase-orders"
@@ -80,7 +84,7 @@ export function PurchaseOrderDetailPage() {
             </Badge>
             {canManage && o.status === 'DRAFT' && (
               <>
-                <Button variant="outline" size="sm" onClick={() => setDialog('edit')}>
+                <Button variant="outline" size="sm" onClick={() => open('edit')}>
                   Edit
                 </Button>
                 <Button
@@ -95,12 +99,12 @@ export function PurchaseOrderDetailPage() {
               </>
             )}
             {canManage && (o.status === 'ORDERED' || o.status === 'PARTIALLY_RECEIVED') && (
-              <Button size="sm" onClick={() => setDialog('receive')}>
+              <Button size="sm" onClick={() => open('receive')}>
                 Receive
               </Button>
             )}
             {canManage && (o.status === 'DRAFT' || o.status === 'ORDERED') && (
-              <Button variant="outline" size="sm" onClick={() => setDialog('cancel')}>
+              <Button variant="outline" size="sm" onClick={() => open('cancel')}>
                 Cancel order
               </Button>
             )}
@@ -228,7 +232,7 @@ export function PurchaseOrderDetailPage() {
           onSaved={() => setDialog(null)}
         />
       )}
-      {dialog === 'receive' && (
+      {dialog === 'receive' && (o.status === 'ORDERED' || o.status === 'PARTIALLY_RECEIVED') && (
         <ReceiveDialog
           order={o}
           busy={action.busy}
