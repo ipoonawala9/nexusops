@@ -166,6 +166,9 @@ public class SalesOrderService {
         orderParties.requireNotArchived(order.getCustomerId());
         warehouses.requireActive(order.getWarehouseId(), "warehouseId");
         List<SalesOrderLine> ls = lines.findByOrderIdOrderByLineNoAsc(id);
+        // Take the order's optimistic lock before any stock is touched; a shortage rolls the transition back.
+        order.confirm(Instant.now());
+        orders.flush();
         Map<StockKey, StockLevel> locked = lock(order, ls);
         List<Shortage> shortages = new ArrayList<>();
         Map<UUID, ProductBrief> names = products.briefs(ls.stream().map(SalesOrderLine::getProductId).toList());
@@ -180,8 +183,6 @@ public class SalesOrderService {
             throw Shortage.conflict(shortages);
         }
         ls.forEach(line -> ledger.reserve(locked.get(key(order, line)), line.getQuantity()));
-        order.confirm(Instant.now());
-        orders.flush();
         parties.ensureRole(order.getCustomerId(), PartyRoleType.CUSTOMER);
         audit.record(AuditEntry.of("SalesOrderConfirmed", "SalesOrder", id).withAfter(Map.of("number", order.getNumber())));
         return view(order, ls);
@@ -195,6 +196,8 @@ public class SalesOrderService {
             throw ApiProblem.conflict(FULFIL_CONFIRMED_ONLY);
         }
         List<SalesOrderLine> ls = lines.findByOrderIdOrderByLineNoAsc(id);
+        order.fulfil(Instant.now());
+        orders.flush();
         Map<StockKey, StockLevel> locked = lock(order, ls);
         for (SalesOrderLine line : ls) {
             StockLevel level = locked.get(key(order, line));
@@ -202,8 +205,6 @@ public class SalesOrderService {
             ledger.move(level, MovementKind.ISSUE, line.getQuantity().negate(), ReferenceType.SALES_ORDER,
                     order.getId(), order.getNumber());
         }
-        order.fulfil(Instant.now());
-        orders.flush();
         audit.record(AuditEntry.of("SalesOrderFulfilled", "SalesOrder", id).withAfter(Map.of("number", order.getNumber())));
         return view(order, ls);
     }
@@ -217,12 +218,12 @@ public class SalesOrderService {
         }
         SalesOrderStatus before = order.getStatus();
         List<SalesOrderLine> ls = lines.findByOrderIdOrderByLineNoAsc(id);
+        order.cancel(Instant.now());
+        orders.flush();
         if (before == SalesOrderStatus.CONFIRMED) {
             Map<StockKey, StockLevel> locked = lock(order, ls);
             ls.forEach(line -> ledger.release(locked.get(key(order, line)), line.getQuantity()));
         }
-        order.cancel(Instant.now());
-        orders.flush();
         audit.record(AuditEntry.of("SalesOrderCancelled", "SalesOrder", id)
                 .withBefore(Map.of("status", before.name())).withAfter(Map.of("number", order.getNumber())));
         return view(order, ls);

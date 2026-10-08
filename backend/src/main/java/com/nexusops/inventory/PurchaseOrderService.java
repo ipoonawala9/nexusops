@@ -220,6 +220,12 @@ public class PurchaseOrderService {
             }
             amounts.put(line, quantity);
         }
+        // Take the order's optimistic lock first (one version bump): a concurrent receipt of the same order fails
+        // here with 409, before it can touch the lines or the stock.
+        boolean complete = byId.values().stream()
+                .allMatch(l -> l.getRemaining().subtract(amounts.getOrDefault(l, BigDecimal.ZERO)).signum() == 0);
+        order.received(complete, Instant.now());
+        orders.flush();
         Map<StockKey, StockLevel> locked = ledger.lock(amounts.keySet().stream()
                 .map(l -> new StockKey(l.getProductId(), order.getWarehouseId())).toList());
         List<Map<String, Object>> received = new ArrayList<>();
@@ -230,9 +236,6 @@ public class PurchaseOrderService {
             received.add(Map.of("productId", line.getProductId().toString(), "quantity", quantity.toPlainString()));
         });
         lines.flush();
-        boolean complete = byId.values().stream().allMatch(l -> l.getRemaining().signum() == 0);
-        order.received(complete, Instant.now());
-        orders.flush();
         audit.record(AuditEntry.of("PurchaseOrderReceived", "PurchaseOrder", id)
                 .withAfter(Map.of("number", order.getNumber(), "lines", received, "status", order.getStatus().name())));
         return view(order, new ArrayList<>(byId.values()));

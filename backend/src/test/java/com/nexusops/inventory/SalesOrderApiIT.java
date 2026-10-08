@@ -209,6 +209,54 @@ class SalesOrderApiIT extends IntegrationTestSupport {
                 .andExpect(jsonPath("$.errors[0].field").value("warehouseId"));
     }
 
+    private List<Integer> concurrently(java.util.concurrent.Callable<Integer> first,
+            java.util.concurrent.Callable<Integer> second) throws Exception {
+        CountDownLatch start = new CountDownLatch(1);
+        var pool = Executors.newFixedThreadPool(2);
+        try {
+            List<Future<Integer>> results = new ArrayList<>();
+            for (var call : List.of(first, second)) {
+                results.add(pool.submit(() -> {
+                    start.await();
+                    return call.call();
+                }));
+            }
+            start.countDown();
+            List<Integer> statuses = new ArrayList<>();
+            for (Future<Integer> result : results) {
+                statuses.add(result.get(30, TimeUnit.SECONDS));
+            }
+            return statuses;
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    @Test
+    void concurrentFulfilmentsOfOneOrderGiveOneSuccess() throws Exception {
+        UUID order = draft(line(widget, "4", null));
+        act(order, "confirm", 0).andExpect(status().isOk());
+        List<Integer> statuses = concurrently(
+                () -> act(order, "fulfil", 1).andReturn().getResponse().getStatus(),
+                () -> act(order, "fulfil", 1).andReturn().getResponse().getStatus());
+        assertThat(statuses).containsExactlyInAnyOrder(200, 409);
+        stock(widget).andExpect(jsonPath("$.onHand").value(6.0)).andExpect(jsonPath("$.reserved").value(0.0));
+    }
+
+    @Test
+    void concurrentCancellationsOfOneOrderGiveOneSuccess() throws Exception {
+        UUID order = draft(line(widget, "4", null));
+        UUID other = draft(line(widget, "3", null));
+        act(order, "confirm", 0).andExpect(status().isOk());
+        act(other, "confirm", 0).andExpect(status().isOk());
+        List<Integer> statuses = concurrently(
+                () -> act(order, "cancel", 1).andReturn().getResponse().getStatus(),
+                () -> act(order, "cancel", 1).andReturn().getResponse().getStatus());
+        assertThat(statuses).containsExactlyInAnyOrder(200, 409);
+        // only the cancelled order's 4 were released; the other order's reservation stands
+        stock(widget).andExpect(jsonPath("$.onHand").value(10.0)).andExpect(jsonPath("$.reserved").value(3.0));
+    }
+
     @Test
     void concurrentConfirmationsNeverOversell() throws Exception {
         UUID first = draft(line(gadget, "2", "40"));

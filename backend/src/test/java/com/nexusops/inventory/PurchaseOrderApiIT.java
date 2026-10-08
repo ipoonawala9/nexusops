@@ -184,6 +184,34 @@ class PurchaseOrderApiIT extends IntegrationTestSupport {
     }
 
     @Test
+    void concurrentReceiptsOfOneLineGiveOneSuccess() throws Exception {
+        UUID order = draft();
+        owner.post("/api/v1/purchase-orders/" + order + "/order", "{\"version\":0}").andExpect(status().isOk());
+        String first = lineIds(order, 0);
+        java.util.concurrent.CountDownLatch start = new java.util.concurrent.CountDownLatch(1);
+        var pool = java.util.concurrent.Executors.newFixedThreadPool(2);
+        java.util.List<Integer> statuses = new java.util.ArrayList<>();
+        try {
+            java.util.List<java.util.concurrent.Future<Integer>> results = new java.util.ArrayList<>();
+            for (int i = 0; i < 2; i++) {
+                results.add(pool.submit(() -> {
+                    start.await();
+                    return receive(order, "{\"lineId\":\"" + first + "\",\"quantity\":10}", 1)
+                            .andReturn().getResponse().getStatus();
+                }));
+            }
+            start.countDown();
+            for (var result : results) {
+                statuses.add(result.get(30, java.util.concurrent.TimeUnit.SECONDS));
+            }
+        } finally {
+            pool.shutdownNow();
+        }
+        assertThat(statuses).containsExactlyInAnyOrder(200, 409);
+        owner.get("/api/v1/inventory/stock/products/" + widget).andExpect(jsonPath("$.onHand").value(10.0));
+    }
+
+    @Test
     void cancellation() throws Exception {
         UUID drafted = draft();
         owner.post("/api/v1/purchase-orders/" + drafted + "/cancel", "{\"version\":0}").andExpect(status().isOk())
