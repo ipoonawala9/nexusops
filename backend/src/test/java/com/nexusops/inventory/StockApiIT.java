@@ -59,15 +59,6 @@ class StockApiIT extends IntegrationTestSupport {
                 "select count(*) from audit_events where action = ?", Long.class, action);
     }
 
-    /** Every level's on-hand equals the sum of its ledger rows. */
-    private void ledgerBalances() {
-        assertThat(OwnerJdbc.ownerAs(ws.tenantId()).queryForObject("""
-                select count(*) from stock_levels l
-                where l.on_hand <> coalesce((select sum(m.quantity) from stock_movements m
-                                             where m.product_id = l.product_id and m.warehouse_id = l.warehouse_id), 0)
-                """, Long.class)).isZero();
-    }
-
     @Test
     void productStockStartsAtZeroInEveryWarehouse() throws Exception {
         owner.get("/api/v1/inventory/stock/products/" + widget).andExpect(status().isOk())
@@ -93,7 +84,7 @@ class StockApiIT extends IntegrationTestSupport {
                 .andExpect(jsonPath("$.items[0].actor").exists())
                 .andExpect(jsonPath("$.items[1].quantity").value(10.0));
         assertThat(audits("StockAdjusted")).isEqualTo(2);
-        ledgerBalances();
+        TestInventory.assertLedgerBalances(ws.tenantId());
     }
 
     @Test
@@ -168,7 +159,7 @@ class StockApiIT extends IntegrationTestSupport {
                 .andExpect(jsonPath("$.items[0].reason").value("For the Pune shop"));
         owner.get("/api/v1/inventory/movements?warehouseId=" + pune).andExpect(jsonPath("$.total").value(1));
         assertThat(audits("StockTransferred")).isEqualTo(1);
-        ledgerBalances();
+        TestInventory.assertLedgerBalances(ws.tenantId());
     }
 
     @Test

@@ -1,5 +1,6 @@
 package com.nexusops.support;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.util.UUID;
@@ -21,5 +22,14 @@ public final class TestInventory {
     public static UUID mainWarehouse(Api owner) throws Exception {
         java.util.List<String> ids = Api.read(owner.get("/api/v1/inventory/warehouses"), "$[?(@.code == 'MAIN')].id");
         return UUID.fromString(ids.getFirst());
+    }
+
+    /** Every stock level's on-hand equals the sum of its ledger rows (ADR-0011): the projection agrees with the books. */
+    public static void assertLedgerBalances(UUID tenantId) {
+        assertThat(OwnerJdbc.ownerAs(tenantId).queryForObject("""
+                select count(*) from stock_levels l
+                where l.on_hand <> coalesce((select sum(m.quantity) from stock_movements m
+                                             where m.product_id = l.product_id and m.warehouse_id = l.warehouse_id), 0)
+                """, Long.class)).as("levels that disagree with the ledger").isZero();
     }
 }

@@ -59,6 +59,7 @@ class SearchApiIT extends IntegrationTestSupport {
         UUID supplier = Api.id(owner.post("/api/v1/organizations", "{\"name\":\"Ordering Co\"}"));
         UUID widget = TestInventory.goods(owner, "PO-W", "Order widget");
         UUID main = TestInventory.mainWarehouse(owner);
+        TestInventory.goods(owner, "O-00001X", "Order number lookalike");
         owner.post("/api/v1/purchase-orders", "{\"supplierId\":\"" + supplier + "\",\"warehouseId\":\"" + main
                 + "\",\"lines\":[{\"productId\":\"" + widget + "\",\"quantity\":1,\"unitCost\":1}]}")
                 .andExpect(status().isCreated());
@@ -66,9 +67,9 @@ class SearchApiIT extends IntegrationTestSupport {
                 + "\",\"lines\":[{\"productId\":\"" + widget + "\",\"quantity\":1,\"unitPrice\":1}]}")
                 .andExpect(status().isCreated());
         owner.get("/api/v1/search?q=o-0000").andExpect(jsonPath("$[*].type")
-                .value(Matchers.contains("PURCHASE_ORDER", "SALES_ORDER")))
-                .andExpect(jsonPath("$[0].label").value("PO-00001"))
-                .andExpect(jsonPath("$[0].detail").value("Ordering Co"));
+                .value(Matchers.contains("PRODUCT", "PURCHASE_ORDER", "SALES_ORDER")))
+                .andExpect(jsonPath("$[1].label").value("PO-00001"))
+                .andExpect(jsonPath("$[1].detail").value("Ordering Co"));
     }
 
     @Test

@@ -168,6 +168,7 @@ class PurchaseOrderApiIT extends IntegrationTestSupport {
                 .andExpect(jsonPath("$.items[0].reason").value("PO-00001"));
         owner.get("/api/v1/inventory/stock/products/" + gadget).andExpect(jsonPath("$.onHand").value(4.0));
         assertThat(audits("PurchaseOrderReceived")).isEqualTo(2);
+        TestInventory.assertLedgerBalances(ws.tenantId());
     }
 
     @Test

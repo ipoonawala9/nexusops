@@ -1,14 +1,17 @@
 package com.nexusops;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowable;
 
 import com.nexusops.support.IntegrationTestSupport;
 import com.nexusops.support.OwnerJdbc;
+import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
@@ -87,46 +90,86 @@ class InventoryRlsIT extends IntegrationTestSupport {
         }
     }
 
+    private final AtomicInteger counter = new AtomicInteger(100);
+
+    private UUID freshProduct() {
+        UUID id = UUID.randomUUID();
+        Timestamp now = Timestamp.from(Instant.now());
+        OwnerJdbc.ownerAs(tenantB).update("insert into products (id, tenant_id, sku, name, kind, unit, created_at, "
+                + "updated_at) values (?, ?, ?, 'Fresh', 'GOODS', 'each', ?, ?)", id, tenantB,
+                "F-" + id.toString().substring(0, 8), now, now);
+        return id;
+    }
+
+    private UUID freshWarehouse() {
+        UUID id = UUID.randomUUID();
+        Timestamp now = Timestamp.from(Instant.now());
+        String code = "W" + id.toString().substring(0, 8);
+        OwnerJdbc.ownerAs(tenantB).update("insert into warehouses (id, tenant_id, code, code_key, name, created_at, "
+                + "updated_at) values (?, ?, ?, ?, 'Fresh', ?, ?)", id, tenantB, code, code.toLowerCase(), now, now);
+        return id;
+    }
+
+    /** A row that is valid for tenant B in every respect except who inserts it: real FK targets, fresh keys. */
     private void insertTenantBRow(JdbcTemplate as, String table) {
         Timestamp now = Timestamp.from(Instant.now());
         UUID id = UUID.randomUUID();
+        int n = counter.incrementAndGet();
         switch (table) {
             case "number_sequences" -> as.update("insert into number_sequences (tenant_id, kind, next_value) "
                     + "values (?, 'SALES_ORDER', 1)", tenantB);
             case "warehouses" -> as.update("insert into warehouses (id, tenant_id, code, code_key, name, created_at, "
-                    + "updated_at) values (?, ?, 'EVIL', 'evil', 'Evil', ?, ?)", id, tenantB, now, now);
+                    + "updated_at) values (?, ?, ?, ?, 'Extra', ?, ?)", id, tenantB, "X" + n, "x" + n, now, now);
             case "stock_levels" -> as.update("insert into stock_levels (id, tenant_id, product_id, warehouse_id, "
-                    + "updated_at) values (?, ?, ?, ?, ?)", id, tenantB, product, UUID.randomUUID(), now);
+                    + "updated_at) values (?, ?, ?, ?, ?)", id, tenantB, freshProduct(), warehouse, now);
             case "stock_movements" -> as.update("insert into stock_movements (id, tenant_id, product_id, warehouse_id, "
                     + "kind, quantity, on_hand_after, reference_type, reference_id, occurred_at) "
                     + "values (?, ?, ?, ?, 'ADJUSTMENT', 1, 6, 'ADJUSTMENT', ?, ?)", id, tenantB, product, warehouse,
                     UUID.randomUUID(), now);
             case "purchase_orders" -> as.update("insert into purchase_orders (id, tenant_id, number, supplier_id, "
                     + "warehouse_id, status, currency, created_at, updated_at) "
-                    + "values (?, ?, 'PO-00009', ?, ?, 'DRAFT', 'USD', ?, ?)", id, tenantB, party, warehouse, now, now);
+                    + "values (?, ?, ?, ?, ?, 'DRAFT', 'USD', ?, ?)", id, tenantB,
+                    String.format("PO-%05d", 90000 + n), party, warehouse, now, now);
             case "purchase_order_lines" -> as.update("insert into purchase_order_lines (id, tenant_id, order_id, "
-                    + "line_no, product_id, quantity, unit_cost) values (?, ?, ?, 9, ?, 1, 1)", id, tenantB,
-                    purchaseOrder, UUID.randomUUID());
+                    + "line_no, product_id, quantity, unit_cost) values (?, ?, ?, ?, ?, 1, 1)", id, tenantB,
+                    purchaseOrder, n, freshProduct());
             case "sales_orders" -> as.update("insert into sales_orders (id, tenant_id, number, customer_id, "
                     + "warehouse_id, status, currency, created_at, updated_at) "
-                    + "values (?, ?, 'SO-00009', ?, ?, 'DRAFT', 'USD', ?, ?)", id, tenantB, party, warehouse, now, now);
+                    + "values (?, ?, ?, ?, ?, 'DRAFT', 'USD', ?, ?)", id, tenantB,
+                    String.format("SO-%05d", 90000 + n), party, warehouse, now, now);
             case "sales_order_lines" -> as.update("insert into sales_order_lines (id, tenant_id, order_id, line_no, "
-                    + "product_id, quantity, unit_price) values (?, ?, ?, 9, ?, 1, 1)", id, tenantB, salesOrder,
-                    UUID.randomUUID());
+                    + "product_id, quantity, unit_price) values (?, ?, ?, ?, ?, 1, 1)", id, tenantB, salesOrder, n,
+                    freshProduct());
             case "reorder_rules" -> as.update("insert into reorder_rules (id, tenant_id, product_id, warehouse_id, "
-                    + "min_quantity, max_quantity, created_at, updated_at) values (?, ?, ?, ?, 1, 2, ?, ?)", id, tenantB,
-                    UUID.randomUUID(), warehouse, now, now);
+                    + "min_quantity, max_quantity, created_at, updated_at) values (?, ?, ?, ?, 1, 2, ?, ?)", id,
+                    tenantB, freshProduct(), freshWarehouse(), now, now);
             default -> throw new IllegalArgumentException(table);
         }
+    }
+
+    /** The failure must be PostgreSQL's insufficient-privilege / row-level-security error (SQLState 42501). */
+    private static void assertDeniedByPostgres(ThrowingCallable call, String what) {
+        Throwable thrown = catchThrowable(call);
+        assertThat(thrown).as(what).isInstanceOf(DataAccessException.class);
+        Throwable cause = thrown;
+        while (cause != null && !(cause instanceof SQLException)) {
+            cause = cause.getCause();
+        }
+        assertThat(cause).as(what + " (SQL cause)").isNotNull();
+        assertThat(((SQLException) cause).getSQLState()).as(what).isEqualTo("42501");
     }
 
     @Test
     void insertsIntoAnotherTenantAreRejectedByRowLevelSecurity() {
         for (String table : TABLES) {
-            assertThatThrownBy(() -> insertTenantBRow(app(tenantA.toString()), table)).as(table + " as tenant A")
-                    .isInstanceOf(DataAccessException.class);
-            assertThatThrownBy(() -> insertTenantBRow(app(""), table)).as(table + " without tenant context")
-                    .isInstanceOf(DataAccessException.class);
+            assertDeniedByPostgres(() -> insertTenantBRow(app(tenantA.toString()), table), table + " as tenant A");
+            assertDeniedByPostgres(() -> insertTenantBRow(app(""), table), table + " without tenant context");
+            // positive control: the very same insert is valid for tenant B, so the rejections above are RLS only
+            insertTenantBRow(app(tenantB.toString()), table);
+            if (table.equals("number_sequences")) {
+                OwnerJdbc.ownerAs(tenantB).update("delete from number_sequences where tenant_id = ? "
+                        + "and kind = 'SALES_ORDER'", tenantB);
+            }
         }
     }
 
@@ -161,10 +204,10 @@ class InventoryRlsIT extends IntegrationTestSupport {
 
     @Test
     void theLedgerIsAppendOnlyEvenForItsOwnTenant() {
-        assertThatThrownBy(() -> app(tenantB.toString()).update("update stock_movements set quantity = 99 where id = ?",
-                movement)).isInstanceOf(DataAccessException.class);
-        assertThatThrownBy(() -> app(tenantB.toString()).update("delete from stock_movements where id = ?", movement))
-                .isInstanceOf(DataAccessException.class);
+        assertDeniedByPostgres(() -> app(tenantB.toString()).update("update stock_movements set quantity = 99 "
+                + "where id = ?", movement), "update of the ledger");
+        assertDeniedByPostgres(() -> app(tenantB.toString()).update("delete from stock_movements where id = ?",
+                movement), "delete from the ledger");
         assertThat(OwnerJdbc.ownerAs(tenantB).queryForObject("select quantity from stock_movements where id = ?",
                 java.math.BigDecimal.class, movement)).isEqualByComparingTo("5");
     }

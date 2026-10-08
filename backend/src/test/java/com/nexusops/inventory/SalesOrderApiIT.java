@@ -175,6 +175,7 @@ class SalesOrderApiIT extends IntegrationTestSupport {
         act(dropped, "cancel", 0).andExpect(status().isOk());
         assertThat(audits("SalesOrderFulfilled")).isEqualTo(1);
         assertThat(audits("SalesOrderCancelled")).isEqualTo(2);
+        TestInventory.assertLedgerBalances(ws.tenantId());
     }
 
     @Test
