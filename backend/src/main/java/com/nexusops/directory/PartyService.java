@@ -246,24 +246,33 @@ public class PartyService {
         return view(party);
     }
 
-    /**
-     * CRM's business rule (spec D7): converting a lead and winning a deal make the party a customer. Not a user action,
-     * so no permission check here (callers hold their own). Idempotent; archived parties are left alone.
-     */
+    /** CRM's business rule (spec D7): kept for its callers. */
     @Transactional
     public void ensureCustomer(UUID id) {
+        ensureRole(id, PartyRoleType.CUSTOMER);
+    }
+
+    /**
+     * Business rules of other modules (CRM: customers; Inventory: suppliers and customers) make a party play a role.
+     * Not a user action, so no permission check here. Idempotent; archived parties are left alone.
+     */
+    @Transactional
+    public void ensureRole(UUID id, PartyRoleType role) {
+        if (role == PartyRoleType.EMPLOYEE) {
+            throw new IllegalArgumentException("Employee roles are managed in the directory");
+        }
         Party party = find(id);
         if (party.isArchived()) {
             return;
         }
         locks.lock(ROLES_LOCK);
-        PartyRole row = roles.findByPartyIdAndRole(id, PartyRoleType.CUSTOMER).orElse(null);
+        PartyRole row = roles.findByPartyIdAndRole(id, role).orElse(null);
         if (row != null && row.getStatus() == RoleStatus.ACTIVE) {
             return;
         }
         Map<String, Object> before = row == null ? null : roleSnapshot(row);
         if (row == null) {
-            row = new PartyRole(Ids.newId(), id, PartyRoleType.CUSTOMER);
+            row = new PartyRole(Ids.newId(), id, role);
         }
         row.update(RoleStatus.ACTIVE, row.getSince(), null);
         roles.saveAndFlush(row);

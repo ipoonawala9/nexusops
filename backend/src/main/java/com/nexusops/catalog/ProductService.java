@@ -15,12 +15,15 @@ import com.nexusops.shared.web.Paging;
 import com.nexusops.tenancy.TenantDirectory;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.Currency;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
@@ -53,6 +56,18 @@ public class ProductService {
     @Transactional(readOnly = true)
     public ProductView get(UUID id) {
         return view(find(id));
+    }
+
+    /** Tenant-scoped lookup for other modules; unknown ids (or other tenants') are simply absent. */
+    @Transactional(readOnly = true)
+    public Map<UUID, ProductBrief> briefs(Collection<UUID> ids) {
+        TenantContext.requireTenantId();
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+        return products.findAllById(Set.copyOf(ids)).stream().collect(Collectors.toMap(Product::getId,
+                p -> new ProductBrief(p.getId(), p.getSku(), p.getName(), p.getKind(), p.getUnit(), p.getListPrice(),
+                        p.getCurrency(), p.isArchived())));
     }
 
     @Transactional(readOnly = true)
