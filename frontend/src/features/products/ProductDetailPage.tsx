@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ErrorState, ListSkeleton, PageHeader } from '@/components/states'
 import { PERMISSIONS, useCan } from '@/features/auth/permissions'
+import { ProductStockPanel } from '@/features/inventory/ProductStockPanel'
 import { ActivityPanel } from '@/features/records/ActivityPanel'
 import { ArchiveControls } from '@/features/records/ArchiveControls'
 import { DocumentsPanel } from '@/features/records/DocumentsPanel'
@@ -102,6 +103,7 @@ export function ProductDetailPage() {
           </dl>
         </CardContent>
       </Card>
+      <ProductStockPanel productId={p.id} kind={p.kind} />
       <SubjectTasksPanel
         subjectType="PRODUCT"
         subjectId={p.id}
