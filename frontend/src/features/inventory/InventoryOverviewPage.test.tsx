@@ -16,9 +16,10 @@ describe('InventoryOverviewPage', () => {
       'href',
       '/app/inventory/stock?belowMin=true',
     )
+    // ordered and partly received orders both await receipt: no status filter
     expect(screen.getByRole('link', { name: /1\s*awaiting receipt/i })).toHaveAttribute(
       'href',
-      '/app/inventory/purchase-orders?status=ORDERED',
+      '/app/inventory/purchase-orders',
     )
     expect(screen.getByRole('link', { name: /3\s*awaiting fulfilment/i })).toHaveAttribute(
       'href',
@@ -38,5 +39,33 @@ describe('InventoryOverviewPage', () => {
     })
     renderApp({ server, path: '/app/inventory' })
     expect(await screen.findByText('No stock has moved yet.')).toBeInTheDocument()
+  })
+
+  it('shows only the order tiles the user may open', async () => {
+    const server = fakeServer()
+    signedIn(
+      server,
+      testProfile({ modules: ['INVENTORY'], permissions: ['inventory.stock.read'] }),
+    ).on('GET /inventory/overview', { body: anOverview() })
+    renderApp({ server, path: '/app/inventory' })
+    expect(await screen.findByRole('link', { name: /2\s*below minimum/i })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /awaiting receipt/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /awaiting fulfilment/i })).not.toBeInTheDocument()
+  })
+
+  it('shows the sales tile to a seller without purchase access', async () => {
+    const server = fakeServer()
+    signedIn(
+      server,
+      testProfile({
+        modules: ['INVENTORY'],
+        permissions: ['inventory.stock.read', 'inventory.order.read'],
+      }),
+    ).on('GET /inventory/overview', { body: anOverview() })
+    renderApp({ server, path: '/app/inventory' })
+    expect(
+      await screen.findByRole('link', { name: /3\s*awaiting fulfilment/i }),
+    ).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /awaiting receipt/i })).not.toBeInTheDocument()
   })
 })

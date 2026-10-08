@@ -69,6 +69,10 @@ export function PurchaseOrderDetailPage() {
   const o = order.data
   // a received order stays open for notes (quality issues, invoices); a cancelled one is history
   const closed = o.status === 'CANCELLED'
+  const cancellable =
+    o.status === 'DRAFT' || o.status === 'ORDERED' || o.status === 'PARTIALLY_RECEIVED'
+  // a partly received order is closed: the rest won't arrive, what came stays in stock
+  const closing = o.status === 'PARTIALLY_RECEIVED'
   const path = `/purchase-orders/${o.id}`
 
   return (
@@ -103,9 +107,9 @@ export function PurchaseOrderDetailPage() {
                 Receive
               </Button>
             )}
-            {canManage && (o.status === 'DRAFT' || o.status === 'ORDERED') && (
+            {canManage && cancellable && (
               <Button variant="outline" size="sm" onClick={() => open('cancel')}>
-                Cancel order
+                {closing ? 'Close order' : 'Cancel order'}
               </Button>
             )}
           </>
@@ -248,9 +252,13 @@ export function PurchaseOrderDetailPage() {
       )}
       <ConfirmDialog
         open={dialog === 'cancel'}
-        title={`Cancel ${o.number}?`}
-        description="The order stays on record as cancelled. Nothing was received, so stock doesn't change."
-        confirmLabel="Cancel order"
+        title={closing ? `Close ${o.number}?` : `Cancel ${o.number}?`}
+        description={
+          closing
+            ? "The rest won't arrive. What was received stays in stock."
+            : "The order stays on record as cancelled. Nothing was received, so stock doesn't change."
+        }
+        confirmLabel={closing ? 'Close order' : 'Cancel order'}
         busy={action.busy}
         error={action.error}
         onCancel={() => {
@@ -259,7 +267,11 @@ export function PurchaseOrderDetailPage() {
         }}
         onConfirm={() =>
           void action
-            .run(`${path}/cancel`, { version: o.version }, `${o.number} cancelled.`)
+            .run(
+              `${path}/cancel`,
+              { version: o.version },
+              closing ? `${o.number} closed.` : `${o.number} cancelled.`,
+            )
             .then((ok) => ok && setDialog(null))
         }
       />

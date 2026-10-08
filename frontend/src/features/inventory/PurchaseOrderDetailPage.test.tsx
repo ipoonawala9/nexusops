@@ -91,6 +91,32 @@ describe('PurchaseOrderDetailPage', () => {
     expect(await screen.findByText('Cancelled')).toBeInTheDocument()
   })
 
+  it('closes a partly received order: the rest will not arrive', async () => {
+    const partly = { ...ordered, status: 'PARTIALLY_RECEIVED' as const, version: 2 }
+    const { server, user } = setup(partly)
+    const closed = { ...partly, status: 'CANCELLED' as const, cancelledAt: '2026-10-09T09:00:00Z' }
+    server.on('POST /purchase-orders/:id/cancel', { body: closed })
+    const close = await screen.findByRole('button', { name: 'Close order' })
+    expect(screen.queryByRole('button', { name: 'Cancel order' })).not.toBeInTheDocument()
+    server.on('GET /purchase-orders/:id', { body: closed })
+    await user.click(close)
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText('Close PO-00001?')).toBeInTheDocument()
+    expect(
+      within(dialog).getByText("The rest won't arrive. What was received stays in stock."),
+    ).toBeInTheDocument()
+    await user.click(within(dialog).getByRole('button', { name: 'Close order' }))
+    expect(server.callsTo('POST /purchase-orders/:id/cancel')[0].body).toEqual({ version: 2 })
+    expect(await screen.findByText('PO-00001 closed.')).toBeInTheDocument()
+    expect(await screen.findByText('Cancelled')).toBeInTheDocument()
+  })
+
+  it('offers no cancellation once everything was received', async () => {
+    setup({ ...ordered, status: 'RECEIVED', receivedAt: '2026-10-09T09:00:00Z', version: 2 })
+    expect(await screen.findByRole('heading', { name: 'PO-00001' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /order$/ })).not.toBeInTheDocument()
+  })
+
   it('shows a stale-version conflict and reloads', async () => {
     const { server, user } = setup(aPurchaseOrder())
     server.on('POST /purchase-orders/:id/order', {
