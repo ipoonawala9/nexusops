@@ -70,6 +70,7 @@ describe('LeadsPage', () => {
     server.on('POST /leads', { status: 201, body: aLead({ id: 'l-new', name: 'Meera Iyer' }) })
     await user.click(await screen.findByRole('button', { name: 'New lead' }))
     const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByRole('option', { name: 'Me (default)' })).toBeInTheDocument()
     await user.type(within(dialog).getByLabelText('First name'), 'Meera')
     await user.type(within(dialog).getByLabelText('Last name'), 'Iyer')
     await user.type(within(dialog).getByLabelText('Estimated value'), '2500')

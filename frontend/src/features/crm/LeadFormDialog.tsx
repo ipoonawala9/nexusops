@@ -148,6 +148,7 @@ export function LeadFormDialog({
             value={form.watch('ownerId')}
             onChange={(id) => form.setValue('ownerId', id)}
             current={lead?.owner}
+            blankLabel={lead ? 'Unassigned' : 'Me (default)'}
             error={form.formState.errors.ownerId?.message}
           />
           <TextAreaField form={form} name="description" label="Notes" maxLength={5000} />

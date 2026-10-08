@@ -13,11 +13,13 @@ export function OwnerSelect({
   onChange,
   current,
   error,
+  blankLabel = 'Unassigned',
 }: {
   value: string
   onChange: (id: string) => void
   current?: MemberRef | null
   error?: string
+  blankLabel?: string
 }) {
   const api = useApi()
   const [search, setSearch] = useState('')
@@ -53,7 +55,7 @@ export function OwnerSelect({
             onChange(id)
           }}
         >
-          <option value="">Unassigned</option>
+          <option value="">{blankLabel}</option>
           {pinned.map((m) => (
             <option key={m.id} value={m.id}>
               {m.name}

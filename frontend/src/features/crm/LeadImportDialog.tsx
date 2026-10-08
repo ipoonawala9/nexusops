@@ -55,7 +55,7 @@ export function LeadImportDialog({ onClose }: { onClose: () => void }) {
     try {
       const result = await api.upload<ImportResult>('/leads/import', form)
       await queryClient.invalidateQueries({ queryKey: ['leads'] })
-      toast.success(`${result.imported} leads imported.`)
+      toast.success(`${result.imported} ${result.imported === 1 ? 'lead' : 'leads'} imported.`)
       onClose()
     } catch (e) {
       const problem =
@@ -91,7 +91,11 @@ export function LeadImportDialog({ onClose }: { onClose: () => void }) {
             id="lead-import-file"
             type="file"
             accept=".csv,text/csv"
-            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            onChange={(e) => {
+              setFile(e.target.files?.[0] ?? null)
+              setError(null)
+              setRows([])
+            }}
           />
         </div>
         <FormError message={error} />
