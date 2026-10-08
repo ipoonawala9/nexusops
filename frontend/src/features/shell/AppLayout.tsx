@@ -8,6 +8,7 @@ import { useApi } from '@/lib/api/ApiContext'
 import { problemMessage } from '@/lib/api/problems'
 import { fullName } from '@/lib/format'
 import { cn } from '@/lib/utils'
+import { GlobalSearch } from './GlobalSearch'
 import { firstSettingsPath, NAV_ITEMS } from './nav'
 
 const linkClass = ({ isActive }: { isActive: boolean }) =>
@@ -98,6 +99,7 @@ export function AppLayout() {
         </div>
       </aside>
       <main className="min-w-0 p-4 md:p-8">
+        <GlobalSearch />
         <Outlet />
       </main>
     </div>
