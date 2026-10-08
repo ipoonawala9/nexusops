@@ -30,6 +30,15 @@ class InventoryProducts {
 
     /** Unknown or other-tenant → 400 on {@code field}; a service → 400; archived (unless allowed) → 409. */
     ProductBrief requireStockable(UUID id, String field, boolean allowArchived) {
+        ProductBrief product = resolve(id, field);
+        if (!allowArchived) {
+            requireNotArchived(product);
+        }
+        return product;
+    }
+
+    /** Resolution only (400s): unknown or other-tenant, or a service. Archived is checked separately, after all 400s. */
+    ProductBrief resolve(UUID id, String field) {
         ProductBrief product = id == null ? null : products.briefs(List.of(id)).get(id);
         if (product == null) {
             throw ApiProblem.badRequestField(field, UNKNOWN);
@@ -37,10 +46,13 @@ class InventoryProducts {
         if (product.kind() != ProductKind.GOODS) {
             throw ApiProblem.badRequestField(field, SERVICE);
         }
-        if (product.archived() && !allowArchived) {
+        return product;
+    }
+
+    static void requireNotArchived(ProductBrief product) {
+        if (product.archived()) {
             throw ApiProblem.conflict(ARCHIVED);
         }
-        return product;
     }
 
     Map<UUID, ProductBrief> briefs(Collection<UUID> ids) {

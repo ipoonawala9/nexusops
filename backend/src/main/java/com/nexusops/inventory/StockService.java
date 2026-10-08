@@ -109,8 +109,10 @@ public class StockService {
         TenantContext.requireTenantId();
         BigDecimal counted = Quantities.count(command.countedQuantity(), "countedQuantity");
         String reason = Text.required(command.reason(), 200, "reason");
-        ProductBrief product = products.requireStockable(command.productId(), "productId");
-        Warehouse warehouse = warehouses.requireActive(command.warehouseId(), "warehouseId");
+        ProductBrief product = products.resolve(command.productId(), "productId");
+        Warehouse warehouse = warehouses.resolve(command.warehouseId(), "warehouseId");
+        InventoryProducts.requireNotArchived(product);
+        WarehouseService.requireNotArchived(warehouse);
         StockKey key = new StockKey(product.id(), warehouse.getId());
         StockLevel level = ledger.lock(List.of(key)).get(key);
         if (counted.compareTo(level.getReserved()) < 0) {
@@ -139,9 +141,12 @@ public class StockService {
         if (command.fromWarehouseId() != null && command.fromWarehouseId().equals(command.toWarehouseId())) {
             throw ApiProblem.badRequestField("toWarehouseId", SAME_WAREHOUSE);
         }
-        ProductBrief product = products.requireStockable(command.productId(), "productId");
-        Warehouse from = warehouses.requireActive(command.fromWarehouseId(), "fromWarehouseId");
-        Warehouse to = warehouses.requireActive(command.toWarehouseId(), "toWarehouseId");
+        ProductBrief product = products.resolve(command.productId(), "productId");
+        Warehouse from = warehouses.resolve(command.fromWarehouseId(), "fromWarehouseId");
+        Warehouse to = warehouses.resolve(command.toWarehouseId(), "toWarehouseId");
+        InventoryProducts.requireNotArchived(product);
+        WarehouseService.requireNotArchived(from);
+        WarehouseService.requireNotArchived(to);
         StockKey fromKey = new StockKey(product.id(), from.getId());
         StockKey toKey = new StockKey(product.id(), to.getId());
         Map<StockKey, StockLevel> locked = ledger.lock(List.of(fromKey, toKey));

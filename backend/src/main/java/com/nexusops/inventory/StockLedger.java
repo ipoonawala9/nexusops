@@ -42,7 +42,12 @@ class StockLedger {
         this.jdbc = jdbc;
     }
 
-    /** Creates missing level rows, then locks every row in key order. Must run inside the caller's transaction. */
+    /**
+     * Creates missing level rows, then locks every row in key order. Must run inside the caller's transaction.
+     * Rules for callers: call this once per transaction with every key the operation needs (locking again later could
+     * invert the lock order), and never load a StockLevel before locking it in the same transaction (a locking query
+     * does not refresh an already-managed entity, so the values would be stale).
+     */
     @Transactional(propagation = Propagation.MANDATORY)
     Map<StockKey, StockLevel> lock(Collection<StockKey> keys) {
         UUID tenant = TenantContext.requireTenantId();

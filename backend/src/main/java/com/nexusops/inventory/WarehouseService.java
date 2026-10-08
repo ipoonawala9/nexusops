@@ -24,7 +24,15 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Warehouses (D4). Codes are unique ignoring case and never reused; at least one warehouse stays active. */
+/**
+ * Warehouses (D4). Codes are unique ignoring case and never reused; at least one warehouse stays active.
+ *
+ * <p>Lock rule: anything that writes stock or an order against a warehouse resolves it with {@link #resolve} /
+ * {@link #requireActive} inside its own transaction, which takes the warehouse row FOR SHARE until commit.
+ * {@link #archive} takes the row FOR UPDATE before checking that the warehouse is unused, so an archive waits for
+ * in-flight writers and any later writer sees {@code archived_at}. Stock and open-order checks in
+ * {@code requireUnused} therefore cannot race with a concurrent write.
+ */
 @Service
 public class WarehouseService {
 
@@ -100,7 +108,8 @@ public class WarehouseService {
 
     @Transactional
     public WarehouseView archive(UUID id) {
-        Warehouse warehouse = find(id);
+        TenantContext.requireTenantId();
+        Warehouse warehouse = warehouses.findByIdForUpdate(id).orElseThrow(() -> ApiProblem.notFound(NOT_FOUND));
         if (!warehouse.isArchived()) {
             locks.lock(LOCK);
             if (warehouses.countByArchivedAtIsNull() <= 1) {
@@ -137,15 +146,25 @@ public class WarehouseService {
 
     /** A warehouse referenced from a request body: unknown is 400 on {@code field}, archived is 409. */
     Warehouse requireActive(UUID id, String field) {
+        Warehouse warehouse = resolve(id, field);
+        requireNotArchived(warehouse);
+        return warehouse;
+    }
+
+    /** Looks the warehouse up (FOR SHARE, held to commit; call inside the caller's transaction): unknown is 400. */
+    Warehouse resolve(UUID id, String field) {
         TenantContext.requireTenantId();
-        Warehouse warehouse = id == null ? null : warehouses.findById(id).orElse(null);
+        Warehouse warehouse = id == null ? null : warehouses.findByIdForShare(id).orElse(null);
         if (warehouse == null) {
             throw ApiProblem.badRequestField(field, UNKNOWN);
         }
+        return warehouse;
+    }
+
+    static void requireNotArchived(Warehouse warehouse) {
         if (warehouse.isArchived()) {
             throw ApiProblem.conflict(ARCHIVED);
         }
-        return warehouse;
     }
 
     Map<UUID, Warehouse> byIds(Collection<UUID> ids) {

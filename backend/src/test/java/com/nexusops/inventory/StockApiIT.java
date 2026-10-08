@@ -139,6 +139,19 @@ class StockApiIT extends IntegrationTestSupport {
     }
 
     @Test
+    void unknownReferencesAreReportedBeforeArchivedOnes() throws Exception {
+        owner.post("/api/v1/products/" + widget + "/archive", "").andExpect(status().isOk());
+        count(UUID.randomUUID(), "1", "x").andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[0].field").value("warehouseId"));
+        UUID spare = warehouse("SPARE");
+        UUID other = TestInventory.goods(owner, "W-2", "Gadget");
+        owner.post("/api/v1/inventory/warehouses/" + spare + "/archive", "").andExpect(status().isOk());
+        owner.post("/api/v1/inventory/transfers", "{\"productId\":\"" + other + "\",\"fromWarehouseId\":\"" + spare
+                + "\",\"toWarehouseId\":\"" + UUID.randomUUID() + "\",\"quantity\":1}")
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("toWarehouseId"));
+    }
+
+    @Test
     void transfersMoveAvailableStock() throws Exception {
         UUID pune = warehouse("PUNE");
         count(main, "10", "Opening stock").andExpect(status().isOk());
