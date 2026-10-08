@@ -40,6 +40,7 @@ export function Customer360Page() {
   const summary = useQuery({
     queryKey: ['crm-customer', partyId],
     queryFn: () => api.get<CustomerSummary>(`/crm/customers/${partyId}`),
+    refetchOnMount: 'always',
   })
   const isOrganization = summary.data?.party.kind === 'ORGANIZATION'
   const contacts = useQuery({
@@ -129,7 +130,11 @@ export function Customer360Page() {
             <CardTitle>People</CardTitle>
           </CardHeader>
           <CardContent className="text-sm">
-            {contacts.data?.items.length ? (
+            {contacts.isPending ? (
+              <ListSkeleton rows={2} />
+            ) : contacts.isError ? (
+              <ErrorState error={contacts.error} onRetry={() => void contacts.refetch()} />
+            ) : contacts.data.items.length ? (
               <ul className="space-y-1">
                 {contacts.data.items.map((p) => (
                   <li key={p.id}>
@@ -152,7 +157,11 @@ export function Customer360Page() {
       {can(PERMISSIONS.opportunityRead) && (
         <section aria-label="Opportunities" className="space-y-2">
           <h2 className="text-lg font-semibold">Opportunities</h2>
-          {deals.data?.items.length ? (
+          {deals.isPending ? (
+            <ListSkeleton rows={2} />
+          ) : deals.isError ? (
+            <ErrorState error={deals.error} onRetry={() => void deals.refetch()} />
+          ) : deals.data.items.length ? (
             <div className="overflow-x-auto rounded-lg border">
               <Table>
                 <TableHeader>

@@ -21,6 +21,7 @@ import { TextField } from '@/components/form/TextField'
 import { useApi } from '@/lib/api/ApiContext'
 import { applyFieldErrors, problemMessage } from '@/lib/api/problems'
 import type { OpportunityView, PartyRef, StageView } from '@/lib/api/types'
+import { invalidateCrmFigures } from './invalidation'
 import { OwnerSelect } from './OwnerSelect'
 import { PartyPicker } from './PartyPicker'
 import { opportunitySchema, type OpportunityValues } from './schemas'
@@ -95,6 +96,7 @@ export function OpportunityFormDialog({
       queryClient.setQueryData(['opportunity', saved.id], saved)
       await queryClient.invalidateQueries({ queryKey: ['crm-board'] })
       await queryClient.invalidateQueries({ queryKey: ['opportunities'] })
+      await invalidateCrmFigures(queryClient)
       toast.success(opportunity ? 'Changes saved.' : `${saved.name} created.`)
       onSaved(saved)
     } catch (error) {

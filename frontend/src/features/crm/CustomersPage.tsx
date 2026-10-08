@@ -28,6 +28,7 @@ export function CustomersPage() {
     queryKey: ['crm-customers', { q, page }],
     queryFn: () => api.get<Page<CustomerRow>>(`/crm/customers?${toQuery({ q, page, size: 20 })}`),
     placeholderData: keepPreviousData,
+    refetchOnMount: 'always',
   })
 
   function onSearch(event: FormEvent<HTMLFormElement>) {

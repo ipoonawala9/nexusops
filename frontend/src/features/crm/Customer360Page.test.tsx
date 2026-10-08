@@ -3,7 +3,14 @@ import { describe, expect, it } from 'vitest'
 import { ALL_TENANT_PERMISSIONS } from '@/features/auth/permissions'
 import { fakeServer } from '@/test/fakeServer'
 import { signedIn, testProfile } from '@/test/fixtures'
-import { aCustomerSummary, anActivity, anOpportunity, aSummary, pageOf } from '@/test/records'
+import {
+  aCustomerSummary,
+  anActivity,
+  anOpportunity,
+  aSummary,
+  defaultStages,
+  pageOf,
+} from '@/test/records'
 import { renderApp } from '@/test/renderApp'
 
 function setup() {
@@ -37,6 +44,8 @@ function setup() {
     })
     .on('GET /documents', { body: [] })
     .on('GET /tasks', { body: pageOf([]) })
+    .on('GET /crm/pipeline/stages', { body: defaultStages() })
+    .on('GET /crm/owners', { body: [] })
   return renderApp({ server, path: '/app/crm/customers/p-acme' })
 }
 
@@ -62,5 +71,28 @@ describe('Customer360Page', () => {
     expect(server.callsTo('GET /activities')[0].query.get('includeRelated')).toBe('true')
     expect(server.callsTo('GET /opportunities')[0].query.get('accountId')).toBe('p-acme')
     expect(server.callsTo('GET /parties')[0].query.get('organizationId')).toBe('p-acme')
+  })
+
+  it('refreshes the figures after a deal is created', async () => {
+    const { server, user } = setup()
+    server.on('POST /opportunities', {
+      status: 201,
+      body: anOpportunity({ id: 'o-new', name: 'Spice supply' }),
+    })
+    await user.click(await screen.findByRole('button', { name: 'New opportunity' }))
+    const dialog = await screen.findByRole('dialog')
+    await user.type(within(dialog).getByLabelText('Name'), 'Spice supply')
+    const before = server.callsTo('GET /crm/customers/:id').length
+    await user.click(within(dialog).getByRole('button', { name: 'Create opportunity' }))
+    await screen.findByText('Spice supply created.')
+    expect(server.callsTo('GET /crm/customers/:id').length).toBeGreaterThan(before)
+  })
+
+  it('shows an error, not an empty message, when the deals fail to load', async () => {
+    const { server } = setup()
+    server.on('GET /opportunities', { status: 500, body: { title: 'Server error' } })
+    const deals = await screen.findByRole('region', { name: 'Opportunities' })
+    expect(await within(deals).findByRole('alert')).toBeInTheDocument()
+    expect(within(deals).queryByText('No opportunities yet.')).not.toBeInTheDocument()
   })
 })

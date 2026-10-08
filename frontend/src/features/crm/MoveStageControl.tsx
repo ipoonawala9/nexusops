@@ -17,6 +17,7 @@ import { TextAreaField } from '@/components/form/TextAreaField'
 import { useApi } from '@/lib/api/ApiContext'
 import { problemMessage } from '@/lib/api/problems'
 import type { OpportunityView, StageRef, StageView } from '@/lib/api/types'
+import { invalidateCrmFigures } from './invalidation'
 import { reasonSchema } from './schemas'
 
 /** "Move to…" for one opportunity (board card or detail page). Lost needs a reason (D6). */
@@ -45,6 +46,7 @@ export function MoveStageControl({
       queryClient.setQueryData(['opportunity', moved.id], moved)
       await queryClient.invalidateQueries({ queryKey: ['crm-board'] })
       await queryClient.invalidateQueries({ queryKey: ['opportunities'] })
+      await invalidateCrmFigures(queryClient)
       toast.success(`Moved to ${stage.name}.`)
       onMoved?.(moved)
       return true

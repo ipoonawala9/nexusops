@@ -22,6 +22,7 @@ import { ApiError } from '@/lib/api/client'
 import { problemMessage } from '@/lib/api/problems'
 import type { DuplicateCandidate, LeadView, PartyRef, StageView } from '@/lib/api/types'
 import { duplicatesOf } from '@/features/records/duplicates'
+import { invalidateCrmFigures } from './invalidation'
 import { PartyPicker } from './PartyPicker'
 import { moneySchema } from './schemas'
 
@@ -146,6 +147,7 @@ export function ConvertLeadDialog({
       await queryClient.invalidateQueries({ queryKey: ['leads'] })
       await queryClient.invalidateQueries({ queryKey: ['crm-board'] })
       await queryClient.invalidateQueries({ queryKey: ['parties'] })
+      await invalidateCrmFigures(queryClient)
       toast.success('Lead converted.')
       onConverted(converted)
     } catch (error) {
