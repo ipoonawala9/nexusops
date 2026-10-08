@@ -17,7 +17,7 @@ export const MODULE_PHASES: Record<string, { label: string; phase: number; descr
     INVENTORY: {
       label: 'Inventory',
       phase: 6,
-      description: 'Products, warehouses and stock movements.',
+      description: 'Warehouses, stock, purchase and sales orders.',
     },
     HELPDESK: { label: 'HelpDesk', phase: 7, description: 'Tickets, SLAs and customer support.' },
     HRMS: { label: 'HRMS', phase: 8, description: 'Employees, onboarding and leave.' },
@@ -44,6 +44,7 @@ export const SETTINGS_TABS: Array<{ to: string; label: string; anyOf: Permission
   { to: '/app/settings/roles', label: 'Roles', anyOf: [PERMISSIONS.roleRead] },
   { to: '/app/settings/modules', label: 'Modules', anyOf: [PERMISSIONS.settingsRead] },
   { to: '/app/settings/pipeline', label: 'Pipeline', anyOf: [PERMISSIONS.pipelineManage] },
+  { to: '/app/settings/warehouses', label: 'Warehouses', anyOf: [PERMISSIONS.warehouseManage] },
 ]
 
 export function firstSettingsPath(can: (...codes: PermissionCode[]) => boolean): string | null {

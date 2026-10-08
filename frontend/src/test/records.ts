@@ -14,6 +14,17 @@ import type {
   ProductView,
   StageView,
   TaskView,
+  InventoryOverview,
+  MovementView,
+  ProductStock,
+  PurchaseOrderSummary,
+  PurchaseOrderView,
+  ReorderRuleView,
+  ReorderSuggestion,
+  SalesOrderSummary,
+  SalesOrderView,
+  StockRow,
+  WarehouseView,
 } from '@/lib/api/types'
 
 export function pageOf<T>(items: T[], total = items.length, page = 0, size = 20): Page<T> {
@@ -297,6 +308,202 @@ export function aDashboard(overrides: Partial<DashboardView> = {}): DashboardVie
       lostThisMonth: { count: 1, totals: [] },
       closingSoon: [anOpportunitySummary()],
     },
+    ...overrides,
+  }
+}
+
+export function aWarehouse(overrides: Partial<WarehouseView> = {}): WarehouseView {
+  return {
+    id: 'w-main',
+    code: 'MAIN',
+    name: 'Main warehouse',
+    address: null,
+    archivedAt: null,
+    version: 0,
+    ...overrides,
+  }
+}
+
+const WIDGET = { id: 'pr-widget', sku: 'W-1', name: 'Widget', unit: 'each' }
+const MAIN = { id: 'w-main', code: 'MAIN', name: 'Main warehouse' }
+const SUPPLIER = { id: 'p-konkan', name: 'Konkan Supplies' }
+const CUSTOMER = { id: 'p-deccan', name: 'Deccan Retail' }
+
+export function aProductStock(overrides: Partial<ProductStock> = {}): ProductStock {
+  return {
+    product: WIDGET,
+    levels: [{ warehouse: MAIN, onHand: 12, reserved: 2, available: 10 }],
+    onHand: 12,
+    reserved: 2,
+    available: 10,
+    ...overrides,
+  }
+}
+
+export function aMovement(overrides: Partial<MovementView> = {}): MovementView {
+  return {
+    id: 'm-1',
+    product: WIDGET,
+    warehouse: MAIN,
+    kind: 'RECEIPT',
+    quantity: 10,
+    onHandAfter: 12,
+    referenceType: 'PURCHASE_ORDER',
+    referenceId: 'po-1',
+    reason: 'PO-00001',
+    actor: { id: 'u-ada', name: 'Ada Lovelace' },
+    occurredAt: '2026-10-08T09:00:00Z',
+    ...overrides,
+  }
+}
+
+export function aStockRow(overrides: Partial<StockRow> = {}): StockRow {
+  return {
+    product: WIDGET,
+    warehouse: MAIN,
+    onHand: 12,
+    reserved: 2,
+    available: 10,
+    onOrder: 0,
+    ruleId: 'rr-1',
+    minQuantity: 20,
+    maxQuantity: 60,
+    belowMin: true,
+    ...overrides,
+  }
+}
+
+export function aPurchaseOrder(overrides: Partial<PurchaseOrderView> = {}): PurchaseOrderView {
+  return {
+    id: 'po-1',
+    number: 'PO-00001',
+    supplier: SUPPLIER,
+    warehouse: MAIN,
+    status: 'DRAFT',
+    currency: 'USD',
+    expectedOn: null,
+    notes: null,
+    lines: [
+      {
+        id: 'pl-1',
+        lineNo: 1,
+        product: WIDGET,
+        quantity: 10,
+        receivedQuantity: 0,
+        remainingQuantity: 10,
+        unitCost: 2.5,
+        lineTotal: 25,
+      },
+    ],
+    total: 25,
+    orderedAt: null,
+    receivedAt: null,
+    cancelledAt: null,
+    createdBy: { id: 'u-ada', name: 'Ada Lovelace' },
+    createdAt: '2026-10-08T09:00:00Z',
+    updatedAt: '2026-10-08T09:00:00Z',
+    version: 0,
+    ...overrides,
+  }
+}
+
+export function aPurchaseSummary(
+  overrides: Partial<PurchaseOrderSummary> = {},
+): PurchaseOrderSummary {
+  return {
+    id: 'po-1',
+    number: 'PO-00001',
+    supplier: SUPPLIER,
+    warehouse: MAIN,
+    status: 'DRAFT',
+    currency: 'USD',
+    total: 25,
+    lineCount: 1,
+    expectedOn: null,
+    createdAt: '2026-10-08T09:00:00Z',
+    ...overrides,
+  }
+}
+
+export function aSalesOrder(overrides: Partial<SalesOrderView> = {}): SalesOrderView {
+  return {
+    id: 'so-1',
+    number: 'SO-00001',
+    customer: CUSTOMER,
+    warehouse: MAIN,
+    status: 'DRAFT',
+    currency: 'USD',
+    notes: null,
+    lines: [
+      { id: 'sl-1', lineNo: 1, product: WIDGET, quantity: 4, unitPrice: 12.5, lineTotal: 50 },
+    ],
+    total: 50,
+    confirmedAt: null,
+    fulfilledAt: null,
+    cancelledAt: null,
+    createdBy: { id: 'u-ada', name: 'Ada Lovelace' },
+    createdAt: '2026-10-08T09:00:00Z',
+    updatedAt: '2026-10-08T09:00:00Z',
+    version: 0,
+    ...overrides,
+  }
+}
+
+export function aSalesSummary(overrides: Partial<SalesOrderSummary> = {}): SalesOrderSummary {
+  return {
+    id: 'so-1',
+    number: 'SO-00001',
+    customer: CUSTOMER,
+    warehouse: MAIN,
+    status: 'DRAFT',
+    currency: 'USD',
+    total: 50,
+    lineCount: 1,
+    createdAt: '2026-10-08T09:00:00Z',
+    ...overrides,
+  }
+}
+
+export function aReorderRule(overrides: Partial<ReorderRuleView> = {}): ReorderRuleView {
+  return {
+    id: 'rr-1',
+    product: WIDGET,
+    warehouse: MAIN,
+    minQuantity: 20,
+    maxQuantity: 60,
+    supplier: SUPPLIER,
+    updatedAt: '2026-10-08T09:00:00Z',
+    version: 0,
+    ...overrides,
+  }
+}
+
+export function aSuggestion(overrides: Partial<ReorderSuggestion> = {}): ReorderSuggestion {
+  return {
+    ruleId: 'rr-1',
+    product: WIDGET,
+    warehouse: MAIN,
+    available: 12,
+    onOrder: 0,
+    minQuantity: 20,
+    maxQuantity: 60,
+    supplier: SUPPLIER,
+    usedLast30Days: 38,
+    averageDailyUsage: 1.2667,
+    daysOfCover: 9.5,
+    suggestedQuantity: 48,
+    explanation:
+      '12 available, 0 on order, below the minimum of 20; 38 used in the last 30 days (about 9 days of cover); order 48 to reach 60',
+    ...overrides,
+  }
+}
+
+export function anOverview(overrides: Partial<InventoryOverview> = {}): InventoryOverview {
+  return {
+    belowMinimum: 2,
+    purchaseOrdersAwaitingReceipt: 1,
+    salesOrdersAwaitingFulfilment: 3,
+    recentMovements: [aMovement()],
     ...overrides,
   }
 }
