@@ -4,6 +4,8 @@ import com.nexusops.inventory.AdjustCommand;
 import com.nexusops.inventory.PurchaseLineCommand;
 import com.nexusops.inventory.PurchaseOrderCommand;
 import com.nexusops.inventory.ReceiptCommand;
+import com.nexusops.inventory.SalesLineCommand;
+import com.nexusops.inventory.SalesOrderCommand;
 import com.nexusops.inventory.TransferCommand;
 import com.nexusops.inventory.WarehouseCommand;
 import java.math.BigDecimal;
@@ -37,6 +39,13 @@ final class InventoryDtos {
             String notes, List<PurchaseLineCommand> lines, Long version) {
         PurchaseOrderCommand command() {
             return new PurchaseOrderCommand(supplierId, warehouseId, currency, expectedOn, notes, lines);
+        }
+    }
+
+    record SalesOrderRequest(UUID customerId, UUID warehouseId, String currency, String notes,
+            List<SalesLineCommand> lines, Long version) {
+        SalesOrderCommand command() {
+            return new SalesOrderCommand(customerId, warehouseId, currency, notes, lines);
         }
     }
 

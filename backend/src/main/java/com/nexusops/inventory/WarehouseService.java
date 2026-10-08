@@ -181,7 +181,7 @@ public class WarehouseService {
     }
 
     /**
-     * Refuses archiving while the warehouse is in use: it holds stock, or open orders use it (purchase orders here; Task 4 adds sales orders). JDBC with an explicit tenant predicate on top of RLS.
+     * Refuses archiving while the warehouse is in use: it holds stock, or open purchase or sales orders use it. JDBC with an explicit tenant predicate on top of RLS.
      */
     private void requireUnused(Warehouse warehouse) {
         UUID tenant = TenantContext.requireTenantId();
@@ -194,6 +194,11 @@ public class WarehouseService {
                 + "and warehouse_id = ? and status in ('DRAFT', 'ORDERED', 'PARTIALLY_RECEIVED'))", Boolean.class,
                 tenant, warehouse.getId());
         if (Boolean.TRUE.equals(ordered)) {
+            throw ApiProblem.conflict(OPEN_ORDERS);
+        }
+        Boolean selling = jdbc.queryForObject("select exists (select 1 from sales_orders where tenant_id = ? "
+                + "and warehouse_id = ? and status in ('DRAFT', 'CONFIRMED'))", Boolean.class, tenant, warehouse.getId());
+        if (Boolean.TRUE.equals(selling)) {
             throw ApiProblem.conflict(OPEN_ORDERS);
         }
     }
