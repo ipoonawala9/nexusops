@@ -76,4 +76,30 @@ describe('ActivityPanel', () => {
     expect(await panel.findByText('No activity yet.')).toBeInTheDocument()
     expect(panel.queryByRole('button', { name: 'Log activity' })).not.toBeInTheDocument()
   })
+
+  it('labels an activity that is on another record', async () => {
+    const { server } = setup()
+    server.on('GET /activities', {
+      body: pageOf([
+        anActivity({
+          id: 'a-9',
+          summary: 'Pricing call',
+          subjectType: 'OPPORTUNITY',
+          subjectId: 'o-renewal',
+          subject: {
+            type: 'OPPORTUNITY',
+            id: 'o-renewal',
+            label: 'Packaging renewal',
+            archived: false,
+          },
+        }),
+      ]),
+    })
+    const panel = within(await screen.findByRole('region', { name: 'Activity' }))
+    expect(await panel.findByRole('link', { name: 'Packaging renewal' })).toHaveAttribute(
+      'href',
+      '/app/crm/opportunities/o-renewal',
+    )
+    expect(panel.getByText(/^On/)).toBeInTheDocument()
+  })
 })
