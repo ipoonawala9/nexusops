@@ -77,4 +77,40 @@ describe('GlobalSearch', () => {
     expect(input).toHaveFocus()
     expect(input).toHaveValue('')
   })
+
+  it('closes the results when you click elsewhere and reopens them on focus', async () => {
+    const { user } = setup()
+    const input = await screen.findByLabelText('Search records')
+    await user.type(input, 'konkan')
+    await screen.findByRole('list', { name: 'Search results' })
+    await user.click(await screen.findByRole('heading', { name: /Welcome/ }))
+    expect(screen.queryByRole('list', { name: 'Search results' })).not.toBeInTheDocument()
+    expect(input).toHaveValue('konkan')
+    await user.click(input)
+    expect(await screen.findByRole('list', { name: 'Search results' })).toBeInTheDocument()
+  })
+
+  it('says when the search fails', async () => {
+    const { server, user } = setup()
+    server.on('GET /search', { status: 500, body: { detail: 'boom' } })
+    await user.type(await screen.findByLabelText('Search records'), 'konkan')
+    expect(await screen.findByText('Search failed. Try again.')).toBeInTheDocument()
+  })
+
+  it('marks archived hits', async () => {
+    const server = fakeServer()
+    signedIn(server, testProfile({ modules: ['CRM'] })).on('GET /search', {
+      body: [{ type: 'LEAD', id: 'l-old', label: 'Old Traders', detail: null, archived: true }],
+    })
+    const { user } = renderApp({ server, path: '/app' })
+    await user.type(await screen.findByLabelText('Search records'), 'old')
+    expect(await screen.findByText('Lead · archived')).toBeInTheDocument()
+  })
+
+  it('does not search for a single character', async () => {
+    const { server, user } = setup()
+    await user.type(await screen.findByLabelText('Search records'), 'k')
+    await new Promise((resolve) => setTimeout(resolve, 300))
+    expect(server.callsTo('GET /search')).toHaveLength(0)
+  })
 })
