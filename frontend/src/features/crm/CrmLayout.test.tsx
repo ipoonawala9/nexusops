@@ -30,10 +30,10 @@ describe('CrmLayout', () => {
 
   it('shows every section to a full user', async () => {
     const server = fakeServer()
-    signedIn(server, testProfile({ modules: ['CRM'], permissions: [...ALL_TENANT_PERMISSIONS] })).on(
-      'GET /crm/dashboard',
-      { body: aDashboard() },
-    )
+    signedIn(
+      server,
+      testProfile({ modules: ['CRM'], permissions: [...ALL_TENANT_PERMISSIONS] }),
+    ).on('GET /crm/dashboard', { body: aDashboard() })
     renderApp({ server, path: '/app/crm' })
     const nav = await screen.findByRole('navigation', { name: 'CRM' })
     for (const name of ['Dashboard', 'Leads', 'Pipeline', 'Customers'])

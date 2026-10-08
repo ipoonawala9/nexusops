@@ -26,7 +26,12 @@ export function CrmLayout() {
   if (!modules.includes('CRM')) {
     const info = MODULE_PHASES.CRM
     return (
-      <ComingSoonPage title={info.label} phase={info.phase} description={info.description} module="CRM" />
+      <ComingSoonPage
+        title={info.label}
+        phase={info.phase}
+        description={info.description}
+        module="CRM"
+      />
     )
   }
   const tabs = TABS.filter((tab) => can(...tab.anyOf))
@@ -40,7 +45,10 @@ export function CrmLayout() {
             to={tab.to}
             end={tab.end}
             className={({ isActive }) =>
-              cn('rounded-md px-3 py-1.5 text-sm hover:bg-muted', isActive && 'bg-muted font-medium')
+              cn(
+                'rounded-md px-3 py-1.5 text-sm hover:bg-muted',
+                isActive && 'bg-muted font-medium',
+              )
             }
           >
             {tab.label}

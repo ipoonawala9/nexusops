@@ -41,7 +41,10 @@ describe('PipelineSettingsPage', () => {
     await user.clear(screen.getByLabelText('New stage probability (%)'))
     await user.type(screen.getByLabelText('New stage probability (%)'), '40')
     await user.click(screen.getByRole('button', { name: 'Add stage' }))
-    expect(server.callsTo('POST /crm/pipeline/stages')[0].body).toEqual({ name: 'Demo', probability: 40 })
+    expect(server.callsTo('POST /crm/pipeline/stages')[0].body).toEqual({
+      name: 'Demo',
+      probability: 40,
+    })
   })
 
   it('saves a renamed stage with its version', async () => {
@@ -77,7 +80,9 @@ describe('PipelineSettingsPage', () => {
     })
     const rows = await stageRows()
     await user.click(within(rows[0]).getByRole('button', { name: 'Delete Prospecting' }))
-    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Delete' }))
+    await user.click(
+      within(await screen.findByRole('dialog')).getByRole('button', { name: 'Delete' }),
+    )
     expect(await screen.findByText("Move this stage's opportunities first.")).toBeInTheDocument()
   })
 })

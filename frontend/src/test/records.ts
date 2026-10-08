@@ -216,7 +216,9 @@ export function anOpportunity(overrides: Partial<OpportunityView> = {}): Opportu
   }
 }
 
-export function anOpportunitySummary(overrides: Partial<OpportunitySummary> = {}): OpportunitySummary {
+export function anOpportunitySummary(
+  overrides: Partial<OpportunitySummary> = {},
+): OpportunitySummary {
   const o = anOpportunity()
   return {
     id: o.id,
@@ -260,7 +262,9 @@ export function aCustomerRow(overrides: Partial<CustomerRow> = {}): CustomerRow 
 
 export function aCustomerSummary(overrides: Partial<CustomerSummary> = {}): CustomerSummary {
   return {
-    party: aParty({ roles: [{ role: 'CUSTOMER', status: 'ACTIVE', since: null, employeeNumber: null }] }),
+    party: aParty({
+      roles: [{ role: 'CUSTOMER', status: 'ACTIVE', since: null, employeeNumber: null }],
+    }),
     openCount: 1,
     openValue: [{ currency: 'USD', amount: 1200 }],
     weightedValue: [{ currency: 'USD', amount: 120 }],

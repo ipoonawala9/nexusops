@@ -18,7 +18,10 @@ const KEY = ['crm-stages']
 export function PipelineSettingsPage() {
   const api = useApi()
   const queryClient = useQueryClient()
-  const stages = useQuery({ queryKey: KEY, queryFn: () => api.get<StageView[]>('/crm/pipeline/stages') })
+  const stages = useQuery({
+    queryKey: KEY,
+    queryFn: () => api.get<StageView[]>('/crm/pipeline/stages'),
+  })
   const [error, setError] = useState<string | null>(null)
   const [deleting, setDeleting] = useState<StageView | null>(null)
   const [busy, setBusy] = useState(false)
@@ -49,14 +52,16 @@ export function PipelineSettingsPage() {
   async function add(event: FormEvent) {
     event.preventDefault()
     const ok = await run(
-      () => api.post('/crm/pipeline/stages', { name: newName, probability: Number(newProbability) }),
+      () =>
+        api.post('/crm/pipeline/stages', { name: newName, probability: Number(newProbability) }),
       'Stage added.',
     )
     if (ok) setNewName('')
   }
 
   if (stages.isPending) return <ListSkeleton />
-  if (stages.isError) return <ErrorState error={stages.error} onRetry={() => void stages.refetch()} />
+  if (stages.isError)
+    return <ErrorState error={stages.error} onRetry={() => void stages.refetch()} />
   const open = stages.data.filter((s) => s.kind === 'OPEN')
 
   function move(stage: StageView, delta: number) {
@@ -207,11 +212,21 @@ function StageRow({
           </Button>
         </>
       )}
-      <Button size="sm" disabled={busy || !changed} onClick={() => onSave(name, Number(probability))}>
+      <Button
+        size="sm"
+        disabled={busy || !changed}
+        onClick={() => onSave(name, Number(probability))}
+      >
         Save
       </Button>
       {!fixed && (
-        <Button variant="ghost" size="sm" aria-label={`Delete ${stage.name}`} disabled={busy} onClick={onDelete}>
+        <Button
+          variant="ghost"
+          size="sm"
+          aria-label={`Delete ${stage.name}`}
+          disabled={busy}
+          onClick={onDelete}
+        >
           Delete
         </Button>
       )}

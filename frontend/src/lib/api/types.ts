@@ -304,14 +304,7 @@ export interface MoneyTotal {
 }
 
 export type LeadSource =
-  | 'WEBSITE'
-  | 'REFERRAL'
-  | 'WALK_IN'
-  | 'PHONE'
-  | 'EMAIL'
-  | 'SOCIAL'
-  | 'EVENT'
-  | 'OTHER'
+  'WEBSITE' | 'REFERRAL' | 'WALK_IN' | 'PHONE' | 'EMAIL' | 'SOCIAL' | 'EVENT' | 'OTHER'
 export type LeadStatus = 'NEW' | 'CONTACTED' | 'QUALIFIED' | 'DISQUALIFIED' | 'CONVERTED'
 
 export interface LeadView {
