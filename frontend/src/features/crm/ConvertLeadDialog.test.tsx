@@ -183,6 +183,18 @@ describe('ConvertLeadDialog', () => {
     expect(await within(dialog).findByText('Enter a valid email address.')).toBeInTheDocument()
   })
 
+  it('sends no amount when the field is cleared', async () => {
+    const { server, user } = setup()
+    server.on('POST /leads/:id/convert', { body: converted() })
+    const dialog = await open(user)
+    await user.clear(within(dialog).getByLabelText('Amount (USD)'))
+    await user.click(within(dialog).getByRole('button', { name: 'Convert lead' }))
+    const body = server.callsTo('POST /leads/:id/convert')[0].body as {
+      opportunity: { amount: number | null; currency: string | null }
+    }
+    expect(body.opportunity).toMatchObject({ amount: null, currency: null })
+  })
+
   it('does not submit an amount that is not a number', async () => {
     const { server, user } = setup()
     server.on('POST /leads/:id/convert', { body: converted() })

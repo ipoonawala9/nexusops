@@ -1,5 +1,5 @@
 import { screen, within } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { ALL_TENANT_PERMISSIONS } from '@/features/auth/permissions'
 import { fakeServer } from '@/test/fakeServer'
 import { signedIn, testProfile } from '@/test/fixtures'
@@ -54,6 +54,24 @@ describe('PipelinePage', () => {
     })
     expect(await screen.findByText('Moved to Proposal.')).toBeInTheDocument()
     expect(server.callsTo('GET /crm/pipeline/board').length).toBeGreaterThan(1)
+  })
+
+  it('refreshes the board and the deal when a move fails', async () => {
+    const { server, user } = setup()
+    server.on('POST /opportunities/:id/stage', {
+      status: 409,
+      body: {
+        title: 'Conflict',
+        detail: 'This record was changed by someone else. Reload and try again.',
+      },
+    })
+    await screen.findByLabelText('Move Packaging renewal to')
+    const boards = server.callsTo('GET /crm/pipeline/board').length
+    await user.selectOptions(screen.getByLabelText('Move Packaging renewal to'), 's-proposal')
+    expect(await screen.findByText(/changed by someone else/)).toBeInTheDocument()
+    await vi.waitFor(() =>
+      expect(server.callsTo('GET /crm/pipeline/board').length).toBeGreaterThan(boards),
+    )
   })
 
   it('asks why a deal was lost', async () => {

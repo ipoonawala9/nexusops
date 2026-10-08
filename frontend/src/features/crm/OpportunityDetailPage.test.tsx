@@ -36,6 +36,8 @@ describe('OpportunityDetailPage', () => {
     expect(screen.getByText(/\$1,200\.00/)).toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'Activity' })).toBeInTheDocument()
     expect(server.callsTo('GET /activities')[0].query.get('subjectType')).toBe('OPPORTUNITY')
+    // the source lead's history shows on the deal too
+    expect(server.callsTo('GET /activities')[0].query.get('includeRelated')).toBe('true')
   })
 
   it('shows why a deal was lost and links its source lead', async () => {

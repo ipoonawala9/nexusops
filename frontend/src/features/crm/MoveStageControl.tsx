@@ -52,6 +52,9 @@ export function MoveStageControl({
       return true
     } catch (error) {
       toast.error(problemMessage(error))
+      // the version or the stages may be stale: refetch before the next try
+      void queryClient.invalidateQueries({ queryKey: ['crm-board'] })
+      void queryClient.invalidateQueries({ queryKey: ['opportunity', opportunity.id] })
       return false
     } finally {
       setBusy(false)

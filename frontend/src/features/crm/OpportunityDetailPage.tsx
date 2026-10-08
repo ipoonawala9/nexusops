@@ -154,7 +154,7 @@ export function OpportunityDetailPage() {
         label={o.name}
         archived={false}
       />
-      <ActivityPanel subjectType="OPPORTUNITY" subjectId={o.id} archived={false} />
+      <ActivityPanel subjectType="OPPORTUNITY" subjectId={o.id} archived={false} includeRelated />
       <DocumentsPanel subjectType="OPPORTUNITY" subjectId={o.id} archived={false} />
       {editing && (
         <OpportunityFormDialog
