@@ -1,9 +1,14 @@
 package com.nexusops.inventory.web;
 
 import com.nexusops.inventory.AdjustCommand;
+import com.nexusops.inventory.PurchaseLineCommand;
+import com.nexusops.inventory.PurchaseOrderCommand;
+import com.nexusops.inventory.ReceiptCommand;
 import com.nexusops.inventory.TransferCommand;
 import com.nexusops.inventory.WarehouseCommand;
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 final class InventoryDtos {
@@ -27,4 +32,15 @@ final class InventoryDtos {
             return new TransferCommand(productId, fromWarehouseId, toWarehouseId, quantity, note);
         }
     }
+
+    record PurchaseOrderRequest(UUID supplierId, UUID warehouseId, String currency, LocalDate expectedOn,
+            String notes, List<PurchaseLineCommand> lines, Long version) {
+        PurchaseOrderCommand command() {
+            return new PurchaseOrderCommand(supplierId, warehouseId, currency, expectedOn, notes, lines);
+        }
+    }
+
+    record VersionRequest(Long version) {}
+
+    record ReceiptRequest(List<ReceiptCommand.Line> lines, Long version) {}
 }

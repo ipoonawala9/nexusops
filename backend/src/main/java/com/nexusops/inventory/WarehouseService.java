@@ -42,6 +42,7 @@ public class WarehouseService {
     static final String CODE_TAKEN = "Another warehouse already uses this code.";
     static final String LAST_ACTIVE = "Keep at least one active warehouse.";
     static final String UNKNOWN = "Choose a warehouse in this workspace.";
+    static final String OPEN_ORDERS = "Close or move this warehouse's open orders first.";
     private static final Pattern CODE = Pattern.compile("^[A-Za-z0-9][A-Za-z0-9_-]{0,19}$");
     private static final String LOCK = "warehouses";
 
@@ -180,8 +181,7 @@ public class WarehouseService {
     }
 
     /**
-     * Refuses archiving while the warehouse is in use: it holds stock (here), or open orders use it (Tasks 3 and 4
-     * add those checks). JDBC with an explicit tenant predicate on top of RLS.
+     * Refuses archiving while the warehouse is in use: it holds stock, or open orders use it (purchase orders here; Task 4 adds sales orders). JDBC with an explicit tenant predicate on top of RLS.
      */
     private void requireUnused(Warehouse warehouse) {
         UUID tenant = TenantContext.requireTenantId();
@@ -189,6 +189,12 @@ public class WarehouseService {
                 + "where tenant_id = ? and warehouse_id = ? and on_hand > 0)", Boolean.class, tenant, warehouse.getId());
         if (Boolean.TRUE.equals(stocked)) {
             throw ApiProblem.conflict("Move or count out this warehouse's stock first.");
+        }
+        Boolean ordered = jdbc.queryForObject("select exists (select 1 from purchase_orders where tenant_id = ? "
+                + "and warehouse_id = ? and status in ('DRAFT', 'ORDERED', 'PARTIALLY_RECEIVED'))", Boolean.class,
+                tenant, warehouse.getId());
+        if (Boolean.TRUE.equals(ordered)) {
+            throw ApiProblem.conflict(OPEN_ORDERS);
         }
     }
 
