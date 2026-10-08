@@ -116,7 +116,7 @@ describe('ReorderPage', () => {
     expect(server.callsTo('DELETE /inventory/reorder-rules/:id')[0].params.id).toBe('rr-1')
   })
 
-  it('edits a rule with its version and reloads the rules after a conflict', async () => {
+  it('closes the editor on a conflict, so editing again starts from the reloaded rule', async () => {
     const { server, user } = setup()
     server.on('PUT /inventory/reorder-rules', {
       status: 409,
@@ -132,12 +132,10 @@ describe('ReorderPage', () => {
     await user.clear(maximum)
     await user.type(maximum, '80')
     const loads = server.callsTo('GET /inventory/reorder-rules').length
+    server.on('GET /inventory/reorder-rules', {
+      body: [aReorderRule({ maxQuantity: 70, version: 1 })],
+    })
     await user.click(within(dialog).getByRole('button', { name: 'Save rule' }))
-    expect(
-      await within(dialog).findByText(
-        'This record was changed by someone else. Reload and try again.',
-      ),
-    ).toBeInTheDocument()
     expect(server.callsTo('PUT /inventory/reorder-rules')[0].body).toEqual({
       productId: 'pr-widget',
       warehouseId: 'w-main',
@@ -146,9 +144,47 @@ describe('ReorderPage', () => {
       supplierId: 'p-konkan',
       version: 0,
     })
+    expect(
+      await screen.findByText('This record was changed by someone else. Reload and try again.'),
+    ).toBeInTheDocument()
+    await vi.waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     await vi.waitFor(() =>
       expect(server.callsTo('GET /inventory/reorder-rules').length).toBeGreaterThan(loads),
     )
+
+    server.on('PUT /inventory/reorder-rules', {
+      body: aReorderRule({ maxQuantity: 70, version: 2 }),
+    })
+    await vi.waitFor(() => expect(screen.getByText('70')).toBeInTheDocument())
+    await user.click(screen.getByRole('button', { name: 'Edit rule for W-1 at MAIN' }))
+    const again = await screen.findByRole('dialog')
+    expect(within(again).getByLabelText('Maximum')).toHaveValue('70')
+    await user.click(within(again).getByRole('button', { name: 'Save rule' }))
+    await vi.waitFor(() => expect(server.callsTo('PUT /inventory/reorder-rules')).toHaveLength(2))
+    expect(server.callsTo('PUT /inventory/reorder-rules')[1].body).toMatchObject({
+      maxQuantity: 70,
+      version: 1,
+    })
+  })
+
+  it('keeps a failed delete inside its dialog and reloads the rules', async () => {
+    const { server, user } = setup()
+    server.on('DELETE /inventory/reorder-rules/:id', {
+      status: 404,
+      body: { status: 404, title: 'Not found', detail: 'Record not found.' },
+    })
+    await user.click(await screen.findByRole('button', { name: 'Delete rule for W-1 at MAIN' }))
+    const dialog = await screen.findByRole('dialog')
+    const loads = server.callsTo('GET /inventory/reorder-rules').length
+    await user.click(within(dialog).getByRole('button', { name: 'Delete rule' }))
+    expect(await within(dialog).findByText('Record not found.')).toBeInTheDocument()
+    await vi.waitFor(() =>
+      expect(server.callsTo('GET /inventory/reorder-rules').length).toBeGreaterThan(loads),
+    )
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+    await vi.waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    // the failure belongs to the dialog: the Suggestions card stays clean
+    expect(screen.queryByText('Record not found.')).not.toBeInTheDocument()
   })
 
   it('lets a stock reader see suggestions but not act on them', async () => {

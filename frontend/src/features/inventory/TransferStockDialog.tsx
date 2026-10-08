@@ -120,7 +120,7 @@ export function TransferStockDialog({
               onChange={(id) => form.setValue('toWarehouseId', id, revalidate)}
             />
           </div>
-          <TextField form={form} name="quantity" label="Quantity" inputMode="numeric" />
+          <TextField form={form} name="quantity" label="Quantity" inputMode="decimal" />
           <TextField form={form} name="note" label="Note" maxLength={200} />
           <FormError message={formError} />
           <DialogFooter>

@@ -29,6 +29,38 @@ describe('ProductStockPanel', () => {
     expect(server.callsTo('GET /inventory/movements')[0].query.get('productId')).toBe('pr-widget')
   })
 
+  it("links to the product's whole movement history", async () => {
+    setup(['INVENTORY'])
+    const panel = await screen.findByRole('region', { name: 'Stock' })
+    expect(await within(panel).findByRole('link', { name: 'View all movements' })).toHaveAttribute(
+      'href',
+      '/app/inventory/movements?productId=pr-widget',
+    )
+  })
+
+  it('says so when nothing has moved', async () => {
+    const { server } = setup(['INVENTORY'])
+    server.on('GET /inventory/movements', { body: pageOf([]) })
+    const panel = await screen.findByRole('region', { name: 'Stock' })
+    expect(await within(panel).findByText('No stock movements yet.')).toBeInTheDocument()
+    expect(
+      within(panel).queryByRole('link', { name: 'View all movements' }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('offers a retry when the movements fail to load', async () => {
+    const { server, user } = setup(['INVENTORY'])
+    server.on('GET /inventory/movements', {
+      status: 500,
+      body: { status: 500, title: 'Server error', detail: 'Something went wrong.' },
+    })
+    const panel = await screen.findByRole('region', { name: 'Stock' })
+    const retry = await within(panel).findByRole('button', { name: /try again|retry/i })
+    server.on('GET /inventory/movements', { body: pageOf([aMovement()]) })
+    await user.click(retry)
+    expect(await within(panel).findByRole('link', { name: 'PO-00001' })).toBeInTheDocument()
+  })
+
   it('is absent without Inventory', async () => {
     setup([])
     await screen.findByRole('heading', { name: 'Widget' })

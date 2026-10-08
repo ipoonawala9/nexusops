@@ -51,6 +51,7 @@ export function ReorderPage() {
   const [busy, setBusy] = useState(false)
   const [editing, setEditing] = useState<ReorderRuleView | 'new' | null>(null)
   const [deleting, setDeleting] = useState<ReorderRuleView | null>(null)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   const quantityFor = (s: ReorderSuggestion) => quantities[keyOf(s)] ?? String(s.suggestedQuantity)
 
@@ -96,14 +97,16 @@ export function ReorderPage() {
 
   async function remove(rule: ReorderRuleView) {
     setBusy(true)
-    setError(null)
+    setDeleteError(null)
     try {
       await api.del(`/inventory/reorder-rules/${rule.id}`)
       await invalidateInventory(queryClient)
       toast.success('Reorder rule deleted.')
       setDeleting(null)
     } catch (e) {
-      setError(problemMessage(e))
+      setDeleteError(problemMessage(e))
+      // the rule may be gone or changed meanwhile: show the current list behind the dialog
+      void queryClient.invalidateQueries({ queryKey: ['inventory', 'reorder-rules'] })
     } finally {
       setBusy(false)
     }
@@ -125,7 +128,7 @@ export function ReorderPage() {
           )}
         </CardHeader>
         <CardContent className="space-y-3">
-          {!deleting && <FormError message={error} />}
+          <FormError message={error} />
           {created.length > 0 && (
             <p role="status" className="text-sm">
               Drafts to review and place:{' '}
@@ -280,7 +283,7 @@ export function ReorderPage() {
                           variant="outline"
                           aria-label={`Delete rule for ${nameOf(r)}`}
                           onClick={() => {
-                            setError(null)
+                            setDeleteError(null)
                             setDeleting(r)
                           }}
                         >
@@ -307,7 +310,7 @@ export function ReorderPage() {
         description="The product stops appearing in reorder suggestions for that warehouse."
         confirmLabel="Delete rule"
         busy={busy}
-        error={error}
+        error={deleteError}
         onCancel={() => setDeleting(null)}
         onConfirm={() => deleting && void remove(deleting)}
       />

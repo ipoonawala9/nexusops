@@ -65,6 +65,11 @@ describe('StockPage', () => {
     const dialog = await screen.findByRole('dialog')
     await user.selectOptions(within(dialog).getByLabelText('Product'), 'pr-widget')
     await user.selectOptions(within(dialog).getByLabelText('Warehouse'), 'w-main')
+    // quantities take up to four decimals: the phone keyboard needs a decimal point
+    expect(within(dialog).getByLabelText('Counted quantity')).toHaveAttribute(
+      'inputmode',
+      'decimal',
+    )
     await user.type(within(dialog).getByLabelText('Counted quantity'), '15')
     await user.type(within(dialog).getByLabelText('Reason'), 'Cycle count')
     await user.click(within(dialog).getByRole('button', { name: 'Save count' }))
@@ -91,6 +96,7 @@ describe('StockPage', () => {
     await user.selectOptions(within(dialog).getByLabelText('Product'), 'pr-widget')
     await user.selectOptions(within(dialog).getByLabelText('From'), 'w-main')
     await user.selectOptions(within(dialog).getByLabelText('To'), 'w-pune')
+    expect(within(dialog).getByLabelText('Quantity')).toHaveAttribute('inputmode', 'decimal')
     await user.type(within(dialog).getByLabelText('Quantity'), '50')
     await user.click(within(dialog).getByRole('button', { name: 'Transfer' }))
     expect(

@@ -1,6 +1,7 @@
 import type { RouteObject } from 'react-router'
 import { PERMISSIONS, RequirePermission } from '@/features/auth/permissions'
-import { InventoryOverviewPage } from './InventoryOverviewPage'
+import { InventoryIndex } from './InventoryIndex'
+import { MovementsPage } from './MovementsPage'
 import { PurchaseOrderDetailPage } from './PurchaseOrderDetailPage'
 import { PurchaseOrdersPage } from './PurchaseOrdersPage'
 import { ReorderPage } from './ReorderPage'
@@ -12,17 +13,21 @@ import { StockPage } from './StockPage'
 export const inventoryChildren: RouteObject[] = [
   {
     index: true,
-    element: (
-      <RequirePermission anyOf={[PERMISSIONS.stockRead]}>
-        <InventoryOverviewPage />
-      </RequirePermission>
-    ),
+    element: <InventoryIndex />,
   },
   {
     path: 'stock',
     element: (
       <RequirePermission anyOf={[PERMISSIONS.stockRead]}>
         <StockPage />
+      </RequirePermission>
+    ),
+  },
+  {
+    path: 'movements',
+    element: (
+      <RequirePermission anyOf={[PERMISSIONS.stockRead]}>
+        <MovementsPage />
       </RequirePermission>
     ),
   },

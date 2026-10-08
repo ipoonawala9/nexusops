@@ -78,9 +78,14 @@ export function ReorderRuleDialog({
       toast.success('Reorder rule saved.')
       onClose()
     } catch (error) {
-      // a conflict means the cached rules are stale (edited or deleted meanwhile): reload them for the retry
-      if (error instanceof ApiError && error.status === 409)
+      // a conflict means this dialog holds a stale rule (edited or deleted meanwhile): say so, reload the
+      // rules and close, so that reopening starts from the current rule
+      if (error instanceof ApiError && error.status === 409) {
+        toast.error(problemMessage(error))
         void queryClient.invalidateQueries({ queryKey: ['inventory', 'reorder-rules'] })
+        onClose()
+        return
+      }
       if (!applyFieldErrors(error, form.setError, FIELDS)) setFormError(problemMessage(error))
     }
   })

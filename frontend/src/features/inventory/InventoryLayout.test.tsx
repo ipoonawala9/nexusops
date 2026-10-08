@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { ALL_TENANT_PERMISSIONS } from '@/features/auth/permissions'
 import { fakeServer } from '@/test/fakeServer'
 import { signedIn, testProfile } from '@/test/fixtures'
-import { anOverview } from '@/test/records'
+import { anOverview, pageOf } from '@/test/records'
 import { renderApp } from '@/test/renderApp'
 
 describe('InventoryLayout', () => {
@@ -38,5 +38,17 @@ describe('InventoryLayout', () => {
     )
     renderApp({ server, path: '/app/inventory' })
     expect(await screen.findByText("You don't have access to this page")).toBeInTheDocument()
+  })
+
+  it('opens the first section a user may see when the overview is not one of them', async () => {
+    const server = fakeServer()
+    signedIn(
+      server,
+      testProfile({ modules: ['INVENTORY'], permissions: ['inventory.purchase.read'] }),
+    ).on('GET /purchase-orders', { body: pageOf([]) })
+    const { router } = renderApp({ server, path: '/app/inventory' })
+    expect(await screen.findByRole('heading', { name: 'Purchase orders' })).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/app/inventory/purchase-orders')
+    expect(server.callsTo('GET /inventory/overview')).toHaveLength(0)
   })
 })

@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
+import { Link } from 'react-router'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
@@ -90,8 +91,23 @@ function StockCard({ productId, canAdjust }: { productId: string; canAdjust: boo
             </TableBody>
           </Table>
         )}
-        {movements.data && movements.data.items.length > 0 && (
-          <MovementsTable movements={movements.data.items} />
+        {movements.isError ? (
+          <ErrorState error={movements.error} onRetry={() => void movements.refetch()} />
+        ) : (
+          movements.data &&
+          (movements.data.items.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No stock movements yet.</p>
+          ) : (
+            <>
+              <MovementsTable movements={movements.data.items} />
+              <Link
+                to={`/app/inventory/movements?productId=${productId}`}
+                className="text-sm underline-offset-4 hover:underline"
+              >
+                View all movements
+              </Link>
+            </>
+          ))
         )}
       </CardContent>
       {dialog === 'count' && stock.data && (

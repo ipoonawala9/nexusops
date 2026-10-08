@@ -104,7 +104,7 @@ export function AdjustStockDialog({
             form={form}
             name="countedQuantity"
             label="Counted quantity"
-            inputMode="numeric"
+            inputMode="decimal"
           />
           <TextField form={form} name="reason" label="Reason" maxLength={200} />
           <FormError message={formError} />

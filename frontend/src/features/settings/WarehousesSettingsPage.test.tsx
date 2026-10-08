@@ -5,24 +5,24 @@ import { signedIn, testProfile } from '@/test/fixtures'
 import { aWarehouse } from '@/test/records'
 import { renderApp } from '@/test/renderApp'
 
-function setup() {
+function setup(permissions?: string[]) {
   const server = fakeServer()
-  signedIn(server, testProfile({ modules: ['INVENTORY'] })).on(
-    'GET /inventory/warehouses',
-    (request) => ({
-      body:
-        request.query.get('archived') === 'true'
-          ? [
-              aWarehouse({
-                id: 'w-old',
-                code: 'OLD',
-                name: 'Old shed',
-                archivedAt: '2026-10-01T00:00:00Z',
-              }),
-            ]
-          : [aWarehouse()],
-    }),
-  )
+  signedIn(
+    server,
+    testProfile({ modules: ['INVENTORY'], ...(permissions ? { permissions } : {}) }),
+  ).on('GET /inventory/warehouses', (request) => ({
+    body:
+      request.query.get('archived') === 'true'
+        ? [
+            aWarehouse({
+              id: 'w-old',
+              code: 'OLD',
+              name: 'Old shed',
+              archivedAt: '2026-10-01T00:00:00Z',
+            }),
+          ]
+        : [aWarehouse()],
+  }))
   return renderApp({ server, path: '/app/settings/warehouses' })
 }
 
@@ -31,6 +31,12 @@ describe('WarehousesSettingsPage', () => {
     setup()
     expect(await screen.findByText('Main warehouse')).toBeInTheDocument()
     expect(await screen.findByText('Old shed')).toBeInTheDocument()
+  })
+
+  it('lists warehouses for a role that only manages them', async () => {
+    setup(['inventory.warehouse.manage'])
+    expect(await screen.findByText('Main warehouse')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'New warehouse' })).toBeInTheDocument()
   })
 
   it('adds a warehouse', async () => {
