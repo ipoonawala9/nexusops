@@ -1,6 +1,7 @@
 import type { RouteObject } from 'react-router'
 import { EmptyState } from '@/components/states'
 import { PERMISSIONS, RequirePermission } from '@/features/auth/permissions'
+import { LeadsPage } from './LeadsPage'
 
 function Pending({ title }: { title: string }) {
   return <EmptyState title={title} description="This page is being built." />
@@ -19,7 +20,7 @@ export const crmChildren: RouteObject[] = [
     path: 'leads',
     element: (
       <RequirePermission anyOf={[PERMISSIONS.leadRead]}>
-        <Pending title="Leads" />
+        <LeadsPage />
       </RequirePermission>
     ),
   },
