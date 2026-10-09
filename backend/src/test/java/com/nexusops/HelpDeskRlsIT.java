@@ -122,17 +122,26 @@ class HelpDeskRlsIT extends IntegrationTestSupport {
 
     @Test
     void updatesAndDeletesOfAnotherTenantsRowsAffectNothing() {
-        record Case(String update, String delete, UUID id) {}
-        for (Case c : List.of(
-                new Case("update ticket_categories set name = 'Evil' where id = ?",
+        record Case(String table, String update, String sameValue, String delete, UUID id) {}
+        List<Case> cases = List.of(
+                new Case("ticket_categories", "update ticket_categories set name = 'Evil' where id = ?",
+                        "update ticket_categories set name = name where id = ?",
                         "delete from ticket_categories where id = ?", category),
-                new Case("update sla_policies set first_response_minutes = 1 where id = ?",
+                new Case("sla_policies", "update sla_policies set first_response_minutes = 1 where id = ?",
+                        "update sla_policies set first_response_minutes = first_response_minutes where id = ?",
                         "delete from sla_policies where id = ?", policy),
-                new Case("update tickets set subject = 'Evil' where id = ?", "delete from tickets where id = ?", ticket),
-                new Case("update kb_articles set title = 'Evil' where id = ?", "delete from kb_articles where id = ?",
-                        article))) {
-            assertThat(app(tenantA.toString()).update(c.update(), c.id())).isZero();
-            assertThat(app(tenantA.toString()).update(c.delete(), c.id())).isZero();
+                new Case("tickets", "update tickets set subject = 'Evil' where id = ?",
+                        "update tickets set subject = subject where id = ?", "delete from tickets where id = ?", ticket),
+                new Case("kb_articles", "update kb_articles set title = 'Evil' where id = ?",
+                        "update kb_articles set title = title where id = ?", "delete from kb_articles where id = ?",
+                        article));
+        for (Case c : cases) {
+            // positive control: the owning tenant reaches the very same row with the very same statement shape
+            assertThat(app(tenantB.toString()).update(c.sameValue(), c.id())).as(c.table() + " as tenant B").isEqualTo(1);
+            assertThat(app(tenantA.toString()).update(c.update(), c.id())).as(c.table() + " update").isZero();
+            assertThat(app(tenantA.toString()).update(c.delete(), c.id())).as(c.table() + " delete").isZero();
+            assertThat(OwnerJdbc.ownerAs(tenantB).queryForObject("select count(*) from " + c.table() + " where id = ?",
+                    Long.class, c.id())).as(c.table() + " still exists").isEqualTo(1);
         }
         assertThat(OwnerJdbc.ownerAs(tenantB).queryForObject("select subject from tickets where id = ?", String.class,
                 ticket)).isEqualTo("Beta ticket");

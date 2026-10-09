@@ -398,7 +398,14 @@ class CrossTenantApiIT extends IntegrationTestSupport {
         as(ownerA, json(put("/api/v1/helpdesk/categories/" + categoryB), "{\"name\":\"H\",\"version\":0}"))
                 .andExpect(status().isNotFound());
         as(ownerA, post("/api/v1/helpdesk/categories/" + categoryB + "/archive")).andExpect(status().isNotFound());
+        as(ownerA, post("/api/v1/helpdesk/categories/" + categoryB + "/restore")).andExpect(status().isNotFound());
         as(ownerA, get("/api/v1/helpdesk/articles/" + articleB)).andExpect(status().isNotFound());
+        as(ownerA, json(put("/api/v1/helpdesk/articles/" + articleB), "{\"title\":\"H\",\"body\":\"H\",\"version\":1}"))
+                .andExpect(status().isNotFound());
+        as(ownerA, json(post("/api/v1/helpdesk/articles/" + articleB + "/publish"), "{\"version\":1}"))
+                .andExpect(status().isNotFound());
+        as(ownerA, json(post("/api/v1/helpdesk/articles/" + articleB + "/unpublish"), "{\"version\":1}"))
+                .andExpect(status().isNotFound());
         as(ownerA, json(post("/api/v1/helpdesk/articles/" + articleB + "/archive"), "{\"version\":1}"))
                 .andExpect(status().isNotFound());
         as(ownerA, get("/api/v1/activities").param("subjectType", "TICKET").param("subjectId", ticketB.toString()))
@@ -412,14 +419,37 @@ class CrossTenantApiIT extends IntegrationTestSupport {
                 + orgA + "\",\"categoryId\":\"" + categoryB + "\"}")).andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors[0].field").value("categoryId"));
         as(ownerA, json(post("/api/v1/helpdesk/tickets"), "{\"subject\":\"x\",\"description\":\"x\",\"requesterId\":\""
-                + orgA + "\",\"linkedType\":\"TICKET\",\"linkedId\":\"" + ticketB + "\"}")).andExpect(status().isBadRequest());
+                + orgA + "\",\"linkedType\":\"TICKET\",\"linkedId\":\"" + ticketB + "\"}")).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[0].field").value("linkedType"));
+        as(ownerA, json(post("/api/v1/helpdesk/tickets"), "{\"subject\":\"x\",\"description\":\"x\",\"requesterId\":\""
+                + orgA + "\",\"linkedType\":\"PRODUCT\",\"linkedId\":\"" + productB + "\"}")).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[0].field").value("linkedId"));
+        as(ownerA, json(post("/api/v1/helpdesk/tickets"), "{\"subject\":\"x\",\"description\":\"x\",\"requesterId\":\""
+                + orgA + "\",\"productId\":\"" + productB + "\"}")).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[0].field").value("productId"));
+        as(ownerA, json(post("/api/v1/helpdesk/tickets"), "{\"subject\":\"x\",\"description\":\"x\",\"requesterId\":\""
+                + orgA + "\",\"assigneeId\":\"" + userBId + "\"}")).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[0].field").value("assigneeId"));
+        String ticketA = JsonPath.read(as(ownerA, json(post("/api/v1/helpdesk/tickets"), "{\"subject\":\"Alpha\","
+                + "\"description\":\"x\",\"requesterId\":\"" + orgA + "\"}")).andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString(), "$.id");
+        as(ownerA, json(post("/api/v1/helpdesk/tickets/" + ticketA + "/assign"), "{\"assigneeId\":\"" + userBId
+                + "\",\"version\":0}")).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[0].field").value("assigneeId"));
         // lists, search and the dashboard never contain B's rows
-        as(ownerA, get("/api/v1/helpdesk/tickets")).andExpect(jsonPath("$.total").value(0));
+        as(ownerA, get("/api/v1/helpdesk/tickets")).andExpect(jsonPath("$.total").value(1)) // only A's own
+                .andExpect(jsonPath("$.items[0].id").value(ticketA));
         as(ownerA, get("/api/v1/helpdesk/articles")).andExpect(jsonPath("$.total").value(0));
         as(ownerA, get("/api/v1/search").param("q", "beta")).andExpect(jsonPath("$[*].type",
-                Matchers.not(Matchers.hasItems("TICKET", "KB_ARTICLE"))));
-        as(ownerA, get("/api/v1/helpdesk/dashboard")).andExpect(jsonPath("$.last30Days.created").value(0));
+                Matchers.not(Matchers.hasItem("TICKET"))));
+        as(ownerA, get("/api/v1/search").param("q", "beta")).andExpect(jsonPath("$[*].type",
+                Matchers.not(Matchers.hasItem("KB_ARTICLE"))));
+        as(ownerA, get("/api/v1/helpdesk/dashboard")).andExpect(jsonPath("$.last30Days.created").value(1));
         // tenant B is untouched
+        as(ownerB, get("/api/v1/helpdesk/categories")).andExpect(jsonPath("$[?(@.id == '" + categoryB
+                + "')].name", Matchers.contains("General")));
+        as(ownerB, get("/api/v1/helpdesk/articles/" + articleB)).andExpect(jsonPath("$.title").value("Beta guide"))
+                .andExpect(jsonPath("$.status").value("PUBLISHED"));
         as(ownerB, get("/api/v1/helpdesk/tickets/" + ticketB)).andExpect(jsonPath("$.status").value("NEW"));
     }
 }

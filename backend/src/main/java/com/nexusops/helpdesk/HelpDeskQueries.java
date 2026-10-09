@@ -71,6 +71,7 @@ class HelpDeskQueries {
                 + "count(*) filter (where " + BREACHED + ") as breached, "
                 + "count(*) filter (where " + AT_RISK + ") as at_risk "
                 + "from tickets t where t.tenant_id = :tenant and " + OPEN_STATUSES, params);
+        // a target that has passed without being met counts as a miss, so an overdue unanswered ticket lowers the rate
         Map<String, Object> w = jdbc.queryForMap("""
                 select count(*) as created,
                        count(*) filter (where t.resolved_at is not null) as resolved,
@@ -79,14 +80,15 @@ class HelpDeskQueries {
                            filter (where t.first_responded_at is not null) as median_first,
                        avg(extract(epoch from t.resolved_at - t.created_at) / 60) as avg_resolution,
                        avg(case when t.first_responded_at <= t.first_response_due_at then 1.0 else 0.0 end)
-                           filter (where t.first_responded_at is not null) as first_met,
+                           filter (where t.first_responded_at is not null
+                                      or t.first_response_due_at < now()) as first_met,
                        avg(case when t.resolved_at <= t.resolution_due_at then 1.0 else 0.0 end)
-                           filter (where t.resolved_at is not null) as resolution_met,
+                           filter (where t.resolved_at is not null or %s) as resolution_met,
                        avg(case when t.reopen_count > 0 then 1.0 else 0.0 end)
                            filter (where t.resolved_at is not null or t.reopen_count > 0) as reopen_rate
                 from tickets t
                 where t.tenant_id = :tenant and t.created_at >= now() - interval '30 days'
-                """, params);
+                """.formatted(OPEN_STATUSES + " and " + RESOLUTION_BREACHED), params);
         return new DashboardView(byStatus, byPriority, number(open.get("unassigned")), number(open.get("breached")),
                 number(open.get("at_risk")), new DashboardView.Last30Days(number(w.get("created")),
                         number(w.get("resolved")), decimal(w.get("avg_first")), decimal(w.get("median_first")),

@@ -19,7 +19,7 @@ class DashboardController {
 
     @GetMapping
     @PreAuthorize("hasAuthority('helpdesk.ticket.read')")
-    DashboardView dashboard() {
+    DashboardView helpDeskDashboard() {
         return tickets.dashboard();
     }
 }

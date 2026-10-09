@@ -63,6 +63,9 @@ class OpenApiContractIT extends IntegrationTestSupport {
                 "\"/api/v1/helpdesk/articles/{id}\"", "\"/api/v1/helpdesk/articles/{id}/publish\"",
                 "\"/api/v1/helpdesk/articles/{id}/unpublish\"", "\"/api/v1/helpdesk/articles/{id}/archive\"",
                 "\"/api/v1/helpdesk/dashboard\"");
+        // the HelpDesk and CRM dashboards keep their own schemas (same Java name, different shape)
+        java.util.Map<String, Object> schemas = com.jayway.jsonpath.JsonPath.read(doc, "$.components.schemas");
+        assertThat(schemas).containsKeys("LeadStats", "HelpDeskDashboardView");
         // hierarchy rules (ADR-0004): no changing a role, or disabling/re-enabling/re-roling a user, stronger than the caller
         for (String op : new String[] {"$.paths['/api/v1/roles/{id}'].patch", "$.paths['/api/v1/roles/{id}'].delete",
                 "$.paths['/api/v1/roles/{id}/permissions'].put", "$.paths['/api/v1/users/{id}'].patch",

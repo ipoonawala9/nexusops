@@ -13,6 +13,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -25,6 +26,8 @@ import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandl
 /** Disabling HelpDesk removes every HelpDesk permission, so every HelpDesk route answers 403 (criterion 5). */
 @AutoConfigureMockMvc
 class HelpDeskModuleGateIT extends IntegrationTestSupport {
+
+    private static final Pattern SINGLE_HELPDESK_AUTHORITY = Pattern.compile("^hasAuthority\\('helpdesk\\.[a-z.]+'\\)$");
 
     @Autowired MockMvc mvc;
     @Autowired RecordingMailSender mail;
@@ -45,7 +48,7 @@ class HelpDeskModuleGateIT extends IntegrationTestSupport {
                 var preAuthorize = AnnotatedElementUtils.findMergedAnnotation(handler.getMethod(), PreAuthorize.class);
                 String expression = preAuthorize == null ? "" : preAuthorize.value().replace(" ", "");
                 checked.add(path);
-                if (!expression.startsWith("hasAuthority('helpdesk.")) {
+                if (!SINGLE_HELPDESK_AUTHORITY.matcher(expression).matches()) {
                     violations.add(info.getMethodsCondition() + " " + path + " -> " + expression);
                 }
             }

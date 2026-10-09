@@ -135,6 +135,8 @@ class SearchApiIT extends IntegrationTestSupport {
         owner.get("/api/v1/search?q=zephyr").andExpect(jsonPath("$[*].type").value(Matchers.contains("TICKET")))
                 .andExpect(jsonPath("$[0].label").value("T-00001 · Zephyr printer jam"))
                 .andExpect(jsonPath("$[0].detail").value("Helpdesk Co"));
+        owner.get("/api/v1/search?q=T-00001").andExpect(jsonPath("$[*].type").value(Matchers.contains("TICKET")))
+                .andExpect(jsonPath("$[0].label").value("T-00001 · Zephyr printer jam"));
         owner.post("/api/v1/helpdesk/articles/" + article + "/publish", "{\"version\":0}").andExpect(status().isOk());
         owner.get("/api/v1/search?q=zephyr").andExpect(jsonPath("$[*].type")
                 .value(Matchers.contains("TICKET", "KB_ARTICLE")));

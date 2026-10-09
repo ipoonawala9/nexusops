@@ -76,6 +76,8 @@ class HelpDeskDashboardIT extends IntegrationTestSupport {
                 .andExpect(jsonPath("$.openByPriority.HIGH").value(1))
                 .andExpect(jsonPath("$.openByPriority.NORMAL").value(0))
                 .andExpect(jsonPath("$.unassigned").value(3))
+                .andExpect(jsonPath("$.breached").value(1)) // slow: open, its first response came late
+                .andExpect(jsonPath("$.atRisk").value(0))
                 .andExpect(jsonPath("$.last30Days.created").value(4))
                 .andExpect(jsonPath("$.last30Days.resolved").value(1))
                 .andExpect(jsonPath("$.last30Days.averageFirstResponseMinutes").value(315.0))
@@ -84,5 +86,28 @@ class HelpDeskDashboardIT extends IntegrationTestSupport {
                 .andExpect(jsonPath("$.last30Days.firstResponseMetRate").value(0.5))
                 .andExpect(jsonPath("$.last30Days.resolutionMetRate").value(1.0))
                 .andExpect(jsonPath("$.last30Days.reopenRate").value(0.5));
+    }
+
+    @Test
+    void anOverdueUnansweredTicketCountsAsAMissedFirstResponse() throws Exception {
+        UUID answered = ticket("NORMAL");
+        UUID overdue = ticket("NORMAL");
+        jdbc().update("update tickets set status = 'OPEN', first_responded_at = created_at + interval '30 minutes' "
+                + "where id = ?", answered);
+        jdbc().update("update tickets set first_response_due_at = now() - interval '1 hour' where id = ?", overdue);
+        owner.get("/api/v1/helpdesk/dashboard")
+                .andExpect(jsonPath("$.last30Days.firstResponseMetRate").value(0.5))
+                .andExpect(jsonPath("$.last30Days.averageFirstResponseMinutes").value(30.0));
+    }
+
+    @Test
+    void anOverdueUnresolvedTicketCountsAsAMissedResolution() throws Exception {
+        UUID resolved = ticket("NORMAL");
+        UUID overdue = ticket("NORMAL");
+        jdbc().update("update tickets set status = 'RESOLVED', first_responded_at = created_at, "
+                + "resolved_at = created_at + interval '1 hour', resolution_note = 'x' where id = ?", resolved);
+        jdbc().update("update tickets set resolution_due_at = now() - interval '1 hour' where id = ?", overdue);
+        owner.get("/api/v1/helpdesk/dashboard")
+                .andExpect(jsonPath("$.last30Days.resolutionMetRate").value(0.5));
     }
 }

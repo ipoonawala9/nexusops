@@ -34,6 +34,7 @@ response, resolution time, SLA breach rate, reopen rate) must be recorded from d
 
 ## Consequences
 - Lists can sort and filter by SLA state cheaply, and the numbers on screen are the numbers in the database.
-- The SLA rule exists twice (Java, SQL); `SlaClockTest` and the list and dashboard tests pin both.
+- The SLA rule exists twice (Java, SQL): `SlaClockTest` pins the Java side; the `TicketApiIT` list filters and
+  `HelpDeskDashboardIT` pin the SQL side.
 - Inbound email, a customer portal, business-hours calendars, automatic closing, teams and satisfaction surveys are later
   work (spec §1 non-goals).

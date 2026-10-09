@@ -368,4 +368,14 @@ class TicketApiIT extends IntegrationTestSupport {
         owner.get("/api/v1/activities?subjectType=PARTY&subjectId=" + customer + "&includeRelated=true")
                 .andExpect(jsonPath("$.items[*].summary").value(Matchers.hasItem("Called Meera back")));
     }
+
+    @Test
+    void theProductsTimelineIncludesTheTicketsActivity() throws Exception {
+        UUID product = Api.id(owner.post("/api/v1/products", "{\"sku\":\"PRN-9\",\"name\":\"Label printer\"}"));
+        UUID id = ticket(",\"productId\":\"" + product + "\"");
+        owner.post("/api/v1/activities", "{\"subjectType\":\"TICKET\",\"subjectId\":\"" + id
+                + "\",\"type\":\"NOTE\",\"summary\":\"Firmware is the cause\"}").andExpect(status().isCreated());
+        owner.get("/api/v1/activities?subjectType=PRODUCT&subjectId=" + product + "&includeRelated=true")
+                .andExpect(jsonPath("$.items[*].summary").value(Matchers.hasItem("Firmware is the cause")));
+    }
 }
