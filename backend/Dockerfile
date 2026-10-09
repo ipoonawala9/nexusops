@@ -7,7 +7,10 @@ COPY src src
 RUN ./gradlew --no-daemon bootJar -x test && cp build/libs/backend-*-SNAPSHOT.jar /src/app.jar
 
 FROM eclipse-temurin:25-jre
-RUN useradd --system --uid 10001 --no-create-home app
+# The Ubuntu base ships Canonical's pebble service manager (a Go binary outside dpkg); the JVM entrypoint never uses
+# it, and its bundled Go stdlib lags behind security fixes, so it is removed rather than scanned around.
+RUN rm -f /usr/bin/pebble && rm -rf /var/lib/pebble \
+    && useradd --system --uid 10001 --no-create-home app
 WORKDIR /app
 COPY --from=build /src/app.jar app.jar
 USER 10001
