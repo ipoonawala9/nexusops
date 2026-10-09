@@ -18,7 +18,24 @@ final class SlaClock {
     }
 
     static Instant resolutionDue(Instant clockStartedAt, long pausedSeconds, SlaTargets targets) {
-        return clockStartedAt.plus(Duration.ofMinutes(targets.resolutionMinutes())).plusSeconds(pausedSeconds);
+        return resolutionDue(clockStartedAt, pausedSeconds, Duration.ofMinutes(targets.resolutionMinutes()));
+    }
+
+    static Instant resolutionDue(Instant clockStartedAt, long pausedSeconds, Duration target) {
+        return clockStartedAt.plus(target).plusSeconds(pausedSeconds);
+    }
+
+    /**
+     * A ticket's own resolution target, from its stored span: due − clock start − accumulated pause. A ticket keeps it
+     * until its priority changes, whatever happens to the policy meanwhile (D8).
+     */
+    static Duration ownResolutionTarget(Instant clockStartedAt, Instant resolutionDueAt, long pausedSeconds) {
+        return Duration.between(clockStartedAt, resolutionDueAt).minusSeconds(pausedSeconds);
+    }
+
+    /** A ticket's own first-response target, from its stored span. */
+    static Duration ownFirstResponseTarget(Instant createdAt, Instant firstResponseDueAt) {
+        return Duration.between(createdAt, firstResponseDueAt);
     }
 
     /** Accumulated pause after leaving PENDING; never negative, whatever the clocks did. */

@@ -63,7 +63,8 @@ public class TicketMessageService {
         List<TicketMessage> found = messages.findByTicketIdOrderByCreatedAtAscIdAsc(ticketId);
         Map<UUID, Members.Member> authors = members.findAll(found.stream().map(TicketMessage::getAuthorId)
                 .filter(Objects::nonNull).collect(Collectors.toSet()));
-        return found.stream().map(m -> view(m, authors.get(m.getAuthorId()))).toList();
+        return found.stream()
+                .map(m -> view(m, m.getAuthorId() == null ? null : authors.get(m.getAuthorId()))).toList();
     }
 
     @Transactional
@@ -115,6 +116,7 @@ public class TicketMessageService {
         return email == null || email.isBlank() ? null : email;
     }
 
+    /** From the workspace's name (D9); the customer's answer goes to the agent who wrote, when known. */
     private void sendReply(Ticket ticket, String to, String body, Members.Member writer) {
         String workspace = tenants.current().name();
         events.publishEvent(new MailRequested(new OutgoingMail(to,
@@ -125,7 +127,7 @@ public class TicketMessageService {
                 %s, %s
                 Reference: %s
                 """.formatted(body, writer == null ? "The support team" : writer.name(), workspace,
-                ticket.getNumber()))));
+                ticket.getNumber()), workspace, writer == null ? null : writer.email())));
     }
 
     private static MessageView view(TicketMessage m, Members.Member author) {

@@ -79,12 +79,10 @@ public class CategoryService {
     public CategoryView update(UUID id, CategoryCommand command, Long version) {
         TicketCategory category = find(id);
         checkVersion(category, version);
-        if (category.isArchived()) {
-            throw ApiProblem.conflict(ARCHIVED);
-        }
         String name = name(command.name());
         String description = Text.optional(command.description(), 500, "description");
         UUID assignee = assignee(command.defaultAssigneeId());
+        requireNotArchived(category);
         locks.lock(LOCK);
         if (categories.existsByNameKeyAndIdNot(key(name), id)) {
             throw ApiProblem.conflictField("name", NAME_TAKEN);

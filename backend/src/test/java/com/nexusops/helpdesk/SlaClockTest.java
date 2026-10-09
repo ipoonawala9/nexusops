@@ -23,6 +23,15 @@ class SlaClockTest {
     }
 
     @Test
+    void aTicketsOwnTargetIsItsStoredSpanLessThePausedTime() {
+        // clock started at T0 with a 2-day target, then 1 h 30 min of waiting on the customer
+        Duration own = SlaClock.ownResolutionTarget(T0, at(2880 + 90), 90 * 60);
+        assertThat(own).isEqualTo(Duration.ofMinutes(2880));
+        assertThat(SlaClock.resolutionDue(at(5000), 0, own)).isEqualTo(at(5000 + 2880));
+        assertThat(SlaClock.ownFirstResponseTarget(T0, at(480))).isEqualTo(Duration.ofMinutes(480));
+    }
+
+    @Test
     void pausingMovesTheResolutionDueTimeByThePausedDuration() {
         // paused at 1 h, resumed at 3 h 30 min: 2 h 30 min of waiting on the customer
         long paused = SlaClock.pausedSecondsAfterResume(0, at(60), at(210));

@@ -100,6 +100,20 @@ class CategoryApiIT extends IntegrationTestSupport {
     }
 
     @Test
+    void editingAnArchivedCategoryChecksTheBodyFirst() throws Exception {
+        UUID id = Api.id(owner.post("/api/v1/helpdesk/categories", "{\"name\":\"Returns\"}")
+                .andExpect(status().isCreated()));
+        owner.post("/api/v1/helpdesk/categories/" + id + "/archive", "").andExpect(status().isOk());
+        owner.put("/api/v1/helpdesk/categories/" + id, "{\"name\":\"\",\"version\":1}")
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("name"));
+        owner.put("/api/v1/helpdesk/categories/" + id, "{\"name\":\"Returns\",\"defaultAssigneeId\":\""
+                + UUID.randomUUID() + "\",\"version\":1}")
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("defaultAssigneeId"));
+        owner.put("/api/v1/helpdesk/categories/" + id, "{\"name\":\"Returns\",\"version\":1}")
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.detail").value("This record is archived."));
+    }
+
+    @Test
     void settingsNeedTheirPermission() throws Exception {
         UUID readerRole = TestRoles.create(mvc, owner.session(), "Agent", "helpdesk.ticket.read");
         Api agent = Api.login(mvc, members.create(ws.tenantId(), Set.of(readerRole)));

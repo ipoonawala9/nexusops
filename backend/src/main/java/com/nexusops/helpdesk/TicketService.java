@@ -29,12 +29,16 @@ import com.nexusops.shared.web.Paging;
 import com.nexusops.tenancy.TenantDirectory;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -61,6 +65,7 @@ public class TicketService {
     static final String NOT_A_MEMBER = "Choose an active team member.";
     static final String NOT_ALLOWED = "This status change isn't allowed.";
     static final String SEQUENCE = "TICKET";
+    private static final DateTimeFormatter DUE_FORMAT = DateTimeFormatter.ofPattern("d MMM yyyy, HH:mm", Locale.ENGLISH);
 
     private final TicketRepository tickets;
     private final NumberSequences numbers;
@@ -231,10 +236,13 @@ public class TicketService {
 
     /** The workflow's side effects on the SLA clock (D6, D8). Validation is the caller's. */
     void moveTo(Ticket ticket, TicketStatus target, String note, Instant now) {
-        SlaTargets targets = policies.targets(ticket.getPriority());
+        // The ticket's own target (its stored span), not the current policy: a policy edit applies only to new tickets
+        // and to tickets whose priority changes afterwards (D8).
+        Duration own = SlaClock.ownResolutionTarget(ticket.getResolutionClockStartedAt(), ticket.getResolutionDueAt(),
+                ticket.getPausedSeconds());
         if (ticket.getStatus() == TicketStatus.PENDING) {
             long paused = SlaClock.pausedSecondsAfterResume(ticket.getPausedSeconds(), ticket.getPausedAt(), now);
-            ticket.resume(paused, SlaClock.resolutionDue(ticket.getResolutionClockStartedAt(), paused, targets), now);
+            ticket.resume(paused, SlaClock.resolutionDue(ticket.getResolutionClockStartedAt(), paused, own), now);
         }
         switch (target) {
             case PENDING -> ticket.pause(now);
@@ -242,7 +250,7 @@ public class TicketService {
             case CLOSED -> ticket.close(now);
             case OPEN -> {
                 if (ticket.getStatus() == TicketStatus.RESOLVED) {
-                    ticket.reopen(SlaClock.resolutionDue(now, 0, targets), now);
+                    ticket.reopen(SlaClock.resolutionDue(now, 0, own), now);
                 } else {
                     ticket.open(now);
                 }
@@ -272,8 +280,9 @@ public class TicketService {
     }
 
     /**
-     * Body checks, then references that need no permission (category, linked type), then those that may answer 403
-     * (product, linked record, requester — last), then archived checks for new or changed references (R3/R4 order).
+     * Body checks, then references that need no permission (category, linked type, assignee), then those that may
+     * answer 403 (product, linked record, requester — last), then the assign permission for an explicit assignee on
+     * create, then archived checks for new or changed references (R3/R4 order).
      */
     private Draft validate(TicketCommand c, Ticket current) {
         String subject = Text.required(c.subject(), 200, "subject").replaceAll("\\s+", " ");
@@ -323,6 +332,10 @@ public class TicketService {
             if (requester == null) {
                 throw ApiProblem.badRequestField("requesterId", UNKNOWN_PARTY);
             }
+        }
+        // Choosing the assignee is assignment (D16); the category's routing is the admin's configuration and isn't.
+        if (explicitAssignee != null && !CurrentAuthorities.has(HelpDeskPermissions.TICKET_ASSIGN)) {
+            throw ApiProblem.forbidden(FORBIDDEN);
         }
         if (category != null && (current == null || !category.getId().equals(current.getCategoryId()))) {
             CategoryService.requireNotArchived(category);
@@ -382,16 +395,28 @@ public class TicketService {
                 Open it: %s/app/helpdesk/tickets/%s
                 """.formatted(to.name(), by == null ? "A teammate" : by.name(), tenants.current().name(),
                 ticket.getNumber(), ticket.getSubject(), ticket.getPriority().name(),
-                ticket.getFirstResponseDueAt(), appBaseUrl, ticket.getId()))));
+                inWorkspaceZone(ticket.getFirstResponseDueAt()), appBaseUrl, ticket.getId()))));
+    }
+
+    /** E.g. "9 Oct 2026, 15:45 (Asia/Kolkata)", in the workspace's time zone (UTC when it has none or a bad one). */
+    private String inWorkspaceZone(Instant instant) {
+        ZoneId zone;
+        try {
+            zone = ZoneId.of(tenants.currentSettings().timezone());
+        } catch (RuntimeException e) {
+            zone = ZoneOffset.UTC;
+        }
+        return DUE_FORMAT.withZone(zone).format(instant) + " (" + zone.getId() + ")";
     }
 
     SlaView sla(Ticket t, Instant now) {
         // The target lengths come from the ticket's own stored spans, as in HelpDeskQueries.AT_RISK, so a later edit
         // of the policy doesn't change how existing tickets are classified.
         boolean paused = t.getStatus() == TicketStatus.PENDING;
-        int firstResponseMinutes = (int) Duration.between(t.getCreatedAt(), t.getFirstResponseDueAt()).toMinutes();
-        int resolutionMinutes = (int) ((Duration.between(t.getResolutionClockStartedAt(), t.getResolutionDueAt())
-                .toSeconds() - t.getPausedSeconds()) / 60);
+        int firstResponseMinutes = (int) SlaClock.ownFirstResponseTarget(t.getCreatedAt(), t.getFirstResponseDueAt())
+                .toMinutes();
+        int resolutionMinutes = (int) SlaClock.ownResolutionTarget(t.getResolutionClockStartedAt(),
+                t.getResolutionDueAt(), t.getPausedSeconds()).toMinutes();
         return new SlaView(t.getFirstResponseDueAt(), t.getFirstRespondedAt(),
                 SlaClock.state(t.getFirstResponseDueAt(), t.getFirstRespondedAt(), now, firstResponseMinutes, null),
                 t.getResolutionDueAt(), t.getResolvedAt(),

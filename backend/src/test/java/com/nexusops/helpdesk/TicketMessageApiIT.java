@@ -13,6 +13,8 @@ import com.nexusops.support.TestMembers;
 import com.nexusops.support.TestRoles;
 import com.nexusops.support.TestTenants;
 import com.nexusops.support.TestTenants.Workspace;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Set;
 import java.util.UUID;
 import org.hamcrest.Matchers;
@@ -73,6 +75,9 @@ class TicketMessageApiIT extends IntegrationTestSupport {
         assertThat(mail.sentTo(customerEmail)).singleElement().satisfies(m -> {
             assertThat(m.subject()).isEqualTo("[T-00001] Printer not printing");
             assertThat(m.textBody()).contains("Please switch it off and on again.");
+            // from the workspace (D9), and the customer's reply reaches the agent who wrote
+            assertThat(m.fromName()).isEqualTo(ws.slug() + " Inc");
+            assertThat(m.replyTo()).isEqualTo(ws.email());
         });
         String firstAt = Api.read(owner.get("/api/v1/helpdesk/tickets/" + id), "$.sla.firstRespondedAt");
         post(id, "PUBLIC_REPLY", "Any luck?").andExpect(status().isCreated())
@@ -103,6 +108,36 @@ class TicketMessageApiIT extends IntegrationTestSupport {
                 .andExpect(jsonPath("$.ticket.sla.firstRespondedAt").doesNotExist());
         assertThat(mail.sentTo(customerEmail)).isEmpty();
         assertThat(audits("TicketCustomerMessage")).isEqualTo(1);
+    }
+
+    @Test
+    void aCustomerMessageResumesWithTheTicketsOwnTargetWhenThePolicyChangedMeanwhile() throws Exception {
+        UUID id = ticket(customer);
+        String pending = Api.read(owner.post("/api/v1/helpdesk/tickets/" + id + "/status",
+                "{\"status\":\"PENDING\",\"version\":0}").andExpect(status().isOk()), "$.sla.resolutionDueAt");
+        Instant due = Instant.parse(pending);
+        Instant pausedAt = Instant.now().minus(Duration.ofHours(3));
+        OwnerJdbc.ownerAs(ws.tenantId()).update("update tickets set paused_at = ? where id = ?",
+                java.sql.Timestamp.from(pausedAt), id);
+        OwnerJdbc.ownerAs(ws.tenantId()).update("update sla_policies set first_response_minutes = 1, resolution_minutes = 1 "
+                + "where priority = 'NORMAL'");
+        Instant before = Instant.now();
+        String resumed = Api.read(post(id, "CUSTOMER_MESSAGE", "Still jamming").andExpect(status().isCreated())
+                .andExpect(jsonPath("$.ticket.sla.resolutionState").value("ON_TRACK")), "$.ticket.sla.resolutionDueAt");
+        Instant after = Instant.now();
+        assertThat(Instant.parse(resumed)).isBetween(due.plus(Duration.between(pausedAt, before)).minusSeconds(2),
+                due.plus(Duration.between(pausedAt, after)).plusSeconds(2));
+    }
+
+    @Test
+    void messagesWhoseAuthorsAreGoneStillList() throws Exception {
+        UUID id = ticket(customer);
+        post(id, "INTERNAL_NOTE", "Written by someone who left").andExpect(status().isCreated());
+        // as after the author's user row is deleted (ON DELETE SET NULL)
+        OwnerJdbc.ownerAs(ws.tenantId()).update("update ticket_messages set author_id = null where ticket_id = ?", id);
+        owner.get("/api/v1/helpdesk/tickets/" + id + "/messages").andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].body").value("Written by someone who left"))
+                .andExpect(jsonPath("$[0].author").doesNotExist());
     }
 
     @Test

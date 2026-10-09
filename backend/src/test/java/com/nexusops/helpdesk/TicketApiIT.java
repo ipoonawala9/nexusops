@@ -343,6 +343,82 @@ class TicketApiIT extends IntegrationTestSupport {
     }
 
     @Test
+    void resumingKeepsTheTicketsOwnTargetWhenThePolicyChangedMeanwhile() throws Exception {
+        UUID id = ticket("");
+        Instant due = instant(Api.read(move(id, "PENDING", null, 0).andExpect(status().isOk()), "$.sla.resolutionDueAt"));
+        // waiting on the customer for the last 2 hours; meanwhile the NORMAL policy is shortened to a minute
+        Instant pausedAt = Instant.now().minus(Duration.ofHours(2));
+        jdbc().update("update tickets set paused_at = ? where id = ?", ts(pausedAt), id);
+        jdbc().update("update sla_policies set first_response_minutes = 1, resolution_minutes = 1 "
+                + "where priority = 'NORMAL'");
+        Instant before = Instant.now();
+        ResultActions resumed = move(id, "OPEN", null, 1).andExpect(status().isOk())
+                .andExpect(jsonPath("$.sla.resolutionState").value("ON_TRACK"));
+        Instant after = Instant.now();
+        // due moves by exactly the pause just ended, not to created + the new policy
+        assertThat(instant(Api.read(resumed, "$.sla.resolutionDueAt"))).isBetween(
+                due.plus(Duration.between(pausedAt, before)).minusSeconds(2),
+                due.plus(Duration.between(pausedAt, after)).plusSeconds(2));
+    }
+
+    @Test
+    void reopeningRestartsTheTicketsOwnTargetWhenThePolicyChangedMeanwhile() throws Exception {
+        UUID id = ticket("");
+        move(id, "PENDING", null, 0).andExpect(status().isOk());
+        // an hour of waiting on the customer, which doesn't count against the target
+        jdbc().update("update tickets set paused_at = ? where id = ?", ts(Instant.now().minus(Duration.ofHours(1))), id);
+        move(id, "OPEN", null, 1).andExpect(status().isOk());
+        move(id, "RESOLVED", "Replaced the drum", 2).andExpect(status().isOk());
+        jdbc().update("update sla_policies set first_response_minutes = 1, resolution_minutes = 1 "
+                + "where priority = 'NORMAL'");
+        Instant before = Instant.now();
+        ResultActions reopened = move(id, "OPEN", null, 3).andExpect(status().isOk())
+                .andExpect(jsonPath("$.sla.resolutionState").value("ON_TRACK"));
+        Instant after = Instant.now();
+        // the ticket's own 2-day NORMAL target from the reopen, with no paused time carried over
+        assertThat(instant(Api.read(reopened, "$.sla.resolutionDueAt"))).isBetween(
+                before.plus(Duration.ofMinutes(2880)).minusSeconds(2), after.plus(Duration.ofMinutes(2880)).plusSeconds(2));
+        assertThat(jdbc().queryForObject("select paused_seconds from tickets where id = ?", Long.class, id)).isZero();
+    }
+
+    @Test
+    void anExplicitAssigneeOnCreateNeedsTheAssignPermission() throws Exception {
+        var agent = members.create(ws.tenantId(), Set.of());
+        UUID agentId = jdbc().queryForObject("select id from users where email = ?", UUID.class, agent.email());
+        UUID billing = TestHelpDesk.category(owner, "Billing");
+        owner.put("/api/v1/helpdesk/categories/" + billing, "{\"name\":\"Billing\",\"defaultAssigneeId\":\"" + agentId
+                + "\",\"version\":0}").andExpect(status().isOk());
+        UUID role = TestRoles.create(mvc, owner.session(), "Agent without assign", "helpdesk.ticket.read",
+                "helpdesk.ticket.manage", "directory.party.read");
+        Api creator = Api.login(mvc, members.create(ws.tenantId(), Set.of(role)));
+        // body errors first
+        creator.post("/api/v1/helpdesk/tickets", body(",\"assigneeId\":\"" + UUID.randomUUID() + "\""))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("assigneeId"));
+        creator.post("/api/v1/helpdesk/tickets", body(",\"assigneeId\":\"" + agentId + "\""))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.detail").value("You do not have permission to perform this action."));
+        assertThat(mail.sentTo(agent.email())).isEmpty();
+        // the category's routing is the admin's configuration and still applies
+        creator.post("/api/v1/helpdesk/tickets", body(",\"categoryId\":\"" + billing + "\""))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.assignee.id").value(agentId.toString()));
+    }
+
+    @Test
+    void theAssignmentEmailShowsTheDueTimeInTheWorkspaceTimeZone() throws Exception {
+        jdbc().update("update tenants set timezone = 'Asia/Kolkata' where id = ?", ws.tenantId());
+        var agent = members.create(ws.tenantId(), Set.of());
+        UUID agentId = jdbc().queryForObject("select id from users where email = ?", UUID.class, agent.email());
+        ResultActions created = owner.post("/api/v1/helpdesk/tickets", body(",\"assigneeId\":\"" + agentId + "\""))
+                .andExpect(status().isCreated());
+        String expected = java.time.format.DateTimeFormatter.ofPattern("d MMM yyyy, HH:mm", java.util.Locale.ENGLISH)
+                .withZone(java.time.ZoneId.of("Asia/Kolkata"))
+                .format(instant(Api.read(created, "$.sla.firstResponseDueAt")));
+        assertThat(mail.sentTo(agent.email())).singleElement()
+                .satisfies(m -> assertThat(m.textBody()).contains("First response due: " + expected + " (Asia/Kolkata)"));
+    }
+
+    @Test
     void aDeactivatedDefaultAssigneeIsSkippedWhenRouting() throws Exception {
         var agent = members.create(ws.tenantId(), Set.of());
         UUID agentId = jdbc().queryForObject("select id from users where email = ?", UUID.class, agent.email());
