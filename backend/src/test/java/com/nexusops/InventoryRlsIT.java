@@ -1,22 +1,19 @@
 package com.nexusops;
 
+import static com.nexusops.support.PostgresAssertions.assertDeniedByPostgres;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.catchThrowable;
 
 import com.nexusops.support.IntegrationTestSupport;
 import com.nexusops.support.OwnerJdbc;
-import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
-import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /** The database alone isolates every Phase 6 table, independent of application code. */
@@ -145,18 +142,6 @@ class InventoryRlsIT extends IntegrationTestSupport {
                     tenantB, freshProduct(), freshWarehouse(), now, now);
             default -> throw new IllegalArgumentException(table);
         }
-    }
-
-    /** The failure must be PostgreSQL's insufficient-privilege / row-level-security error (SQLState 42501). */
-    private static void assertDeniedByPostgres(ThrowingCallable call, String what) {
-        Throwable thrown = catchThrowable(call);
-        assertThat(thrown).as(what).isInstanceOf(DataAccessException.class);
-        Throwable cause = thrown;
-        while (cause != null && !(cause instanceof SQLException)) {
-            cause = cause.getCause();
-        }
-        assertThat(cause).as(what + " (SQL cause)").isNotNull();
-        assertThat(((SQLException) cause).getSQLState()).as(what).isEqualTo("42501");
     }
 
     @Test

@@ -52,7 +52,20 @@ class OpenApiContractIT extends IntegrationTestSupport {
                 "\"/api/v1/purchase-orders/{id}\"", "\"/api/v1/purchase-orders/{id}/order\"",
                 "\"/api/v1/purchase-orders/{id}/cancel\"", "\"/api/v1/purchase-orders/{id}/receipts\"",
                 "\"/api/v1/sales-orders\"", "\"/api/v1/sales-orders/{id}\"", "\"/api/v1/sales-orders/{id}/confirm\"",
-                "\"/api/v1/sales-orders/{id}/fulfil\"", "\"/api/v1/sales-orders/{id}/cancel\"");
+                "\"/api/v1/sales-orders/{id}/fulfil\"", "\"/api/v1/sales-orders/{id}/cancel\"",
+                "\"/api/v1/helpdesk/tickets\"", "\"/api/v1/helpdesk/tickets/{id}\"",
+                "\"/api/v1/helpdesk/tickets/{id}/assign\"", "\"/api/v1/helpdesk/tickets/{id}/status\"",
+                "\"/api/v1/helpdesk/tickets/{id}/messages\"", "\"/api/v1/helpdesk/tickets/{id}/context\"",
+                "\"/api/v1/helpdesk/agents\"", "\"/api/v1/helpdesk/categories\"",
+                "\"/api/v1/helpdesk/categories/{id}\"", "\"/api/v1/helpdesk/categories/{id}/archive\"",
+                "\"/api/v1/helpdesk/categories/{id}/restore\"", "\"/api/v1/helpdesk/sla-policies\"",
+                "\"/api/v1/helpdesk/sla-policies/{priority}\"", "\"/api/v1/helpdesk/articles\"",
+                "\"/api/v1/helpdesk/articles/{id}\"", "\"/api/v1/helpdesk/articles/{id}/publish\"",
+                "\"/api/v1/helpdesk/articles/{id}/unpublish\"", "\"/api/v1/helpdesk/articles/{id}/archive\"",
+                "\"/api/v1/helpdesk/dashboard\"");
+        // the HelpDesk and CRM dashboards keep their own schemas (same Java name, different shape)
+        java.util.Map<String, Object> schemas = com.jayway.jsonpath.JsonPath.read(doc, "$.components.schemas");
+        assertThat(schemas).containsKeys("LeadStats", "HelpDeskDashboardView");
         // hierarchy rules (ADR-0004): no changing a role, or disabling/re-enabling/re-roling a user, stronger than the caller
         for (String op : new String[] {"$.paths['/api/v1/roles/{id}'].patch", "$.paths['/api/v1/roles/{id}'].delete",
                 "$.paths['/api/v1/roles/{id}/permissions'].put", "$.paths['/api/v1/users/{id}'].patch",

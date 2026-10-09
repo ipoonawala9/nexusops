@@ -7,6 +7,7 @@ import com.nexusops.support.Api;
 import com.nexusops.support.IntegrationTestSupport;
 import com.nexusops.support.RecordingMailSender;
 import com.nexusops.support.TestCrm;
+import com.nexusops.support.TestHelpDesk;
 import com.nexusops.support.TestInventory;
 import com.nexusops.support.TestMembers;
 import com.nexusops.support.TestRoles;
@@ -122,5 +123,22 @@ class SearchApiIT extends IntegrationTestSupport {
         owner.get("/api/v1/search?q=" + "x".repeat(101)).andExpect(status().isBadRequest());
         owner.get("/api/v1/search?q=%25%25").andExpect(jsonPath("$.length()").value(0));
         owner.get("/api/v1/search?q=__").andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    void findsTicketsByNumberOrSubjectAndPublishedArticlesByTitle() throws Exception {
+        TestHelpDesk.enable(owner);
+        UUID org = Api.id(owner.post("/api/v1/organizations", "{\"name\":\"Helpdesk Co\"}"));
+        owner.post("/api/v1/helpdesk/tickets", "{\"subject\":\"Zephyr printer jam\",\"description\":\"x\","
+                + "\"requesterId\":\"" + org + "\"}").andExpect(status().isCreated());
+        UUID article = Api.id(owner.post("/api/v1/helpdesk/articles", "{\"title\":\"Zephyr setup guide\",\"body\":\"y\"}"));
+        owner.get("/api/v1/search?q=zephyr").andExpect(jsonPath("$[*].type").value(Matchers.contains("TICKET")))
+                .andExpect(jsonPath("$[0].label").value("T-00001 · Zephyr printer jam"))
+                .andExpect(jsonPath("$[0].detail").value("Helpdesk Co"));
+        owner.get("/api/v1/search?q=T-00001").andExpect(jsonPath("$[*].type").value(Matchers.contains("TICKET")))
+                .andExpect(jsonPath("$[0].label").value("T-00001 · Zephyr printer jam"));
+        owner.post("/api/v1/helpdesk/articles/" + article + "/publish", "{\"version\":0}").andExpect(status().isOk());
+        owner.get("/api/v1/search?q=zephyr").andExpect(jsonPath("$[*].type")
+                .value(Matchers.contains("TICKET", "KB_ARTICLE")));
     }
 }

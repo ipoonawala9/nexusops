@@ -18,6 +18,7 @@ import com.nexusops.inventory.domain.Warehouse;
 import com.nexusops.shared.Currencies;
 import com.nexusops.shared.Decimals;
 import com.nexusops.shared.Ids;
+import com.nexusops.shared.NumberSequences;
 import com.nexusops.shared.TenantContext;
 import com.nexusops.shared.Text;
 import com.nexusops.shared.web.ApiProblem;
@@ -131,7 +132,8 @@ public class PurchaseOrderService {
     public PurchaseOrderView create(PurchaseOrderCommand command) {
         TenantContext.requireTenantId();
         Draft draft = validate(command, null, List.of());
-        PurchaseOrder order = new PurchaseOrder(Ids.newId(), numbers.next(SequenceKind.PURCHASE_ORDER),
+        PurchaseOrder order = new PurchaseOrder(Ids.newId(), numbers.next(SequenceKind.PURCHASE_ORDER.name(),
+                SequenceKind.PURCHASE_ORDER.prefix()),
                 draft.supplierId(), draft.warehouseId(), draft.currency(), draft.expectedOn(), draft.notes(),
                 TenantContext.userId().orElse(null));
         orders.saveAndFlush(order);
