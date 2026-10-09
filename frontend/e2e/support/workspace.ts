@@ -25,7 +25,7 @@ export async function signUpAndVerify(page: Page, ws: Workspace): Promise<void> 
   await page.getByLabel('First name').fill('Ada')
   await page.getByLabel('Last name').fill('Owner')
   await page.getByLabel('Work email').fill(ws.email)
-  await page.getByLabel('Password').fill(PASSWORD)
+  await page.getByLabel('Password', { exact: true }).fill(PASSWORD)
   await page.getByRole('button', { name: 'Create workspace' }).click()
   await expect(page.getByRole('heading', { name: 'Check your email' })).toBeVisible()
   const token = await tokenFromEmail(ws.email, '/verify-email')
@@ -42,6 +42,6 @@ export async function signIn(
   await page.goto('/login')
   await page.getByLabel('Workspace URL').fill(ws.slug)
   await page.getByLabel('Email').fill(email)
-  await page.getByLabel('Password').fill(password)
+  await page.getByLabel('Password', { exact: true }).fill(password)
   await page.getByRole('button', { name: 'Sign in' }).click()
 }
