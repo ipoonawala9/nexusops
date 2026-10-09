@@ -25,6 +25,17 @@ import type {
   SalesOrderView,
   StockRow,
   WarehouseView,
+  AssigneeView,
+  ArticleSummary,
+  ArticleView,
+  CategoryView,
+  HelpDeskDashboard,
+  MessageView,
+  SlaPolicyView,
+  SlaView,
+  TicketContext,
+  TicketSummary,
+  TicketView,
 } from '@/lib/api/types'
 
 export function pageOf<T>(items: T[], total = items.length, page = 0, size = 20): Page<T> {
@@ -504,6 +515,157 @@ export function anOverview(overrides: Partial<InventoryOverview> = {}): Inventor
     purchaseOrdersAwaitingReceipt: 1,
     salesOrdersAwaitingFulfilment: 3,
     recentMovements: [aMovement()],
+    ...overrides,
+  }
+}
+
+const MEERA = { id: 'p-meera', name: 'Meera Iyer' }
+const ADA = { id: 'u-ada', name: 'Ada Lovelace' }
+
+export function anSla(overrides: Partial<SlaView> = {}): SlaView {
+  return {
+    firstResponseDueAt: '2026-10-09T17:00:00Z',
+    firstRespondedAt: null,
+    firstResponseState: 'ON_TRACK',
+    resolutionDueAt: '2026-10-11T09:00:00Z',
+    resolvedAt: null,
+    resolutionState: 'ON_TRACK',
+    pausedAt: null,
+    ...overrides,
+  }
+}
+
+export function aTicket(overrides: Partial<TicketView> = {}): TicketView {
+  return {
+    id: 't-1',
+    number: 'T-00001',
+    subject: 'Printer jams on every page',
+    description: 'Since Monday the printer jams on every page.',
+    requester: MEERA,
+    product: { id: 'pr-widget', sku: 'W-1', name: 'Widget' },
+    linked: null,
+    category: { id: 'c-general', name: 'General' },
+    priority: 'NORMAL',
+    channel: 'PHONE',
+    assignee: null,
+    status: 'NEW',
+    sla: anSla(),
+    resolutionNote: null,
+    reopenCount: 0,
+    closedAt: null,
+    createdBy: ADA,
+    createdAt: '2026-10-09T09:00:00Z',
+    updatedAt: '2026-10-09T09:00:00Z',
+    version: 0,
+    ...overrides,
+  }
+}
+
+export function aTicketSummary(overrides: Partial<TicketSummary> = {}): TicketSummary {
+  return {
+    id: 't-1',
+    number: 'T-00001',
+    subject: 'Printer jams on every page',
+    requester: MEERA,
+    category: { id: 'c-general', name: 'General' },
+    priority: 'NORMAL',
+    status: 'NEW',
+    assignee: null,
+    sla: anSla(),
+    createdAt: '2026-10-09T09:00:00Z',
+    updatedAt: '2026-10-09T09:00:00Z',
+    ...overrides,
+  }
+}
+
+export function aCategory(overrides: Partial<CategoryView> = {}): CategoryView {
+  return {
+    id: 'c-general',
+    name: 'General',
+    description: null,
+    defaultAssignee: null,
+    position: 0,
+    archivedAt: null,
+    version: 0,
+    ...overrides,
+  }
+}
+
+export function defaultSlaPolicies(): SlaPolicyView[] {
+  return [
+    { priority: 'LOW', firstResponseMinutes: 1440, resolutionMinutes: 7200, version: 0 },
+    { priority: 'NORMAL', firstResponseMinutes: 480, resolutionMinutes: 2880, version: 0 },
+    { priority: 'HIGH', firstResponseMinutes: 240, resolutionMinutes: 1440, version: 0 },
+    { priority: 'URGENT', firstResponseMinutes: 60, resolutionMinutes: 240, version: 0 },
+  ]
+}
+
+export function anAgent(overrides: Partial<AssigneeView> = {}): AssigneeView {
+  return { id: 'u-ravi', name: 'Ravi Kumar', email: 'ravi@acme.test', ...overrides }
+}
+
+export function aMessage(overrides: Partial<MessageView> = {}): MessageView {
+  return {
+    id: 'msg-1',
+    kind: 'PUBLIC_REPLY',
+    body: 'Please try clearing the paper tray.',
+    author: ADA,
+    emailedTo: 'meera@deccan.test',
+    createdAt: '2026-10-09T09:30:00Z',
+    ...overrides,
+  }
+}
+
+export function anArticle(overrides: Partial<ArticleView> = {}): ArticleView {
+  return {
+    id: 'a-1',
+    title: 'Clearing a paper jam',
+    body: 'Open the rear tray and pull the sheet out gently.',
+    category: { id: 'c-general', name: 'General' },
+    status: 'PUBLISHED',
+    author: ADA,
+    publishedAt: '2026-10-08T09:00:00Z',
+    createdAt: '2026-10-08T08:00:00Z',
+    updatedAt: '2026-10-08T09:00:00Z',
+    version: 1,
+    ...overrides,
+  }
+}
+
+export function anArticleSummary(overrides: Partial<ArticleSummary> = {}): ArticleSummary {
+  return {
+    id: 'a-1',
+    title: 'Clearing a paper jam',
+    excerpt: 'Open the rear tray and pull the sheet out gently.',
+    category: { id: 'c-general', name: 'General' },
+    status: 'PUBLISHED',
+    publishedAt: '2026-10-08T09:00:00Z',
+    updatedAt: '2026-10-08T09:00:00Z',
+    ...overrides,
+  }
+}
+
+export function aTicketContext(overrides: Partial<TicketContext> = {}): TicketContext {
+  return { previousTickets: [], possibleDuplicates: [], suggestedArticles: [], ...overrides }
+}
+
+export function aHelpDeskDashboard(overrides: Partial<HelpDeskDashboard> = {}): HelpDeskDashboard {
+  return {
+    openByStatus: { NEW: 2, OPEN: 3, PENDING: 1 },
+    openByPriority: { LOW: 1, NORMAL: 3, HIGH: 1, URGENT: 1 },
+    unassigned: 2,
+    breached: 1,
+    atRisk: 1,
+    last30Days: {
+      created: 9,
+      resolved: 4,
+      averageFirstResponseMinutes: 95,
+      medianFirstResponseMinutes: 60,
+      averageResolutionMinutes: 1500,
+      firstResponseMetRate: 0.75,
+      resolutionMetRate: 1,
+      reopenRate: 0.25,
+    },
     ...overrides,
   }
 }

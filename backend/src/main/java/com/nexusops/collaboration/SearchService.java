@@ -14,7 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class SearchService {
 
     static final List<String> ORDER = List.of("PARTY", "LEAD", "OPPORTUNITY", "PRODUCT", "PURCHASE_ORDER",
-            "SALES_ORDER");
+            "SALES_ORDER", "TICKET", "KB_ARTICLE");
     static final int PER_TYPE = 5;
 
     private final List<SubjectResolver> resolvers;

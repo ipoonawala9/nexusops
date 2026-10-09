@@ -1,6 +1,5 @@
-package com.nexusops.inventory;
+package com.nexusops.shared;
 
-import com.nexusops.shared.TenantContext;
 import java.util.Locale;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -8,9 +7,12 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Gap-free per tenant within committed orders: UPDATE … RETURNING takes the row lock until the transaction ends. */
+/**
+ * Per-tenant document numbers (PO-00001, SO-00001, T-00001). Gap-free among committed records: UPDATE … RETURNING
+ * holds the row lock until the transaction ends, and the increment rolls back with it.
+ */
 @Component
-class NumberSequences {
+public class NumberSequences {
 
     private final JdbcTemplate jdbc;
 
@@ -19,12 +21,12 @@ class NumberSequences {
     }
 
     @Transactional(propagation = Propagation.MANDATORY)
-    String next(SequenceKind kind) {
+    public String next(String kind, String prefix) {
         UUID tenant = TenantContext.requireTenantId();
         jdbc.update("insert into number_sequences (tenant_id, kind, next_value) values (?, ?, 1) on conflict do nothing",
-                tenant, kind.name());
+                tenant, kind);
         Long value = jdbc.queryForObject("update number_sequences set next_value = next_value + 1 "
-                + "where tenant_id = ? and kind = ? returning next_value - 1", Long.class, tenant, kind.name());
-        return kind.prefix() + String.format(Locale.ROOT, "%05d", value);
+                + "where tenant_id = ? and kind = ? returning next_value - 1", Long.class, tenant, kind);
+        return prefix + String.format(Locale.ROOT, "%05d", value);
     }
 }

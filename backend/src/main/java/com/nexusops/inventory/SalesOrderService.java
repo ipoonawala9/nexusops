@@ -18,6 +18,7 @@ import com.nexusops.inventory.domain.Warehouse;
 import com.nexusops.shared.Currencies;
 import com.nexusops.shared.Decimals;
 import com.nexusops.shared.Ids;
+import com.nexusops.shared.NumberSequences;
 import com.nexusops.shared.TenantContext;
 import com.nexusops.shared.Text;
 import com.nexusops.shared.web.ApiProblem;
@@ -127,7 +128,8 @@ public class SalesOrderService {
     public SalesOrderView create(SalesOrderCommand command) {
         TenantContext.requireTenantId();
         Draft draft = validate(command, null, List.of());
-        SalesOrder order = new SalesOrder(Ids.newId(), numbers.next(SequenceKind.SALES_ORDER), draft.customerId(),
+        SalesOrder order = new SalesOrder(Ids.newId(), numbers.next(SequenceKind.SALES_ORDER.name(),
+                SequenceKind.SALES_ORDER.prefix()), draft.customerId(),
                 draft.warehouseId(), draft.currency(), draft.notes(), TenantContext.userId().orElse(null));
         orders.saveAndFlush(order);
         List<SalesOrderLine> saved = saveLines(order.getId(), draft.lines());
