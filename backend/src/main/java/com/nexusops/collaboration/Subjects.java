@@ -22,6 +22,11 @@ public class Subjects {
         this.resolvers = resolvers.stream().collect(Collectors.toMap(SubjectResolver::type, Function.identity()));
     }
 
+    /** Whether a subject type exists (a resolver is registered for it). */
+    public boolean isKnownType(String type) {
+        return type != null && resolvers.containsKey(type);
+    }
+
     public boolean canRead(String type) {
         SubjectResolver resolver = type == null ? null : resolvers.get(type);
         return resolver != null && CurrentAuthorities.has(resolver.readPermission());
