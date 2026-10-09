@@ -25,7 +25,8 @@ class RlsCoverageIT extends IntegrationTestSupport {
             "parties", "party_roles", "products", "activities", "tasks",
             "documents", "document_contents", "pipeline_stages", "leads", "opportunities",
             "number_sequences", "warehouses", "stock_levels", "stock_movements", "purchase_orders",
-            "purchase_order_lines", "sales_orders", "sales_order_lines", "reorder_rules", "password_resets");
+            "purchase_order_lines", "sales_orders", "sales_order_lines", "reorder_rules", "password_resets",
+            "ticket_categories", "sla_policies");
 
     @Autowired JdbcTemplate jdbc;
 
