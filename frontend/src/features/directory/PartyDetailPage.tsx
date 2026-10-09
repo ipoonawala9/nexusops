@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ErrorState, ListSkeleton, PageHeader } from '@/components/states'
 import { PERMISSIONS, useCan } from '@/features/auth/permissions'
+import { TicketsPanel } from '@/features/helpdesk/TicketsPanel'
 import { PartyOrdersPanel } from '@/features/inventory/PartyOrdersPanel'
 import { ActivityPanel } from '@/features/records/ActivityPanel'
 import { ArchiveControls } from '@/features/records/ArchiveControls'
@@ -97,6 +98,7 @@ export function PartyDetailPage() {
       </div>
       {p.kind === 'ORGANIZATION' && <OrganizationPeople organizationId={p.id} />}
       <PartyOrdersPanel partyId={p.id} />
+      <TicketsPanel requester={{ id: p.id, name: p.name }} />
       {/* record panels */}
       <SubjectTasksPanel subjectType="PARTY" subjectId={p.id} label={p.name} archived={archived} />
       <ActivityPanel subjectType="PARTY" subjectId={p.id} archived={archived} />

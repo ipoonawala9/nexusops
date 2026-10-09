@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { ALL_TENANT_PERMISSIONS } from '@/features/auth/permissions'
 import { fakeServer } from '@/test/fakeServer'
 import { signedIn, testProfile } from '@/test/fixtures'
-import { aHelpDeskDashboard } from '@/test/records'
+import { aHelpDeskDashboard, pageOf } from '@/test/records'
 import { renderApp } from '@/test/renderApp'
 
 describe('HelpDeskLayout', () => {
@@ -39,5 +39,16 @@ describe('HelpDeskLayout', () => {
     )
     renderApp({ server, path: '/app/helpdesk' })
     expect(await screen.findByText("You don't have access to this page")).toBeInTheDocument()
+  })
+
+  it('opens the knowledge base for someone who may only read articles', async () => {
+    const server = fakeServer()
+    signedIn(
+      server,
+      testProfile({ modules: ['HELPDESK'], permissions: ['helpdesk.article.read'] }),
+    ).on('GET /helpdesk/articles', { body: pageOf([]) })
+    const { router } = renderApp({ server, path: '/app/helpdesk' })
+    expect(await screen.findByRole('heading', { name: 'Knowledge base' })).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/app/helpdesk/articles')
   })
 })
