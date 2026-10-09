@@ -88,8 +88,8 @@ public class ArticleService {
     public ArticleView update(UUID id, ArticleCommand command, Long version) {
         KbArticle article = find(id);
         checkVersion(article, version);
-        requireNotArchived(article);
         Fields f = validate(command, article);
+        requireNotArchived(article);
         Map<String, Object> before = snapshot(article);
         article.apply(f.title(), f.body(), f.categoryId());
         articles.flush();

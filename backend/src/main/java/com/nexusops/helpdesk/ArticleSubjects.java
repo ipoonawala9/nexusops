@@ -5,6 +5,7 @@ import com.nexusops.collaboration.SubjectRef;
 import com.nexusops.collaboration.SubjectResolver;
 import com.nexusops.helpdesk.domain.KbArticle;
 import com.nexusops.helpdesk.domain.KbArticleRepository;
+import com.nexusops.shared.security.CurrentAuthorities;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -40,12 +41,18 @@ class ArticleSubjects implements SubjectResolver {
 
     @Override
     public Optional<SubjectRef> find(UUID id) {
-        return articles.findById(id).map(ArticleSubjects::ref);
+        return articles.findById(id).filter(ArticleSubjects::visible).map(ArticleSubjects::ref);
     }
 
     @Override
     public Map<UUID, SubjectRef> findAll(Collection<UUID> ids) {
-        return articles.findAllById(ids).stream().collect(Collectors.toMap(KbArticle::getId, ArticleSubjects::ref));
+        return articles.findAllById(ids).stream().filter(ArticleSubjects::visible)
+                .collect(Collectors.toMap(KbArticle::getId, ArticleSubjects::ref));
+    }
+
+    /** Drafts and archived articles don't exist for readers without manage, as in ArticleService (no title leak). */
+    private static boolean visible(KbArticle a) {
+        return a.getStatus() == ArticleStatus.PUBLISHED || CurrentAuthorities.has(HelpDeskPermissions.ARTICLE_MANAGE);
     }
 
     @Override

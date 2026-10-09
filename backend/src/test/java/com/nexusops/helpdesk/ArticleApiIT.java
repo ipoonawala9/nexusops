@@ -124,4 +124,26 @@ class ArticleApiIT extends IntegrationTestSupport {
         owner.get("/api/v1/helpdesk/articles?status=DRAFT").andExpect(jsonPath("$.items[*].id")
                 .value(Matchers.contains(draft.toString())));
     }
+
+    @Test
+    void draftAndArchivedArticlesAreNotSubjectsForReadersWithoutManage() throws Exception {
+        UUID draft = article("Internal draft", "Not ready");
+        UUID readerRole = TestRoles.create(mvc, owner.session(), "KB reader", "helpdesk.article.read",
+                "collaboration.activity.create");
+        Api reader = Api.login(mvc, members.create(ws.tenantId(), Set.of(readerRole)));
+        reader.get("/api/v1/activities?subjectType=KB_ARTICLE&subjectId=" + draft).andExpect(status().isNotFound());
+        owner.get("/api/v1/activities?subjectType=KB_ARTICLE&subjectId=" + draft).andExpect(status().isOk());
+        owner.post("/api/v1/helpdesk/articles/" + draft + "/publish", "{\"version\":0}").andExpect(status().isOk());
+        reader.get("/api/v1/activities?subjectType=KB_ARTICLE&subjectId=" + draft).andExpect(status().isOk());
+        owner.post("/api/v1/helpdesk/articles/" + draft + "/archive", "{\"version\":1}").andExpect(status().isOk());
+        reader.get("/api/v1/activities?subjectType=KB_ARTICLE&subjectId=" + draft).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void anArchivedArticleStillGetsBodyErrorsBeforeTheConflict() throws Exception {
+        UUID id = article("Old", "Old body");
+        owner.post("/api/v1/helpdesk/articles/" + id + "/archive", "{\"version\":0}").andExpect(status().isOk());
+        owner.put("/api/v1/helpdesk/articles/" + id, "{\"title\":\"\",\"body\":\"y\",\"version\":1}")
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("title"));
+    }
 }

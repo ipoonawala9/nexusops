@@ -96,4 +96,18 @@ class TicketContextIT extends IntegrationTestSupport {
                 .andExpect(jsonPath("$.suggestedArticles").isEmpty());
         owner.get("/api/v1/helpdesk/tickets/" + UUID.randomUUID() + "/context").andExpect(status().isNotFound());
     }
+
+    @Test
+    void onlyPublishedArticlesAreSuggested() throws Exception {
+        UUID draft = Api.id(owner.post("/api/v1/helpdesk/articles",
+                "{\"title\":\"Paper jam draft\",\"body\":\"Draft steps.\"}"));
+        UUID archived = published("Paper jam archived", "Old steps.");
+        owner.post("/api/v1/helpdesk/articles/" + archived + "/archive", "{\"version\":1}").andExpect(status().isOk());
+        UUID live = published("Paper jam live", "Current steps.");
+        UUID current = ticket(meera, "Paper jam", "Stuck");
+        owner.get("/api/v1/helpdesk/tickets/" + current + "/context").andExpect(status().isOk())
+                .andExpect(jsonPath("$.suggestedArticles[*].id").value(Matchers.contains(live.toString())))
+                .andExpect(jsonPath("$.suggestedArticles[*].id",
+                        Matchers.not(Matchers.hasItems(draft.toString(), archived.toString()))));
+    }
 }
