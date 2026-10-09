@@ -1,6 +1,7 @@
 import type { RouteObject } from 'react-router'
 import { PERMISSIONS, RequirePermission } from '@/features/auth/permissions'
 import { HelpDeskIndex } from './HelpDeskIndex'
+import { TicketDetailPage } from './TicketDetailPage'
 import { TicketsPage } from './TicketsPage'
 
 /** /app/helpdesk/* children (Tasks 9–10 add theirs). */
@@ -11,6 +12,14 @@ export const helpdeskChildren: RouteObject[] = [
     element: (
       <RequirePermission anyOf={[PERMISSIONS.ticketRead]}>
         <TicketsPage />
+      </RequirePermission>
+    ),
+  },
+  {
+    path: 'tickets/:ticketId',
+    element: (
+      <RequirePermission anyOf={[PERMISSIONS.ticketRead]}>
+        <TicketDetailPage />
       </RequirePermission>
     ),
   },
