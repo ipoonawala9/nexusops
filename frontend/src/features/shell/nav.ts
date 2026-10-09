@@ -45,6 +45,7 @@ export const SETTINGS_TABS: Array<{ to: string; label: string; anyOf: Permission
   { to: '/app/settings/modules', label: 'Modules', anyOf: [PERMISSIONS.settingsRead] },
   { to: '/app/settings/pipeline', label: 'Pipeline', anyOf: [PERMISSIONS.pipelineManage] },
   { to: '/app/settings/warehouses', label: 'Warehouses', anyOf: [PERMISSIONS.warehouseManage] },
+  { to: '/app/settings/helpdesk', label: 'HelpDesk', anyOf: [PERMISSIONS.helpdeskSettings] },
 ]
 
 export function firstSettingsPath(can: (...codes: PermissionCode[]) => boolean): string | null {

@@ -6,11 +6,14 @@ import { AuditPage } from '@/features/audit/AuditPage'
 import { PERMISSIONS, RequirePermission } from '@/features/auth/permissions'
 import { DirectoryPage } from '@/features/directory/DirectoryPage'
 import { PartyDetailPage } from '@/features/directory/PartyDetailPage'
+import { HelpDeskLayout } from '@/features/helpdesk/HelpDeskLayout'
+import { helpdeskChildren } from '@/features/helpdesk/routes'
 import { InventoryLayout } from '@/features/inventory/InventoryLayout'
 import { inventoryChildren } from '@/features/inventory/routes'
 import { ProductDetailPage } from '@/features/products/ProductDetailPage'
 import { ProductsPage } from '@/features/products/ProductsPage'
 import { TasksPage } from '@/features/tasks/TasksPage'
+import { HelpDeskSettingsPage } from '@/features/settings/HelpDeskSettingsPage'
 import { ModulesSettingsPage } from '@/features/settings/ModulesSettingsPage'
 import { PipelineSettingsPage } from '@/features/settings/PipelineSettingsPage'
 import { RoleDetailPage } from '@/features/settings/roles/RoleDetailPage'
@@ -98,6 +101,14 @@ export const settingsChildren: RouteObject[] = [
     ),
   },
   {
+    path: 'helpdesk',
+    element: (
+      <RequirePermission anyOf={[PERMISSIONS.helpdeskSettings]}>
+        <HelpDeskSettingsPage />
+      </RequirePermission>
+    ),
+  },
+  {
     path: '*',
     element: <EmptyState title="Settings page not found" description="Pick a section above." />,
   },
@@ -148,7 +159,7 @@ export const appChildren: RouteObject[] = [
   },
   { path: 'crm', element: <CrmLayout />, children: crmChildren },
   { path: 'inventory', element: <InventoryLayout />, children: inventoryChildren },
-  modulePage('helpdesk', 'HELPDESK'),
+  { path: 'helpdesk', element: <HelpDeskLayout />, children: helpdeskChildren },
   modulePage('hrms', 'HRMS'),
   {
     path: 'workflows',

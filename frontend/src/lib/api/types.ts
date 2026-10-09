@@ -212,7 +212,14 @@ export interface ProductView {
 
 /** Record types activities, tasks and documents attach to (server SubjectResolver codes). */
 export type SubjectType =
-  'PARTY' | 'PRODUCT' | 'LEAD' | 'OPPORTUNITY' | 'PURCHASE_ORDER' | 'SALES_ORDER'
+  | 'PARTY'
+  | 'PRODUCT'
+  | 'LEAD'
+  | 'OPPORTUNITY'
+  | 'PURCHASE_ORDER'
+  | 'SALES_ORDER'
+  | 'TICKET'
+  | 'KB_ARTICLE'
 
 export interface MemberRef {
   id: string
@@ -642,4 +649,156 @@ export interface InventoryOverview {
   purchaseOrdersAwaitingReceipt: number
   salesOrdersAwaitingFulfilment: number
   recentMovements: MovementView[]
+}
+
+export type TicketStatus = 'NEW' | 'OPEN' | 'PENDING' | 'RESOLVED' | 'CLOSED'
+export type TicketPriority = 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT'
+export type TicketChannel = 'PHONE' | 'EMAIL' | 'WALK_IN' | 'WEB' | 'OTHER'
+export type SlaState = 'ON_TRACK' | 'AT_RISK' | 'PAUSED' | 'MET' | 'BREACHED'
+export type MessageKind = 'PUBLIC_REPLY' | 'INTERNAL_NOTE' | 'CUSTOMER_MESSAGE'
+export type ArticleStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED'
+
+export interface CategoryRef {
+  id: string
+  name: string
+}
+
+export interface CategoryView extends CategoryRef {
+  description: string | null
+  defaultAssignee: MemberRef | null
+  position: number
+  archivedAt: string | null
+  version: number
+}
+
+export interface SlaPolicyView {
+  priority: TicketPriority
+  firstResponseMinutes: number
+  resolutionMinutes: number
+  version: number
+}
+
+export interface TicketProductRef {
+  id: string
+  sku: string
+  name: string
+}
+
+/** Any record the ticket concerns; `label` is null when the viewer may not read that type. */
+export interface LinkedRecord {
+  type: string
+  id: string
+  label: string | null
+}
+
+export interface SlaView {
+  firstResponseDueAt: string
+  firstRespondedAt: string | null
+  firstResponseState: SlaState
+  resolutionDueAt: string
+  resolvedAt: string | null
+  resolutionState: SlaState
+  pausedAt: string | null
+}
+
+export interface TicketView {
+  id: string
+  number: string
+  subject: string
+  description: string
+  requester: PartyRef | null
+  product: TicketProductRef | null
+  linked: LinkedRecord | null
+  category: CategoryRef | null
+  priority: TicketPriority
+  channel: TicketChannel
+  assignee: MemberRef | null
+  status: TicketStatus
+  sla: SlaView
+  resolutionNote: string | null
+  reopenCount: number
+  closedAt: string | null
+  createdBy: MemberRef | null
+  createdAt: string
+  updatedAt: string
+  version: number
+}
+
+export interface TicketSummary {
+  id: string
+  number: string
+  subject: string
+  requester: PartyRef | null
+  category: CategoryRef | null
+  priority: TicketPriority
+  status: TicketStatus
+  assignee: MemberRef | null
+  sla: SlaView
+  createdAt: string
+  updatedAt: string
+}
+
+export interface MessageView {
+  id: string
+  kind: MessageKind
+  body: string
+  author: MemberRef | null
+  /** The address a public reply was emailed to; null when no email was sent. */
+  emailedTo: string | null
+  createdAt: string
+}
+
+/** A posted message and the ticket as it is afterwards (status and SLA may have moved). */
+export interface MessagePosted {
+  message: MessageView
+  ticket: TicketView
+}
+
+export interface ArticleView {
+  id: string
+  title: string
+  body: string
+  category: CategoryRef | null
+  status: ArticleStatus
+  author: MemberRef | null
+  publishedAt: string | null
+  createdAt: string
+  updatedAt: string
+  version: number
+}
+
+export interface ArticleSummary {
+  id: string
+  title: string
+  /** The first 200 characters of the body, on one line. */
+  excerpt: string
+  category: CategoryRef | null
+  status: ArticleStatus
+  publishedAt: string | null
+  updatedAt: string
+}
+
+export interface TicketContext {
+  previousTickets: TicketSummary[]
+  possibleDuplicates: TicketSummary[]
+  suggestedArticles: ArticleSummary[]
+}
+
+/** D15. Rates are 0–1; null (or absent) when nothing in the window can be measured. */
+export interface HelpDeskDashboard {
+  openByStatus: Partial<Record<TicketStatus, number>>
+  openByPriority: Partial<Record<TicketPriority, number>>
+  unassigned: number
+  breached: number
+  atRisk: number
+  last30Days: {
+    created: number
+    resolved: number
+    averageFirstResponseMinutes?: number | null
+    medianFirstResponseMinutes?: number | null
+    averageResolutionMinutes?: number | null
+    firstResponseMetRate?: number | null
+    resolutionMetRate?: number | null
+    reopenRate?: number | null
+  }
 }
