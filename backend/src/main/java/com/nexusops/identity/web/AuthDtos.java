@@ -22,6 +22,10 @@ final class AuthDtos {
 
     record ResendVerificationRequest(@NotBlank @Size(max = 64) String workspace, @NotBlank @Size(max = 254) String email) {}
 
+    record PasswordResetRequest(@NotBlank @Size(max = 64) String workspace, @NotBlank @Size(max = 254) String email) {}
+
+    record PasswordResetConfirmation(@NotBlank @Size(max = 200) String token, @NotNull @Size(max = 128) String password) {}
+
     record LoginRequest(
             @NotBlank @Size(max = 64) String workspace,
             @NotBlank @Size(max = 254) String email,
