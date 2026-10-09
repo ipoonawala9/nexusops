@@ -68,6 +68,7 @@ function SlaCard({ ticket }: { ticket: TicketView }) {
 }
 
 function DetailsCard({ ticket: t }: { ticket: TicketView }) {
+  const can = useCan()
   return (
     <Card role="region" aria-label="Details">
       <CardHeader>
@@ -78,13 +79,15 @@ function DetailsCard({ ticket: t }: { ticket: TicketView }) {
         <dl className="grid grid-cols-[8rem_1fr] gap-x-3 gap-y-2">
           <dt className="text-muted-foreground">Requester</dt>
           <dd>
-            {t.requester ? (
+            {t.requester && can(PERMISSIONS.partyRead) ? (
               <Link
                 to={`/app/directory/${t.requester.id}`}
                 className="underline-offset-4 hover:underline"
               >
                 {t.requester.name}
               </Link>
+            ) : t.requester ? (
+              t.requester.name
             ) : (
               '—'
             )}

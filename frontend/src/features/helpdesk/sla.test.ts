@@ -51,4 +51,28 @@ describe('currentTarget', () => {
       state: 'MET',
     })
   })
+
+  it('keeps a late first response visible as breached while the ticket is open, as the breached filter does', () => {
+    const late = anSla({
+      firstRespondedAt: '2026-10-09T12:00:00Z',
+      firstResponseState: 'BREACHED',
+      resolutionState: 'ON_TRACK',
+    })
+    expect(currentTarget({ status: 'OPEN', sla: late })).toEqual({
+      target: 'First response',
+      state: 'BREACHED',
+      due: late.firstResponseDueAt,
+    })
+    // a breached resolution is the one to show; a resolved ticket shows its resolution
+    const both = anSla({ ...late, resolutionState: 'BREACHED' })
+    expect(currentTarget({ status: 'OPEN', sla: both })).toMatchObject({
+      target: 'Resolution',
+      state: 'BREACHED',
+    })
+    const done = anSla({ ...late, resolutionState: 'MET', resolvedAt: '2026-10-10T09:00:00Z' })
+    expect(currentTarget({ status: 'RESOLVED', sla: done })).toMatchObject({
+      target: 'Resolution',
+      state: 'MET',
+    })
+  })
 })

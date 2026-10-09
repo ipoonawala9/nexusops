@@ -209,6 +209,22 @@ describe('TicketsPage', () => {
     expect(within(dialog).getByLabelText('Related record')).toHaveAttribute('aria-invalid', 'true')
   })
 
+  it('offers no assignee to someone who may not assign, and lets the category route', async () => {
+    const { server, user } = setup('/app/helpdesk/tickets', [
+      'helpdesk.ticket.read',
+      'helpdesk.ticket.manage',
+      'directory.party.read',
+    ])
+    server.on('POST /helpdesk/tickets', { status: 201, body: aTicket({ id: 't-new' }) })
+    await user.click(await screen.findByRole('button', { name: 'New ticket' }))
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).queryByLabelText('Assignee')).not.toBeInTheDocument()
+    await fillRequired(dialog, user)
+    await user.click(within(dialog).getByRole('button', { name: 'Create ticket' }))
+    await waitFor(() => expect(server.callsTo('POST /helpdesk/tickets')).toHaveLength(1))
+    expect(server.callsTo('POST /helpdesk/tickets')[0].body).toMatchObject({ assigneeId: null })
+  })
+
   it('hides New ticket from readers', async () => {
     setup('/app/helpdesk/tickets', ['helpdesk.ticket.read'])
     await screen.findByRole('link', { name: 'T-00001' })

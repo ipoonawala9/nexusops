@@ -370,6 +370,13 @@ describe('TicketDetailPage', () => {
     expect(screen.queryByRole('button', { name: 'Resolve…' })).not.toBeInTheDocument()
   })
 
+  it('shows the requester as plain text to someone who may not open directory records', async () => {
+    setup(aTicket(), ['helpdesk.ticket.read'])
+    const details = await screen.findByRole('region', { name: 'Details' })
+    expect(within(details).getByText('Meera Iyer')).toBeInTheDocument()
+    expect(within(details).queryByRole('link', { name: 'Meera Iyer' })).not.toBeInTheDocument()
+  })
+
   it('starts a fresh reply when the user moves to another ticket', async () => {
     const { server, user } = setup()
     const other = aTicket({ id: 't-7', number: 'T-00007', subject: 'Printer jam again' })

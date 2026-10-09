@@ -19,14 +19,25 @@ export function formatRate(rate: number | null | undefined): string {
   return rate == null ? '—' : `${Math.round(rate * 100)}%`
 }
 
-/** The target that matters now: the first response until someone has replied, then the resolution. */
+/**
+ * The target that matters now: the first response until someone has replied, then the resolution. An open ticket
+ * whose first response came late stays badged as breached (as the list's breached filter counts it) until its
+ * resolution is the breached one.
+ */
 export function currentTarget(ticket: { status: TicketStatus; sla: SlaView }): {
   target: 'First response' | 'Resolution'
   state: SlaState
   due: string
 } {
   const { sla, status } = ticket
-  if (sla.firstRespondedAt === null && status !== 'RESOLVED' && status !== 'CLOSED')
-    return { target: 'First response', state: sla.firstResponseState, due: sla.firstResponseDueAt }
+  const open = status !== 'RESOLVED' && status !== 'CLOSED'
+  const firstResponse = {
+    target: 'First response' as const,
+    state: sla.firstResponseState,
+    due: sla.firstResponseDueAt,
+  }
+  if (open && sla.firstRespondedAt === null) return firstResponse
+  if (open && sla.firstResponseState === 'BREACHED' && sla.resolutionState !== 'BREACHED')
+    return firstResponse
   return { target: 'Resolution', state: sla.resolutionState, due: sla.resolutionDueAt }
 }

@@ -18,6 +18,7 @@ import { FormError } from '@/components/form/FormError'
 import { NativeSelect } from '@/components/form/NativeSelect'
 import { TextAreaField } from '@/components/form/TextAreaField'
 import { TextField } from '@/components/form/TextField'
+import { PERMISSIONS, useCan } from '@/features/auth/permissions'
 import { requiredText } from '@/features/auth/schemas'
 import { PartyPicker } from '@/features/records/PartyPicker'
 import { useApi } from '@/lib/api/ApiContext'
@@ -61,7 +62,10 @@ function splitLinked(value: string): { linkedType: string | null; linkedId: stri
     : { linkedType: value.slice(0, at), linkedId: value.slice(at + 1) }
 }
 
-/** Create a ticket (D3; may pick an assignee — blank uses the category's default) or edit its details. */
+/**
+ * Create a ticket (D3; someone who may assign can pick the assignee — blank uses the category's default) or edit its
+ * details.
+ */
 export function TicketFormDialog({
   ticket,
   requester,
@@ -75,6 +79,8 @@ export function TicketFormDialog({
 }) {
   const api = useApi()
   const queryClient = useQueryClient()
+  const can = useCan()
+  const canAssign = can(PERMISSIONS.ticketAssign)
   const [formError, setFormError] = useState<string | null>(null)
   const form = useForm<Values>({
     resolver: zodResolver(schema),
@@ -104,7 +110,9 @@ export function TicketFormDialog({
       categoryId: values.categoryId || null,
       priority: values.priority,
       channel: values.channel,
-      ...(ticket ? { version: ticket.version } : { assigneeId: values.assigneeId || null }),
+      ...(ticket
+        ? { version: ticket.version }
+        : { assigneeId: (canAssign && values.assigneeId) || null }),
     }
     try {
       const saved = ticket
@@ -199,7 +207,7 @@ export function TicketFormDialog({
               </NativeSelect>
             </Field>
           </div>
-          {!ticket && (
+          {!ticket && canAssign && (
             <AgentSelect
               id="field-assigneeId"
               label="Assignee"
