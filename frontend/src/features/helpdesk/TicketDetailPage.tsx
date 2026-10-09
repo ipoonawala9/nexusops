@@ -135,8 +135,13 @@ function DetailsCard({ ticket: t }: { ticket: TicketView }) {
   )
 }
 
+/** The route reuses this page when only :ticketId changes, so the body is keyed: a reply draft or an open dialog never follows the user to another ticket. */
 export function TicketDetailPage() {
   const { ticketId = '' } = useParams()
+  return <TicketDetail key={ticketId} ticketId={ticketId} />
+}
+
+function TicketDetail({ ticketId }: { ticketId: string }) {
   const api = useApi()
   const can = useCan()
   const queryClient = useQueryClient()

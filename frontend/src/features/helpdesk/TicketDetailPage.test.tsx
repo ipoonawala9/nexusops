@@ -369,4 +369,44 @@ describe('TicketDetailPage', () => {
     expect(screen.queryByRole('button', { name: 'Assign…' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Resolve…' })).not.toBeInTheDocument()
   })
+
+  it('starts a fresh reply when the user moves to another ticket', async () => {
+    const { server, user } = setup()
+    const other = aTicket({ id: 't-7', number: 'T-00007', subject: 'Printer jam again' })
+    server.on('GET /helpdesk/tickets/:id', (request) => ({
+      body: request.params.id === 't-7' ? other : aTicket(),
+    }))
+    await user.selectOptions(await screen.findByLabelText('Message type'), 'INTERNAL_NOTE')
+    await user.type(screen.getByLabelText('Message'), 'Draft for the first ticket')
+    const context = screen.getByRole('region', { name: 'Context' })
+    await user.click(await within(context).findByRole('link', { name: 'T-00007' }))
+    expect(
+      await screen.findByRole('heading', { name: 'T-00007 · Printer jam again' }),
+    ).toBeInTheDocument()
+    expect(screen.getByLabelText('Message')).toHaveValue('')
+    expect(screen.getByLabelText('Message type')).toHaveValue('PUBLIC_REPLY')
+  })
+
+  it('edits the ticket', async () => {
+    const { server, user } = setup()
+    const edit = await screen.findByRole('button', { name: 'Edit' })
+    const edited = aTicket({ subject: 'Printer jams on every page, again', version: 1 })
+    server
+      .on('PUT /helpdesk/tickets/:id', { body: edited })
+      .on('GET /helpdesk/tickets/:id', { body: edited })
+    await user.click(edit)
+    const dialog = await screen.findByRole('dialog')
+    const subject = await within(dialog).findByLabelText('Subject')
+    await user.clear(subject)
+    await user.type(subject, 'Printer jams on every page, again')
+    await user.click(within(dialog).getByRole('button', { name: 'Save changes' }))
+    await waitFor(() => expect(server.callsTo('PUT /helpdesk/tickets/:id')).toHaveLength(1))
+    expect(server.callsTo('PUT /helpdesk/tickets/:id')[0].body).toMatchObject({
+      subject: 'Printer jams on every page, again',
+      version: 0,
+    })
+    expect(
+      await screen.findByRole('heading', { name: 'T-00001 · Printer jams on every page, again' }),
+    ).toBeInTheDocument()
+  })
 })
