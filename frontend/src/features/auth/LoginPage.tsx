@@ -71,6 +71,11 @@ export function LoginPage() {
           type="password"
           autoComplete="current-password"
         />
+        <p className="text-sm">
+          <Link to="/forgot-password" className="underline">
+            Forgot password?
+          </Link>
+        </p>
         <FormError message={error} />
         <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
           Sign in
