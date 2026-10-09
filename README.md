@@ -8,6 +8,7 @@ one permission model, one operational event stream — with modular business cap
 - Canonical data model (Phase 4): `docs/superpowers/specs/2026-10-06-canonical-data-model-design.md`
 - CRM (Phase 5): `docs/superpowers/specs/2026-10-07-crm-mvp-design.md`
 - Inventory (Phase 6): `docs/superpowers/specs/2026-10-08-inventory-mvp-design.md`
+- HelpDesk (Phase 7): `docs/superpowers/specs/2026-10-09-helpdesk-mvp-design.md`
 - Decisions: `docs/decisions/`
 - Implementation plans: `docs/superpowers/plans/`
 
@@ -76,6 +77,24 @@ Switch the module on under **Settings → Modules**; every Inventory permission 
 - **Reorder:** per product and warehouse, a minimum and maximum with a preferred supplier. Suggestions explain
   themselves ("12 available, 0 on order, below the minimum of 20; 38 used in the last 30 days …") and become draft
   purchase orders a person reviews and places.
+
+## HelpDesk (Phase 7)
+Switch the module on under **Settings → Modules**. Every HelpDesk permission switches off with it (ADR-0011).
+
+- **Tickets** (`T-00001`, per workspace) belong to a requester from the directory. They can name a catalog product and
+  any related record you may read, such as a sales order, a deal or a lead. A category routes a new ticket to its
+  default assignee, and assigning someone else emails them.
+- **SLA** targets per priority live under **Settings → HelpDesk** (defaults: urgent 1 h / 4 h, high 4 h / 1 d, normal
+  8 h / 2 d, low 1 d / 5 d). The first public reply is the first response. Time *waiting on the customer* doesn't
+  count towards resolution, and reopening restarts the resolution clock (ADR-0012).
+- **Conversation**: a reply to the customer is emailed to the requester's address. An internal note stays inside the
+  team. Logging a customer message moves a waiting ticket back to open. Messages can't be edited or deleted.
+- **Context** next to each ticket: the requester, their previous tickets, possible duplicates and suggested
+  knowledge-base articles, found with PostgreSQL full-text search. An article can be inserted into a reply.
+- **Knowledge base**: draft → published (suggested on tickets) → archived.
+- **Dashboard**: open tickets by status and priority, unassigned, breached and at-risk tickets, and for the last 30
+  days the first-response and resolution times, the SLA met rates and the reopen rate.
+- Party, Customer 360 and product pages show their tickets. Tickets have tasks, files and activity like any record.
 
 ## Try the API (local)
 ```bash
