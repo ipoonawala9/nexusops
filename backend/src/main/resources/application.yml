@@ -69,6 +69,7 @@ nexusops:
       verify-email: { capacity: 5, window: 1m }
       resend-verification: { capacity: 5, window: 1m }
       password-reset-request: { capacity: 5, window: 1m }
+      password-reset-account: { capacity: 3, window: 15m }
       password-reset: { capacity: 10, window: 1m }
       invitation-accept: { capacity: 5, window: 1m }
       invitation-preview: { capacity: 20, window: 1m }

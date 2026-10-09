@@ -87,7 +87,8 @@ class AuthController {
     @PostMapping("/password-reset/request")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     void requestPasswordReset(@Valid @RequestBody PasswordResetRequest request, HttpServletRequest http) {
-        rateLimits.checkPublic("password-reset-request", http.getRemoteAddr());
+        rateLimits.checkPasswordResetRequest(http.getRemoteAddr(), Slug.tryNormalize(request.workspace()).orElse(null),
+                Emails.tryNormalize(request.email()).orElse(null));
         passwordReset.request(request.workspace(), request.email());
     }
 

@@ -57,7 +57,12 @@ public final class RateLimitKeys {
 
     /** Per-account login bucket: workspace + email, normalized and hashed together. */
     public static String account(String rawWorkspace, String rawEmail) {
-        return "rl:acct:" + sha256(normalize(rawWorkspace) + "\n" + normalize(rawEmail)) + ":login";
+        return account(rawWorkspace, rawEmail, "login");
+    }
+
+    /** Per-account bucket for {@code purpose} (e.g. "login", "password-reset"): workspace + email, hashed together. */
+    public static String account(String rawWorkspace, String rawEmail, String purpose) {
+        return "rl:acct:" + sha256(normalize(rawWorkspace) + "\n" + normalize(rawEmail)) + ":" + purpose;
     }
 
     /** Per-account platform login bucket, keyed by the canonical email (the platform has no workspace). */
