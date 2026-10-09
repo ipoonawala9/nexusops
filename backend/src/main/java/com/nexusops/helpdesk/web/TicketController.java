@@ -1,13 +1,17 @@
 package com.nexusops.helpdesk.web;
 
 import com.nexusops.helpdesk.AgentView;
+import com.nexusops.helpdesk.MessagePosted;
+import com.nexusops.helpdesk.MessageView;
 import com.nexusops.helpdesk.Priority;
+import com.nexusops.helpdesk.TicketMessageService;
 import com.nexusops.helpdesk.TicketQuery;
 import com.nexusops.helpdesk.TicketService;
 import com.nexusops.helpdesk.TicketStatus;
 import com.nexusops.helpdesk.TicketSummary;
 import com.nexusops.helpdesk.TicketView;
 import com.nexusops.helpdesk.web.HelpDeskDtos.AssignRequest;
+import com.nexusops.helpdesk.web.HelpDeskDtos.MessageRequest;
 import com.nexusops.helpdesk.web.HelpDeskDtos.StatusRequest;
 import com.nexusops.helpdesk.web.HelpDeskDtos.TicketRequest;
 import com.nexusops.shared.web.PageResponse;
@@ -30,9 +34,11 @@ import org.springframework.web.bind.annotation.RestController;
 class TicketController {
 
     private final TicketService tickets;
+    private final TicketMessageService messages;
 
-    TicketController(TicketService tickets) {
+    TicketController(TicketService tickets, TicketMessageService messages) {
         this.tickets = tickets;
+        this.messages = messages;
     }
 
     @GetMapping("/tickets")
@@ -76,6 +82,19 @@ class TicketController {
     @PreAuthorize("hasAuthority('helpdesk.ticket.resolve')")
     TicketView status(@PathVariable UUID id, @RequestBody StatusRequest request) {
         return tickets.changeStatus(id, request.status(), request.note(), request.version());
+    }
+
+    @GetMapping("/tickets/{id}/messages")
+    @PreAuthorize("hasAuthority('helpdesk.ticket.read')")
+    List<MessageView> messages(@PathVariable UUID id) {
+        return messages.list(id);
+    }
+
+    @PostMapping("/tickets/{id}/messages")
+    @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAuthority('helpdesk.ticket.manage')")
+    MessagePosted post(@PathVariable UUID id, @RequestBody MessageRequest request) {
+        return messages.post(id, request.command());
     }
 
     @GetMapping("/agents")
