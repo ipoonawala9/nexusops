@@ -74,6 +74,7 @@ export function ArticlesPage() {
             <Label htmlFor="article-q">Search articles</Label>
             <Input
               id="article-q"
+              key={q}
               name="q"
               defaultValue={q}
               placeholder="Words in the title or text"

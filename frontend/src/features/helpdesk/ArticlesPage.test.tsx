@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react'
+import { act, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { fakeServer } from '@/test/fakeServer'
 import { signedIn, testProfile } from '@/test/fixtures'
@@ -45,8 +45,10 @@ describe('ArticlesPage', () => {
   })
 
   it("shows the URL's search words in the search box", async () => {
-    setup('/app/helpdesk/articles?q=jam')
+    const { router } = setup('/app/helpdesk/articles?q=jam')
     expect(await screen.findByLabelText('Search articles')).toHaveValue('jam')
+    await act(() => router.navigate('/app/helpdesk/articles?q=toner'))
+    await waitFor(() => expect(screen.getByLabelText('Search articles')).toHaveValue('toner'))
   })
 
   it('searches and filters by status and category', async () => {
