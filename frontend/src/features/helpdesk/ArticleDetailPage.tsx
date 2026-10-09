@@ -123,6 +123,7 @@ function ArticleDetail({ articleId }: { articleId: string }) {
                 <Button
                   variant="outline"
                   size="sm"
+                  disabled={busy}
                   onClick={() => {
                     setError(null)
                     setDialog('archive')

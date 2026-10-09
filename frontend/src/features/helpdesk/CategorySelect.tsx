@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { describedBy, Field } from '@/components/form/Field'
 import { NativeSelect } from '@/components/form/NativeSelect'
+import { PERMISSIONS, useCan } from '@/features/auth/permissions'
 import { useApi } from '@/lib/api/ApiContext'
 import type { CategoryRef, CategoryView } from '@/lib/api/types'
 
@@ -23,9 +24,11 @@ export function CategorySelect({
   blankLabel?: string
 }) {
   const api = useApi()
+  const canList = useCan()(PERMISSIONS.ticketRead)
   const categories = useQuery({
     queryKey: ['helpdesk', 'categories', false],
     queryFn: () => api.get<CategoryView[]>('/helpdesk/categories'),
+    enabled: canList,
   })
   const options = categories.data ?? []
   const extra = current && !options.some((c) => c.id === current.id) ? [current] : []
@@ -43,7 +46,7 @@ export function CategorySelect({
         <option value="">{blankLabel}</option>
         {extra.map((c) => (
           <option key={c.id} value={c.id}>
-            {c.name} (archived)
+            {canList ? `${c.name} (archived)` : c.name}
           </option>
         ))}
         {options.map((c) => (

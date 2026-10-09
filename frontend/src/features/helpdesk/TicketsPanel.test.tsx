@@ -16,18 +16,21 @@ import {
 } from '@/test/records'
 import { renderApp } from '@/test/renderApp'
 
-function partyPage(modules: string[]) {
+function partyPage(modules: string[], ticketsReply?: { status: number; body: unknown }) {
   const server = fakeServer()
   signedIn(server, testProfile({ modules }))
     .on('GET /parties/:id', { body: aParty() })
     .on('GET /parties', { body: pageOf([]) })
     .on('GET /activities', { body: pageOf([]) })
     .on('GET /documents', { body: [] })
-    .on('GET /helpdesk/tickets', {
-      body: pageOf([
-        aTicketSummary({ status: 'RESOLVED', requester: { id: 'p-acme', name: 'Acme' } }),
-      ]),
-    })
+    .on(
+      'GET /helpdesk/tickets',
+      ticketsReply ?? {
+        body: pageOf([
+          aTicketSummary({ status: 'RESOLVED', requester: { id: 'p-acme', name: 'Acme' } }),
+        ]),
+      },
+    )
     .on('GET /helpdesk/categories', { body: [aCategory()] })
     .on('GET /helpdesk/agents', { body: [anAgent()] })
     .on('GET /products', { body: pageOf([aProduct()]) })
@@ -68,6 +71,14 @@ describe('TicketsPanel', () => {
         subject: 'Late delivery',
       }),
     )
+  })
+
+  it('says so when the tickets cannot be loaded', async () => {
+    partyPage(['HELPDESK'], { status: 500, body: { title: 'Server error' } })
+    const panel = await screen.findByRole('region', { name: 'Tickets' })
+    expect(await within(panel).findByText("Couldn't load tickets.")).toBeInTheDocument()
+    expect(within(panel).getByRole('button', { name: 'Retry' })).toBeInTheDocument()
+    expect(within(panel).queryByText('No tickets yet.')).not.toBeInTheDocument()
   })
 
   it('is absent without HelpDesk', async () => {

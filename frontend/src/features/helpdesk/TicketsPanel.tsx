@@ -54,7 +54,16 @@ export function TicketsPanel({
         )}
       </CardHeader>
       <CardContent className="text-sm">
-        {items.length === 0 ? (
+        {tickets.isPending ? (
+          <p className="text-muted-foreground">Loading tickets…</p>
+        ) : tickets.isError ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-muted-foreground">Couldn&apos;t load tickets.</p>
+            <Button size="sm" variant="outline" onClick={() => void tickets.refetch()}>
+              Retry
+            </Button>
+          </div>
+        ) : items.length === 0 ? (
           <p className="text-muted-foreground">No tickets yet.</p>
         ) : (
           <ul className="space-y-1">

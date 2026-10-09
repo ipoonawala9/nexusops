@@ -44,6 +44,11 @@ describe('ArticlesPage', () => {
     )
   })
 
+  it("shows the URL's search words in the search box", async () => {
+    setup('/app/helpdesk/articles?q=jam')
+    expect(await screen.findByLabelText('Search articles')).toHaveValue('jam')
+  })
+
   it('searches and filters by status and category', async () => {
     const { server, user } = setup()
     await screen.findByRole('link', { name: 'Clearing a paper jam' })
@@ -78,6 +83,16 @@ describe('ArticlesPage', () => {
       categoryId: 'c-general',
     })
     await waitFor(() => expect(router.state.location.pathname).toBe('/app/helpdesk/articles/a-new'))
+  })
+
+  it('does not ask for categories when the editor may not read tickets', async () => {
+    const { server, user } = setup('/app/helpdesk/articles', [
+      'helpdesk.article.read',
+      'helpdesk.article.manage',
+    ])
+    await user.click(await screen.findByRole('button', { name: 'New article' }))
+    await screen.findByRole('dialog')
+    expect(server.callsTo('GET /helpdesk/categories')).toHaveLength(0)
   })
 
   it('needs a title and a text', async () => {
