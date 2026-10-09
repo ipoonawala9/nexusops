@@ -3,7 +3,9 @@ package com.nexusops.helpdesk;
 import com.nexusops.shared.TenantContext;
 import com.nexusops.shared.Text;
 import com.nexusops.shared.web.ApiProblem;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -46,6 +48,59 @@ class HelpDeskQueries {
         List<UUID> ids = jdbc.queryForList("select t.id from tickets t where " + where
                 + " order by t.created_at desc, t.id desc limit :limit offset :offset", params, UUID.class);
         return new Page(ids, total == null ? 0 : total);
+    }
+
+    DashboardView dashboard() {
+        MapSqlParameterSource params = new MapSqlParameterSource("tenant", TenantContext.requireTenantId());
+        Map<TicketStatus, Long> byStatus = new EnumMap<>(TicketStatus.class);
+        for (TicketStatus s : List.of(TicketStatus.NEW, TicketStatus.OPEN, TicketStatus.PENDING)) {
+            byStatus.put(s, 0L);
+        }
+        Map<Priority, Long> byPriority = new EnumMap<>(Priority.class);
+        for (Priority p : Priority.values()) {
+            byPriority.put(p, 0L);
+        }
+        jdbc.query("select t.status, t.priority, count(*) as n from tickets t where t.tenant_id = :tenant and "
+                + OPEN_STATUSES + " group by t.status, t.priority", params, rs -> {
+                    long n = rs.getLong("n");
+                    byStatus.merge(TicketStatus.valueOf(rs.getString("status")), n, Long::sum);
+                    byPriority.merge(Priority.valueOf(rs.getString("priority")), n, Long::sum);
+                });
+        Map<String, Object> open = jdbc.queryForMap("select "
+                + "count(*) filter (where t.assignee_id is null) as unassigned, "
+                + "count(*) filter (where " + BREACHED + ") as breached, "
+                + "count(*) filter (where " + AT_RISK + ") as at_risk "
+                + "from tickets t where t.tenant_id = :tenant and " + OPEN_STATUSES, params);
+        Map<String, Object> w = jdbc.queryForMap("""
+                select count(*) as created,
+                       count(*) filter (where t.resolved_at is not null) as resolved,
+                       avg(extract(epoch from t.first_responded_at - t.created_at) / 60) as avg_first,
+                       percentile_cont(0.5) within group (order by extract(epoch from t.first_responded_at - t.created_at) / 60)
+                           filter (where t.first_responded_at is not null) as median_first,
+                       avg(extract(epoch from t.resolved_at - t.created_at) / 60) as avg_resolution,
+                       avg(case when t.first_responded_at <= t.first_response_due_at then 1.0 else 0.0 end)
+                           filter (where t.first_responded_at is not null) as first_met,
+                       avg(case when t.resolved_at <= t.resolution_due_at then 1.0 else 0.0 end)
+                           filter (where t.resolved_at is not null) as resolution_met,
+                       avg(case when t.reopen_count > 0 then 1.0 else 0.0 end)
+                           filter (where t.resolved_at is not null or t.reopen_count > 0) as reopen_rate
+                from tickets t
+                where t.tenant_id = :tenant and t.created_at >= now() - interval '30 days'
+                """, params);
+        return new DashboardView(byStatus, byPriority, number(open.get("unassigned")), number(open.get("breached")),
+                number(open.get("at_risk")), new DashboardView.Last30Days(number(w.get("created")),
+                        number(w.get("resolved")), decimal(w.get("avg_first")), decimal(w.get("median_first")),
+                        decimal(w.get("avg_resolution")), decimal(w.get("first_met")), decimal(w.get("resolution_met")),
+                        decimal(w.get("reopen_rate"))));
+    }
+
+    private static long number(Object value) {
+        return value == null ? 0 : ((Number) value).longValue();
+    }
+
+    /** Rounded to 2 decimals; null stays null (nothing to measure). */
+    private static Double decimal(Object value) {
+        return value == null ? null : Math.round(((Number) value).doubleValue() * 100) / 100.0;
     }
 
     private static String where(TicketQuery q, UUID currentUser, MapSqlParameterSource params) {

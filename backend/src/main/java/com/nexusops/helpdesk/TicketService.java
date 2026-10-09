@@ -110,6 +110,12 @@ public class TicketService {
     }
 
     @Transactional(readOnly = true)
+    public DashboardView dashboard() {
+        TenantContext.requireTenantId();
+        return queries.dashboard();
+    }
+
+    @Transactional(readOnly = true)
     public PageResponse<TicketSummary> list(TicketQuery query, Integer page, Integer size) {
         TenantContext.requireTenantId();
         Pageable paging = Paging.of(page, size);

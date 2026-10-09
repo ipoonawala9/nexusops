@@ -359,4 +359,13 @@ class TicketApiIT extends IntegrationTestSupport {
     private static java.sql.Timestamp ts(Instant instant) {
         return java.sql.Timestamp.from(instant);
     }
+
+    @Test
+    void theRequestersTimelineIncludesTheTicketsActivity() throws Exception {
+        UUID id = ticket("");
+        owner.post("/api/v1/activities", "{\"subjectType\":\"TICKET\",\"subjectId\":\"" + id
+                + "\",\"type\":\"CALL\",\"summary\":\"Called Meera back\"}").andExpect(status().isCreated());
+        owner.get("/api/v1/activities?subjectType=PARTY&subjectId=" + customer + "&includeRelated=true")
+                .andExpect(jsonPath("$.items[*].summary").value(Matchers.hasItem("Called Meera back")));
+    }
 }
