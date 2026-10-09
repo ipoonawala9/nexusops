@@ -11,7 +11,7 @@ interface Message {
 /** Polls Mailpit for the newest email to `to` containing `${path}?token=…` and returns the decoded token. */
 export async function tokenFromEmail(
   to: string,
-  path: '/verify-email' | '/invite/accept',
+  path: '/verify-email' | '/invite/accept' | '/reset-password',
 ): Promise<string> {
   const pattern = new RegExp(`${path.replace(/\//g, '\\/')}\\?token=([^\\s"'<&]+)`)
   const deadline = Date.now() + 30_000

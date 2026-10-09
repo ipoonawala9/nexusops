@@ -3,10 +3,13 @@ package com.nexusops.identity.web;
 import com.nexusops.identity.application.AuthResult;
 import com.nexusops.identity.application.ClientInfo;
 import com.nexusops.identity.application.LoginService;
+import com.nexusops.identity.application.PasswordResetService;
 import com.nexusops.identity.application.RefreshService;
 import com.nexusops.identity.application.SignupCommand;
 import com.nexusops.identity.application.SignupService;
 import com.nexusops.identity.web.AuthDtos.LoginRequest;
+import com.nexusops.identity.web.AuthDtos.PasswordResetConfirmation;
+import com.nexusops.identity.web.AuthDtos.PasswordResetRequest;
 import com.nexusops.identity.web.AuthDtos.ResendVerificationRequest;
 import com.nexusops.identity.web.AuthDtos.SignupRequest;
 import com.nexusops.identity.web.AuthDtos.SignupResponse;
@@ -42,14 +45,16 @@ import org.springframework.web.bind.annotation.RestController;
 class AuthController {
 
     private final SignupService signup;
+    private final PasswordResetService passwordReset;
     private final LoginService login;
     private final RefreshService refresh;
     private final OriginGuard originGuard;
     private final RateLimits rateLimits;
 
-    AuthController(SignupService signup, LoginService login, RefreshService refresh, OriginGuard originGuard,
-            RateLimits rateLimits) {
+    AuthController(SignupService signup, PasswordResetService passwordReset, LoginService login,
+            RefreshService refresh, OriginGuard originGuard, RateLimits rateLimits) {
         this.signup = signup;
+        this.passwordReset = passwordReset;
         this.login = login;
         this.refresh = refresh;
         this.originGuard = originGuard;
@@ -77,6 +82,21 @@ class AuthController {
     void resendVerification(@Valid @RequestBody ResendVerificationRequest request, HttpServletRequest http) {
         rateLimits.checkPublic("resend-verification", http.getRemoteAddr());
         signup.resendVerification(request.workspace(), request.email());
+    }
+
+    @PostMapping("/password-reset/request")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void requestPasswordReset(@Valid @RequestBody PasswordResetRequest request, HttpServletRequest http) {
+        rateLimits.checkPasswordResetRequest(http.getRemoteAddr(), Slug.tryNormalize(request.workspace()).orElse(null),
+                Emails.tryNormalize(request.email()).orElse(null));
+        passwordReset.request(request.workspace(), request.email());
+    }
+
+    @PostMapping("/password-reset")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void resetPassword(@Valid @RequestBody PasswordResetConfirmation request, HttpServletRequest http) {
+        rateLimits.checkPublic("password-reset", http.getRemoteAddr());
+        passwordReset.reset(request.token(), request.password());
     }
 
     @PostMapping("/login")

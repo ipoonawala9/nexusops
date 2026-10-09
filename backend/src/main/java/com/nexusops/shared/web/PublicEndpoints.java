@@ -15,6 +15,8 @@ public final class PublicEndpoints {
             "POST /api/v1/auth/signup",
             "POST /api/v1/auth/verify-email",
             "POST /api/v1/auth/resend-verification",
+            "POST /api/v1/auth/password-reset/request",
+            "POST /api/v1/auth/password-reset",
             "POST /api/v1/auth/login",
             "POST /api/v1/auth/refresh",
             "POST /api/v1/auth/logout",

@@ -25,6 +25,9 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
         "nexusops.rate-limits.rules.login-account.capacity=3",
         "nexusops.rate-limits.rules.login-workspace.capacity=5",
         "nexusops.rate-limits.rules.verify-email.capacity=2",
+        "nexusops.rate-limits.rules.password-reset-request.capacity=2",
+        "nexusops.rate-limits.rules.password-reset.capacity=2",
+        "nexusops.rate-limits.rules.password-reset-account.capacity=2",
         "nexusops.rate-limits.rules.api.capacity=5"
 })
 class RateLimitIT extends IntegrationTestSupport {
@@ -120,6 +123,37 @@ class RateLimitIT extends IntegrationTestSupport {
         }
         mvc.perform(from(post("/api/v1/auth/verify-email"), ip).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"token\":\"garbage\"}")).andExpect(status().isTooManyRequests());
+    }
+
+    @Test
+    void passwordResetRoutesAreLimitedPerIp() throws Exception {
+        String ip = uniqueIp();
+        for (int i = 0; i < 2; i++) {
+            mvc.perform(from(post("/api/v1/auth/password-reset/request"), ip).contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"workspace\":\"nobody\",\"email\":\"a@b.test\"}")).andExpect(status().isNoContent());
+            mvc.perform(from(post("/api/v1/auth/password-reset"), ip).contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"token\":\"garbage\",\"password\":\"x\"}")).andExpect(status().isBadRequest());
+        }
+        mvc.perform(from(post("/api/v1/auth/password-reset/request"), ip).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"workspace\":\"nobody\",\"email\":\"a@b.test\"}")).andExpect(status().isTooManyRequests());
+        mvc.perform(from(post("/api/v1/auth/password-reset"), ip).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"token\":\"garbage\",\"password\":\"x\"}")).andExpect(status().isTooManyRequests());
+    }
+
+    @Test
+    void passwordResetRequestsAreAlsoLimitedPerAccountAcrossIps() throws Exception {
+        String account = "{\"workspace\":\"victim-ws\",\"email\":\"victim@b.test\"}";
+        for (int i = 0; i < 2; i++) {
+            mvc.perform(from(post("/api/v1/auth/password-reset/request"), uniqueIp())
+                    .contentType(MediaType.APPLICATION_JSON).content(account)).andExpect(status().isNoContent());
+        }
+        // a third request for the same account is refused even from a fresh IP, and padded/cased variants share it
+        mvc.perform(from(post("/api/v1/auth/password-reset/request"), uniqueIp()).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"workspace\":\" Victim-WS \",\"email\":\"VICTIM@b.test \"}"))
+                .andExpect(status().isTooManyRequests());
+        // another account is unaffected
+        mvc.perform(from(post("/api/v1/auth/password-reset/request"), uniqueIp()).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"workspace\":\"victim-ws\",\"email\":\"other@b.test\"}")).andExpect(status().isNoContent());
     }
 
     @Test

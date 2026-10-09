@@ -44,6 +44,19 @@ public class RateLimits {
         decide(() -> limiter.peek(RateLimitKeys.workspace("login-workspace", canonicalWorkspace), rule("login-workspace")));
     }
 
+    /**
+     * Password-reset request: per IP, then per account (workspace+email) so requests spread over many IPs can't flood an
+     * inbox or keep invalidating the link its owner is about to use. Every request is charged, whether or not the account
+     * exists, so the limit reveals nothing. {@code null} canonical values charge only the IP bucket.
+     */
+    public void checkPasswordResetRequest(String clientIp, String canonicalWorkspace, String canonicalEmail) {
+        enforce(RateLimitKeys.ip("password-reset-request", clientIp), rule("password-reset-request"));
+        if (canonicalWorkspace == null || canonicalEmail == null) {
+            return;
+        }
+        enforce(RateLimitKeys.account(canonicalWorkspace, canonicalEmail, "password-reset"), rule("password-reset-account"));
+    }
+
     /** After a failed authentication: charge one token to the workspace bucket. Successful logins never consume. */
     public void recordLoginFailure(String canonicalWorkspace, String canonicalEmail) {
         if (canonicalWorkspace == null || canonicalEmail == null) {

@@ -62,6 +62,18 @@ describe('LoginPage', () => {
     expect(await screen.findByText(/we've sent a new link/i)).toBeInTheDocument()
   })
 
+  it('links to the forgot-password page', async () => {
+    setup()
+    expect(await screen.findByRole('link', { name: 'Forgot password?' })).toHaveAttribute(
+      'href',
+      '/forgot-password',
+    )
+    expect(screen.getByRole('link', { name: 'Create a workspace' })).toHaveAttribute(
+      'href',
+      '/signup',
+    )
+  })
+
   it('pre-fills the workspace and email from the link', async () => {
     setup('/login?workspace=acme&email=ada%40acme.test')
     expect(await screen.findByLabelText('Workspace URL')).toHaveValue('acme')

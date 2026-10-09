@@ -102,6 +102,12 @@ public class User extends TenantOwnedEntity {
         lastLoginAt = now;
     }
 
+    /** Replaces the credential and bumps token_version, so every access token issued before it stops working. */
+    public void changePassword(String newPasswordHash) {
+        passwordHash = newPasswordHash;
+        bumpTokenVersion();
+    }
+
     public void bumpTokenVersion() {
         tokenVersion++;
         updatedAt = Instant.now();

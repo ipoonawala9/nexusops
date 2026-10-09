@@ -193,7 +193,9 @@ export function ReorderPage() {
                         {s.product.name}
                       </TableCell>
                       <TableCell>{s.warehouse.code}</TableCell>
-                      <TableCell className="max-w-md text-sm">{s.explanation}</TableCell>
+                      <TableCell className="max-w-md min-w-64 text-sm whitespace-normal">
+                        {s.explanation}
+                      </TableCell>
                       <TableCell>
                         {s.supplier?.name ?? (
                           <span className="text-muted-foreground">No supplier</span>

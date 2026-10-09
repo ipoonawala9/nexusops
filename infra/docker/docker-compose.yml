@@ -50,6 +50,8 @@ services:
       MAIL_HOST: mailpit
       MAIL_PORT: "1025"
       APP_BASE_URL: ${APP_BASE_URL:-http://localhost:3000}
+      # `make e2e` raises this: its journeys share one client IP behind nginx (default matches application.yml)
+      NEXUSOPS_RATELIMITS_RULES_REFRESH_CAPACITY: ${REFRESH_RATE_LIMIT:-30}
     ports:
       - "127.0.0.1:${BACKEND_PORT:-8081}:8080"
     depends_on:

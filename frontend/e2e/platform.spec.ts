@@ -21,7 +21,7 @@ test('a platform admin suspends and reactivates a workspace', async ({
   const ops = await opsContext.newPage()
   await ops.goto('/platform/login')
   await ops.getByLabel('Email').fill(OPERATOR.email)
-  await ops.getByLabel('Password').fill(OPERATOR.password)
+  await ops.getByLabel('Password', { exact: true }).fill(OPERATOR.password)
   // The server rejects a code whose step isn't after the last one used (replay). A CI retry may sign in again within
   // the same 30 s step, so a retry uses the next step's code (still inside the server's ±1 step window).
   const at = Date.now() + (testInfo.retry > 0 ? 30_000 : 0)
