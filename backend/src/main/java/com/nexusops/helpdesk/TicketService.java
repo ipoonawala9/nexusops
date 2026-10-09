@@ -27,6 +27,7 @@ import com.nexusops.shared.web.ApiProblem;
 import com.nexusops.shared.web.PageResponse;
 import com.nexusops.shared.web.Paging;
 import com.nexusops.tenancy.TenantDirectory;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collection;
@@ -264,7 +265,8 @@ public class TicketService {
         TicketCategory category = c.categoryId() == null ? null : categories.resolve(c.categoryId(), "categoryId");
         UUID explicitAssignee = c.assigneeId() != null && current == null ? activeMember(c.assigneeId(), "assigneeId") : null;
         ProductBrief product = null;
-        if (c.productId() != null) {
+        boolean productChanged = current == null || !Objects.equals(c.productId(), current.getProductId());
+        if (c.productId() != null && productChanged) {
             if (!CurrentAuthorities.has(CatalogPermissions.PRODUCT_READ)) {
                 throw ApiProblem.forbidden(FORBIDDEN);
             }
@@ -273,7 +275,9 @@ public class TicketService {
                 throw ApiProblem.badRequestField("productId", "Choose a product in this workspace.");
             }
         }
-        if (c.linkedType() != null) {
+        boolean linkedChanged = current == null || !Objects.equals(c.linkedType(), current.getLinkedType())
+                || !Objects.equals(c.linkedId(), current.getLinkedId());
+        if (c.linkedType() != null && linkedChanged) {
             if (!subjects.canRead(c.linkedType())) {
                 throw ApiProblem.forbidden(FORBIDDEN);
             }
@@ -296,7 +300,7 @@ public class TicketService {
         if (category != null && (current == null || !category.getId().equals(current.getCategoryId()))) {
             CategoryService.requireNotArchived(category);
         }
-        if (product != null && product.archived() && (current == null || !product.id().equals(current.getProductId()))) {
+        if (product != null && product.archived()) {
             throw ApiProblem.conflict(ARCHIVED);
         }
         if (requester != null && requester.archived()) {
@@ -304,12 +308,20 @@ public class TicketService {
         }
         return new Draft(subject, description, c.requesterId(), c.productId(), c.linkedType(), c.linkedId(),
                 c.categoryId(), priority, channel,
-                explicitAssignee != null ? explicitAssignee : category == null ? null : category.getDefaultAssigneeId());
+                explicitAssignee != null ? explicitAssignee : routedAssignee(category, current));
     }
 
     private void apply(Ticket ticket, Draft d) {
         ticket.applyDetails(d.subject(), d.description(), d.requesterId(), d.productId(), d.linkedType(), d.linkedId(),
                 d.categoryId(), d.channel());
+    }
+
+    /** The category's default assignee for a new ticket, unless that member has been deactivated since. */
+    private UUID routedAssignee(TicketCategory category, Ticket current) {
+        if (current != null || category == null || category.getDefaultAssigneeId() == null) {
+            return null;
+        }
+        return members.findActive(category.getDefaultAssigneeId()).map(Members.Member::id).orElse(null);
     }
 
     private UUID activeMember(UUID id, String field) {
@@ -347,13 +359,16 @@ public class TicketService {
     }
 
     SlaView sla(Ticket t, Instant now) {
-        SlaTargets targets = policies.targets(t.getPriority());
+        // The target lengths come from the ticket's own stored spans, as in HelpDeskQueries.AT_RISK, so a later edit
+        // of the policy doesn't change how existing tickets are classified.
         boolean paused = t.getStatus() == TicketStatus.PENDING;
+        int firstResponseMinutes = (int) Duration.between(t.getCreatedAt(), t.getFirstResponseDueAt()).toMinutes();
+        int resolutionMinutes = (int) ((Duration.between(t.getResolutionClockStartedAt(), t.getResolutionDueAt())
+                .toSeconds() - t.getPausedSeconds()) / 60);
         return new SlaView(t.getFirstResponseDueAt(), t.getFirstRespondedAt(),
-                SlaClock.state(t.getFirstResponseDueAt(), t.getFirstRespondedAt(), now, targets.firstResponseMinutes(),
-                        null),
+                SlaClock.state(t.getFirstResponseDueAt(), t.getFirstRespondedAt(), now, firstResponseMinutes, null),
                 t.getResolutionDueAt(), t.getResolvedAt(),
-                SlaClock.state(t.getResolutionDueAt(), t.getResolvedAt(), now, targets.resolutionMinutes(),
+                SlaClock.state(t.getResolutionDueAt(), t.getResolvedAt(), now, resolutionMinutes,
                         paused ? t.getPausedAt() : null),
                 t.getPausedAt());
     }

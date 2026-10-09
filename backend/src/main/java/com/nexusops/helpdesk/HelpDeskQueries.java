@@ -10,16 +10,17 @@ import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Component;
 
 /**
- * SQL read models for HelpDesk. The SLA fragments mirror SlaClock (D8) — keep the two in step: breached = a running
- * clock past its due time, or a pause that began after the due time; at risk = running, not breached, and less than
- * 25 % of the target left.
+ * SQL read models for HelpDesk. The SLA fragments mirror SlaClock (D8) — keep the two in step: breached = a first
+ * response that is overdue or came late, a running clock past its due time, or a pause that began after the due time;
+ * at risk = running, not breached, and less than 25 % of the target left.
  */
 @Component
 class HelpDeskQueries {
 
     static final String OPEN_STATUSES = "t.status in ('NEW', 'OPEN', 'PENDING')";
 
-    static final String FIRST_RESPONSE_BREACHED = "(t.first_responded_at is null and t.first_response_due_at < now())";
+    static final String FIRST_RESPONSE_BREACHED = "((t.first_responded_at is null and t.first_response_due_at < now()) "
+            + "or (t.first_responded_at is not null and t.first_responded_at > t.first_response_due_at))";
     static final String RESOLUTION_BREACHED = "((t.paused_at is null and t.resolution_due_at < now()) "
             + "or (t.paused_at is not null and t.paused_at > t.resolution_due_at))";
     static final String BREACHED = "(" + OPEN_STATUSES + " and (" + FIRST_RESPONSE_BREACHED + " or "

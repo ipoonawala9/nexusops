@@ -305,6 +305,57 @@ class TicketApiIT extends IntegrationTestSupport {
         blind.post("/api/v1/helpdesk/tickets", body("")).andExpect(status().isForbidden());
     }
 
+    @Test
+    void editingATicketDoesNotRequireReadAccessToItsUnchangedProduct() throws Exception {
+        UUID product = Api.id(owner.post("/api/v1/products", "{\"sku\":\"PRN-2\",\"name\":\"Inkjet printer\"}"));
+        UUID id = ticket(",\"productId\":\"" + product + "\"");
+        UUID role = TestRoles.create(mvc, owner.session(), "Agent without catalog", "helpdesk.ticket.read",
+                "helpdesk.ticket.manage", "directory.party.read");
+        Api agent = Api.login(mvc, members.create(ws.tenantId(), Set.of(role)));
+        agent.put("/api/v1/helpdesk/tickets/" + id, "{\"subject\":\"Printer jams again\",\"description\":\"x\","
+                + "\"requesterId\":\"" + customer + "\",\"productId\":\"" + product + "\",\"version\":0}")
+                .andExpect(status().isOk()).andExpect(jsonPath("$.subject").value("Printer jams again"));
+        owner.get("/api/v1/helpdesk/tickets/" + id).andExpect(jsonPath("$.product.sku").value("PRN-2"));
+        // choosing a different product still needs the permission
+        UUID other = Api.id(owner.post("/api/v1/products", "{\"sku\":\"PRN-3\",\"name\":\"Plotter\"}"));
+        agent.put("/api/v1/helpdesk/tickets/" + id, "{\"subject\":\"Printer jams again\",\"description\":\"x\","
+                + "\"requesterId\":\"" + customer + "\",\"productId\":\"" + other + "\",\"version\":1}")
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void aLateFirstResponseCountsAsBreachedInTheListToo() throws Exception {
+        UUID id = ticket("");
+        jdbc().update("update tickets set first_responded_at = now(), first_response_due_at = now() - interval '5 minutes' "
+                + "where id = ?", id);
+        owner.get("/api/v1/helpdesk/tickets/" + id).andExpect(jsonPath("$.sla.firstResponseState").value("BREACHED"));
+        owner.get("/api/v1/helpdesk/tickets?sla=breached").andExpect(jsonPath("$.items[*].id")
+                .value(Matchers.contains(id.toString())));
+    }
+
+    @Test
+    void slaStatesUseTheTicketsOwnTargetsNotTheCurrentPolicy() throws Exception {
+        UUID id = ticket("");
+        jdbc().update("update sla_policies set first_response_minutes = 1, resolution_minutes = 1 "
+                + "where priority = 'NORMAL'");
+        owner.get("/api/v1/helpdesk/tickets/" + id).andExpect(jsonPath("$.sla.firstResponseState").value("ON_TRACK"))
+                .andExpect(jsonPath("$.sla.resolutionState").value("ON_TRACK"));
+    }
+
+    @Test
+    void aDeactivatedDefaultAssigneeIsSkippedWhenRouting() throws Exception {
+        var agent = members.create(ws.tenantId(), Set.of());
+        UUID agentId = jdbc().queryForObject("select id from users where email = ?", UUID.class, agent.email());
+        UUID billing = TestHelpDesk.category(owner, "Billing");
+        owner.put("/api/v1/helpdesk/categories/" + billing, "{\"name\":\"Billing\",\"defaultAssigneeId\":\"" + agentId
+                + "\",\"version\":0}").andExpect(status().isOk());
+        jdbc().update("update users set status = 'DISABLED' where id = ?", agentId);
+        owner.post("/api/v1/helpdesk/tickets", body(",\"categoryId\":\"" + billing + "\"")).andExpect(status().isCreated())
+                .andExpect(jsonPath("$.assignee").doesNotExist())
+                .andExpect(jsonPath("$.status").value("NEW"));
+        assertThat(mail.sentTo(agent.email())).isEmpty();
+    }
+
     private static java.sql.Timestamp ts(Instant instant) {
         return java.sql.Timestamp.from(instant);
     }
