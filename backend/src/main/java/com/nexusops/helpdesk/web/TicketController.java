@@ -4,6 +4,7 @@ import com.nexusops.helpdesk.AgentView;
 import com.nexusops.helpdesk.MessagePosted;
 import com.nexusops.helpdesk.MessageView;
 import com.nexusops.helpdesk.Priority;
+import com.nexusops.helpdesk.TicketContext;
 import com.nexusops.helpdesk.TicketMessageService;
 import com.nexusops.helpdesk.TicketQuery;
 import com.nexusops.helpdesk.TicketService;
@@ -57,6 +58,12 @@ class TicketController {
     @PreAuthorize("hasAuthority('helpdesk.ticket.read')")
     TicketView get(@PathVariable UUID id) {
         return tickets.get(id);
+    }
+
+    @GetMapping("/tickets/{id}/context")
+    @PreAuthorize("hasAuthority('helpdesk.ticket.read')")
+    TicketContext context(@PathVariable UUID id) {
+        return tickets.context(id);
     }
 
     @PostMapping("/tickets")

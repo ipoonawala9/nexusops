@@ -67,6 +67,8 @@ public class TicketService {
     private final CategoryService categories;
     private final SlaPolicyService policies;
     private final HelpDeskQueries queries;
+    private final HelpDeskSearch search;
+    private final ArticleService articles;
     private final PartyService parties;
     private final ProductService products;
     private final Subjects subjects;
@@ -77,7 +79,8 @@ public class TicketService {
     private final String appBaseUrl;
 
     TicketService(TicketRepository tickets, NumberSequences numbers, CategoryService categories,
-            SlaPolicyService policies, HelpDeskQueries queries, PartyService parties, ProductService products,
+            SlaPolicyService policies, HelpDeskQueries queries, HelpDeskSearch search, ArticleService articles,
+            PartyService parties, ProductService products,
             Subjects subjects, Members members, TenantDirectory tenants, AuditService audit,
             ApplicationEventPublisher events, @Value("${nexusops.app.base-url}") String appBaseUrl) {
         this.tickets = tickets;
@@ -85,6 +88,8 @@ public class TicketService {
         this.categories = categories;
         this.policies = policies;
         this.queries = queries;
+        this.search = search;
+        this.articles = articles;
         this.parties = parties;
         this.products = products;
         this.subjects = subjects;
@@ -110,10 +115,26 @@ public class TicketService {
         Pageable paging = Paging.of(page, size);
         HelpDeskQueries.Page found = queries.ticketPage(query, TenantContext.userId().orElse(null),
                 paging.getPageSize(), paging.getOffset());
-        Map<UUID, Ticket> byId = tickets.findAllById(found.ids()).stream()
+        return new PageResponse<>(ticketsInOrder(found.ids()), paging.getPageNumber(), paging.getPageSize(),
+                found.total());
+    }
+
+    /** What sits next to a ticket for the agent: the requester's history, likely duplicates, helpful articles (D12). */
+    @Transactional(readOnly = true)
+    public TicketContext context(UUID id) {
+        Ticket ticket = find(id);
+        List<TicketSummary> previous = ticketsInOrder(search.previousTickets(ticket.getRequesterId(), id, 10));
+        List<TicketSummary> duplicates = ticketsInOrder(search.duplicateCandidates(ticket, 5));
+        List<ArticleSummary> suggested = CurrentAuthorities.has(HelpDeskPermissions.ARTICLE_READ)
+                ? articles.summaries(search.suggestedArticles(ticket.getSubject() + " " + ticket.getDescription(), 5))
+                : List.of();
+        return new TicketContext(previous, duplicates, suggested);
+    }
+
+    private List<TicketSummary> ticketsInOrder(List<UUID> ids) {
+        Map<UUID, Ticket> byId = tickets.findAllById(ids).stream()
                 .collect(Collectors.toMap(Ticket::getId, Function.identity()));
-        List<Ticket> ordered = found.ids().stream().map(byId::get).filter(Objects::nonNull).toList();
-        return new PageResponse<>(summaries(ordered), paging.getPageNumber(), paging.getPageSize(), found.total());
+        return summaries(ids.stream().map(byId::get).filter(Objects::nonNull).toList());
     }
 
     @Transactional

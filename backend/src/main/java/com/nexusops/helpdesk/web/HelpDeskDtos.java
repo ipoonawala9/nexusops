@@ -1,5 +1,6 @@
 package com.nexusops.helpdesk.web;
 
+import com.nexusops.helpdesk.ArticleCommand;
 import com.nexusops.helpdesk.CategoryCommand;
 import com.nexusops.helpdesk.Channel;
 import com.nexusops.helpdesk.MessageCommand;
@@ -43,6 +44,12 @@ final class HelpDeskDtos {
     record MessageRequest(MessageKind kind, String body) {
         MessageCommand command() {
             return new MessageCommand(kind, body);
+        }
+    }
+
+    record ArticleRequest(String title, String body, UUID categoryId, Long version) {
+        ArticleCommand command() {
+            return new ArticleCommand(title, body, categoryId);
         }
     }
 }
