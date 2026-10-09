@@ -25,6 +25,7 @@ export function CatalogProductPicker({
 }) {
   const api = useApi()
   const [search, setSearch] = useState('')
+  const [picked, setPicked] = useState<TicketProductRef | null>(null)
   const products = useQuery({
     queryKey: ['catalog-product-picker', search.trim()],
     queryFn: () =>
@@ -35,7 +36,10 @@ export function CatalogProductPicker({
     sku: p.sku,
     name: p.name,
   }))
-  const all = current && !options.some((p) => p.id === current.id) ? [current, ...options] : options
+  const pinned = [current, picked].filter(
+    (p, i, list): p is TicketProductRef => !!p && list.findIndex((o) => o?.id === p.id) === i,
+  )
+  const all = [...pinned, ...options.filter((p) => !pinned.some((o) => o.id === p.id))]
   const searchId = `${id}-search`
   return (
     <div className="grid gap-3 sm:grid-cols-2">
@@ -54,9 +58,11 @@ export function CatalogProductPicker({
           value={value}
           aria-invalid={error ? true : undefined}
           aria-describedby={describedBy(id, error)}
-          onChange={(e) =>
-            onChange(e.target.value, all.find((p) => p.id === e.target.value) ?? null)
-          }
+          onChange={(e) => {
+            const chosen = all.find((p) => p.id === e.target.value) ?? null
+            setPicked(chosen)
+            onChange(e.target.value, chosen)
+          }}
         >
           <option value="">None</option>
           {all.map((p) => (

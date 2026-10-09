@@ -145,6 +145,19 @@ describe('TicketsPage', () => {
     await waitFor(() => expect(router.state.location.pathname).toBe('/app/helpdesk/tickets/t-new'))
   })
 
+  it('keeps the chosen product selected when the product search changes', async () => {
+    const { server, user } = setup()
+    await user.click(await screen.findByRole('button', { name: 'New ticket' }))
+    const dialog = await screen.findByRole('dialog')
+    await user.selectOptions(within(dialog).getByLabelText('Product'), 'pr-widget')
+    server.on('GET /products', { body: pageOf([]) })
+    await user.type(within(dialog).getByLabelText('Find product'), 'zzz')
+    await waitFor(() => expect(server.callsTo('GET /products').at(-1)?.query.get('q')).toBe('zzz'))
+    const select = within(dialog).getByLabelText('Product')
+    expect(select).toHaveValue('pr-widget')
+    expect(within(select).getByRole('option', { name: /Widget/ })).toBeInTheDocument()
+  })
+
   it('leaves optional fields empty as nulls and defaults to normal priority by phone', async () => {
     const { server, user } = setup()
     server.on('POST /helpdesk/tickets', { status: 201, body: aTicket({ id: 't-new' }) })

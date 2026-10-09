@@ -109,7 +109,13 @@ export function TicketsPage() {
         <form onSubmit={onSearch} className="flex items-end gap-2" role="search">
           <div className="space-y-1.5">
             <Label htmlFor="ticket-q">Search tickets</Label>
-            <Input id="ticket-q" name="q" defaultValue={q} placeholder="Number or subject" />
+            <Input
+              key={q}
+              id="ticket-q"
+              name="q"
+              defaultValue={q}
+              placeholder="Number or subject"
+            />
           </div>
           <Button type="submit" variant="outline">
             Search
